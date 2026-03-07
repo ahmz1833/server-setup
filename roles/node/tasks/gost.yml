@@ -40,7 +40,7 @@
     src: "/tmp/gost-{{ node_gost_version }}/gost"
     dest: "/usr/local/bin/gost"
     mode: '0755'
-  when: gost_check.rc != 0
+  when: node_gost_check.rc != 0
 
 - name: Create gost configuration directory
   ansible.builtin.file:

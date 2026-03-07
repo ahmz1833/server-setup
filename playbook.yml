@@ -2,11 +2,15 @@
 - name: Provision Core Setup
   hosts: all
   become: true
+  tags:
+    - core
   roles:
     - role: core
 
 - name: Provision Node Services
   hosts: all
   become: true
+  tags:
+    - node
   roles:
     - role: node
