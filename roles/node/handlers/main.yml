@@ -11,7 +11,8 @@
     state: restarted
     daemon_reload: true
 
-- name: Restart nginx
+- name: Restart node_exporter
   ansible.builtin.systemd:
-    name: nginx
+    name: node_exporter
     state: restarted
+    daemon_reload: true

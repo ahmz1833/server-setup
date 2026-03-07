@@ -22,3 +22,9 @@
   tags:
     - node-docker
   when: node_docker_enabled
+
+- name: Node Services - Node Exporter Installation and Configuration
+  ansible.builtin.import_tasks: exporter.yml
+  tags:
+    - node-exporter
+  when: node_exporter_install

@@ -1,0 +1,57 @@
+---
+- name: Create node_exporter system user
+  ansible.builtin.user:
+    name: node_exporter
+    system: true
+    shell: /sbin/nologin
+    state: present
+
+- name: Check if node_exporter is installed
+  ansible.builtin.command: node_exporter --version
+  register: node_exporter_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Download node_exporter archive locally
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz
+    dest: "/tmp/node_exporter-{{ node_exporter_version }}-linux-amd64.tar.gz"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: node_exporter_check.rc != 0
+
+- name: Extract node_exporter archive locally
+  ansible.builtin.unarchive:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/"
+    remote_src: true
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: node_exporter_check.rc != 0
+
+- name: Copy node_exporter binary to target node
+  ansible.builtin.copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+    dest: "/usr/local/bin/node_exporter"
+    mode: '0755'
+    owner: root
+    group: root
+  when: node_exporter_check.rc != 0
+
+- name: Configure node_exporter systemd service
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    mode: '0644'
+  notify: Restart node_exporter
+
+- name: Manage node_exporter Service State
+  ansible.builtin.systemd:
+    name: node_exporter
+    state: "{{ 'started' if node_exporter_enabled | default(false) else 'stopped' }}"
+    enabled: "{{ node_exporter_enabled | default(false) }}"
+    daemon_reload: true

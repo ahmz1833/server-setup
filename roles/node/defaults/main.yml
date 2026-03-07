@@ -38,4 +38,6 @@ node_gost_config: {}
 
 node_docker_enabled: true
 
-node_nginx_enabled: true
+node_exporter_install: true
+node_exporter_enabled: false
+node_exporter_version: "1.10.2"
