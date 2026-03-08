@@ -1,0 +1,20 @@
+# Managed by Ansible
+
+log_format json_analytics escape=json
+  '{'
+    '"time_local":"$time_iso8601",'
+    '"remote_addr":"$remote_addr",'
+    '"remote_user":"$remote_user",'
+    '"request_method":"$request_method",'
+    '"request_uri":"$request_uri",'
+    '"status":"$status",'
+    '"body_bytes_sent":"$body_bytes_sent",'
+    '"request_time":"$request_time",'
+    '"upstream_response_time":"$upstream_response_time",'
+    '"upstream_connect_time":"$upstream_connect_time",'
+    '"upstream_header_time":"$upstream_header_time",'
+    '"http_referer":"$http_referer",'
+    '"http_user_agent":"$http_user_agent",'
+    '"server_name":"$server_name",'
+    '"endpoint":"$endpoint_name"'
+  '}';

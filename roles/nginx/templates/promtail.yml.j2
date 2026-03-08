@@ -1,0 +1,49 @@
+server:
+  http_listen_port: {{ nginx_promtail_port }}
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/promtail-positions.yaml
+
+clients:
+  - url: {% if nginx_promtail_loki_url | default('') | length > 0 %}{{ nginx_promtail_loki_url }}{% else %}http://127.0.0.1:{{ nginx_dummy_metric_port }}/loki/api/v1/push{% endif %}
+
+scrape_configs:
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          __path__: /var/log/nginx/*_access.log
+    pipeline_stages:
+      - match:
+          selector: '{job="nginx"}'
+          stages:
+            - json:
+                expressions:
+                  status: status
+                  method: request_method
+                  domain: server_name
+                  request_time: request_time
+                  client_ip: remote_addr
+                  endpoint: endpoint
+            - labels:
+                status:
+                method:
+                domain:
+                client_ip:
+                endpoint:
+            - metrics:
+                nginx_http_requests_total:
+                  type: Counter
+                  description: "Total HTTP requests mapped by domain, endpoint, and status"
+                  source: status
+                  config:
+                    action: inc
+                nginx_http_request_duration_seconds:
+                  type: Histogram
+                  description: "Histogram of request durations"
+                  source: request_time
+                  config:
+                    buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]

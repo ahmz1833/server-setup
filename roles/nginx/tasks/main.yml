@@ -1,0 +1,39 @@
+---
+- name: Install Nginx and WAF
+  ansible.builtin.import_tasks: install.yml
+  tags:
+    - nginx-install
+    - nginx-waf
+
+- name: Configure WAF
+  ansible.builtin.import_tasks: waf.yml
+  tags:
+    - nginx-waf
+  when: nginx_waf_install
+
+- name: Configure Nginx
+  ansible.builtin.import_tasks: config.yml
+  tags:
+    - nginx-config
+
+- name: Configure Metrics
+  ansible.builtin.import_tasks: metrics.yml
+  tags:
+    - nginx-metrics
+  when: nginx_exporter_install
+
+- name: Configure Error Pages
+  ansible.builtin.import_tasks: error_pages.yml
+  tags:
+    - nginx-error-pages
+
+- name: Configure Sites
+  ansible.builtin.import_tasks: sites.yml
+  tags:
+    - nginx-sites
+
+- name: Configure Promtail
+  ansible.builtin.import_tasks: promtail.yml
+  tags:
+    - nginx-promtail
+  when: nginx_promtail_install

@@ -1,0 +1,7 @@
+# Managed by Ansible
+
+{% if nginx_enable_rate_limit %}
+# $binary_remote_addr uses the real IP translated by the realip module
+limit_req_zone $binary_remote_addr zone={{ nginx_rate_limit_zone_name }}:{{ nginx_rate_limit_zone_size }} rate={{ nginx_rate_limit_rate }};
+limit_req_status 503;
+{% endif %}

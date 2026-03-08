@@ -1,0 +1,34 @@
+---
+- name: Verify nginx config
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  listen: Reload nginx
+
+- name: Reload nginx service
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+  listen: Reload nginx
+
+- name: Verify nginx config for restart
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  listen: Restart nginx
+
+- name: Restart nginx service
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted
+  listen: Restart nginx
+
+- name: Restart nginx_exporter
+  ansible.builtin.systemd:
+    name: nginx_exporter
+    state: restarted
+  when: nginx_exporter_enabled
+
+- name: Restart promtail
+  ansible.builtin.systemd:
+    name: promtail
+    state: restarted
+  when: nginx_promtail_enabled

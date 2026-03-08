@@ -1,0 +1,109 @@
+---
+- name: Ensure modsecurity directory exists
+  ansible.builtin.file:
+    path: /etc/modsecurity
+    state: directory
+    mode: '0755'
+
+- name: Check modsecurity recommended config
+  ansible.builtin.stat:
+    path: /etc/modsecurity/modsecurity.conf-recommended
+  register: nginx_modsec_rec_conf
+
+- name: Download modsecurity recommended config locally
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/modsecurity.conf-recommended
+    dest: /tmp/modsecurity.conf-recommended
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: not nginx_modsec_rec_conf.stat.exists
+
+- name: Copy modsecurity recommended config to target
+  ansible.builtin.copy:
+    src: /tmp/modsecurity.conf-recommended
+    dest: /etc/modsecurity/modsecurity.conf-recommended
+    mode: '0644'
+    owner: root
+    group: root
+  when: not nginx_modsec_rec_conf.stat.exists
+
+- name: Check unicode mapping file
+  ansible.builtin.stat:
+    path: /etc/modsecurity/unicode.mapping
+  register: nginx_unicode_mapping_check
+
+- name: Download unicode mapping file locally
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/unicode.mapping
+    dest: /tmp/unicode.mapping
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: not nginx_unicode_mapping_check.stat.exists
+
+- name: Copy unicode mapping file to target
+  ansible.builtin.copy:
+    src: /tmp/unicode.mapping
+    dest: /etc/modsecurity/unicode.mapping
+    mode: '0644'
+    owner: root
+    group: root
+  when: not nginx_unicode_mapping_check.stat.exists
+
+- name: Initialize modsecurity config
+  ansible.builtin.copy:
+    src: /etc/modsecurity/modsecurity.conf-recommended
+    dest: /etc/modsecurity/modsecurity.conf
+    remote_src: true
+    force: false
+    mode: '0644'
+  notify: Reload nginx
+
+- name: Configure global modsecurity settings
+  ansible.builtin.lineinfile:
+    path: /etc/modsecurity/modsecurity.conf
+    regexp: '^\s*(#\s*)?{{ item.key }}\s+.*$'
+    line: '{{ item.key }} {{ item.value }}'
+  loop: "{{ nginx_waf_global_settings | dict2items }}"
+  notify: Reload nginx
+
+- name: Check crs setup example
+  ansible.builtin.stat:
+    path: /etc/modsecurity/crs-setup.conf
+  register: nginx_crs_setup_check
+
+- name: Download CRS setup config locally
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/coreruleset/coreruleset/v3.3/master/crs-setup.conf.example
+    dest: /tmp/crs-setup.conf
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: not nginx_crs_setup_check.stat.exists
+
+- name: Copy CRS setup config to target
+  ansible.builtin.copy:
+    src: /tmp/crs-setup.conf
+    dest: /etc/modsecurity/crs-setup.conf
+    mode: '0644'
+    owner: root
+    group: root
+  when: not nginx_crs_setup_check.stat.exists
+  notify: Reload nginx
+
+- name: Create nginx modsec directory
+  ansible.builtin.file:
+    path: /etc/nginx/modsec
+    state: directory
+    mode: '0755'
+
+- name: Configure modsec main inclusion
+  ansible.builtin.template:
+    src: modsec_main.conf.j2
+    dest: /etc/nginx/modsec/main.conf
+    mode: '0644'
+  notify: Reload nginx

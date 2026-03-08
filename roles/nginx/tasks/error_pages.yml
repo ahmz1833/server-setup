@@ -1,0 +1,57 @@
+---
+- name: Ensure global error pages directory exists
+  ansible.builtin.file:
+    path: /var/www/nginx/errors/global
+    state: directory
+    mode: '0755'
+
+- name: Generate default global error pages
+  ansible.builtin.template:
+    src: default_error.html.j2
+    dest: "/var/www/nginx/errors/global/{{ item.key }}.html"
+    mode: '0644'
+  loop: "{{ nginx_standard_error_codes | dict2items }}"
+  vars:
+    error_code: "{{ item.key }}"
+    error_message: "{{ item.value }}"
+
+- name: Build flat list of custom error pages to generate
+  ansible.builtin.set_fact:
+    nginx_custom_error_pages_to_build: >-
+      {%- set res = [] -%}
+      {%- for site in nginx_sites if site.custom_errors is defined -%}
+        {%- for cerr in site.custom_errors -%}
+          {%- set matched_codes = nginx_standard_error_codes.keys() | map('string') | select('match', cerr.match) | list -%}
+          {%- for code in matched_codes -%}
+            {%- set _ = res.append({
+              'domain': site.domain,
+              'code': code,
+              'msg': nginx_standard_error_codes[code|int],
+              'template': cerr.template
+            }) -%}
+          {%- endfor -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ res | to_json }}
+
+- name: Parse custom error pages JSON
+  ansible.builtin.set_fact:
+    nginx_custom_error_pages_list: "{{ nginx_custom_error_pages_to_build | from_json }}"
+
+- name: Ensure per-site custom error directories exist
+  ansible.builtin.file:
+    path: "/var/www/nginx/errors/{{ item.domain }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ nginx_sites }}"
+  when: item.custom_errors is defined
+
+- name: Generate custom error pages per site
+  ansible.builtin.template:
+    src: "{{ item.template }}"
+    dest: "/var/www/nginx/errors/{{ item.domain }}/{{ item.code }}.html"
+    mode: '0644'
+  loop: "{{ nginx_custom_error_pages_list }}"
+  vars:
+    error_code: "{{ item.code }}"
+    error_message: "{{ item.msg }}"

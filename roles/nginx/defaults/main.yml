@@ -1,0 +1,107 @@
+---
+nginx_sites: []
+nginx_remove_default_site: true
+
+# Global Nginx Tuning
+nginx_worker_connections: 65535
+nginx_logrotate_days: 14
+
+# Gzip Compression
+nginx_enable_gzip: true
+nginx_gzip_comp_level: 5
+nginx_gzip_min_length: 256
+
+# Rate Limiting & Real IP
+nginx_enable_rate_limit: true
+nginx_rate_limit_zone_name: "global_limit"
+nginx_rate_limit_zone_size: "10m"
+nginx_rate_limit_rate: "10r/s"
+nginx_real_ip_header: "X-Forwarded-For"
+nginx_trusted_proxies:
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"
+  # Cloudflare
+  - "173.245.48.0/20"
+  - "103.21.244.0/22"
+  - "103.22.200.0/22"
+  - "103.31.4.0/22"
+  - "141.101.64.0/18"
+  - "108.162.192.0/18"
+  - "190.93.240.0/20"
+  - "188.114.96.0/20"
+  - "197.234.240.0/22"
+  - "198.41.128.0/17"
+  - "162.158.0.0/15"
+  - "104.16.0.0/13"
+  - "104.24.0.0/14"
+  - "172.64.0.0/13"
+  - "131.0.72.0/22"
+  # Arvan
+  - "185.143.232.0/22"
+  - "188.229.116.16/30"
+  - "94.101.182.0/27"
+  - "2.144.3.128/28"
+  - "37.32.16.0/27"
+  - "37.32.17.0/27"
+  - "37.32.18.0/27"
+  - "37.32.19.0/27"
+  - "185.215.232.0/22"
+  - "178.131.120.48/28"
+
+# Global Security Settings
+nginx_server_tokens: "off"
+nginx_ssl_protocols: "TLSv1.2 TLSv1.3"
+nginx_ssl_ciphers: >-
+  ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:
+  ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:
+  ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:
+  DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
+nginx_ssl_prefer_server_ciphers: "on"
+nginx_ssl_session_cache: "shared:SSL:10m"
+nginx_ssl_session_timeout: "1d"
+nginx_ssl_session_tickets: "off"
+
+nginx_header_x_frame_options: "SAMEORIGIN"
+nginx_header_x_xss_protection: "1; mode=block"
+nginx_header_referrer_policy: "strict-origin-when-cross-origin"
+nginx_header_permissions_policy: ""
+nginx_header_csp: ""
+
+nginx_waf_install: true
+nginx_waf_global_settings:
+  SecRuleEngine: "On"
+  SecRequestBodyAccess: "On"
+  SecRequestBodyLimit: "13107200"
+  SecRequestBodyNoFilesLimit: "131072"
+  SecResponseBodyAccess: "On"
+  SecResponseBodyLimit: "524288"
+
+# Exporter Configuration
+nginx_exporter_install: true
+nginx_exporter_enabled: true
+nginx_exporter_version: "1.5.1"
+nginx_exporter_port: 9113
+nginx_dummy_metric_port: 29182
+
+# Promtail Configuration (Log to Metrics)
+nginx_promtail_install: true
+nginx_promtail_enabled: false
+nginx_promtail_version: "3.6.7"
+nginx_promtail_port: 9080
+nginx_promtail_loki_url: ""
+
+# Standard HTTP Error Codes mapping
+nginx_standard_error_codes:
+  400: "Bad Request"
+  401: "Unauthorized"
+  403: "Forbidden"
+  404: "Not Found"
+  405: "Method Not Allowed"
+  408: "Request Timeout"
+  413: "Payload Too Large"
+  429: "Too Many Requests"
+  500: "Internal Server Error"
+  502: "Bad Gateway"
+  503: "Service Unavailable"
+  504: "Gateway Timeout"

@@ -1,0 +1,23 @@
+---
+- name: Generate site configs
+  ansible.builtin.template:
+    src: site.conf.j2
+    dest: "/etc/nginx/sites-available/{{ item.domain }}.conf"
+    mode: '0644'
+  loop: "{{ nginx_sites }}"
+  notify: Reload nginx
+
+- name: Manage site links
+  ansible.builtin.file:
+    src: "{{ '/etc/nginx/sites-available/' ~ item.domain ~ '.conf' if item.enabled | default(true) else omit }}"
+    dest: "/etc/nginx/sites-enabled/{{ item.domain }}.conf"
+    state: "{{ 'link' if item.enabled | default(true) else 'absent' }}"
+    mode: '0644'
+  loop: "{{ nginx_sites }}"
+  notify: Reload nginx
+
+- name: Ensure nginx service
+  ansible.builtin.systemd:
+    name: nginx
+    state: started
+    enabled: true

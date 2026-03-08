@@ -1,0 +1,293 @@
+# Managed by Ansible
+
+{% set site_custom_codes = [] %}
+{% if item.custom_errors is defined %}
+  {% for cerr in item.custom_errors %}
+    {% set matched_codes = nginx_standard_error_codes.keys() | map('string') | select('match', cerr.match) | list %}
+    {% for code in matched_codes %}
+      {% if code not in site_custom_codes %}
+        {% set _ = site_custom_codes.append(code) %}
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+{% endif %}
+
+{% set fallback_codes = [] %}
+{% for code in nginx_standard_error_codes.keys() | map('string') %}
+  {% if code not in site_custom_codes %}
+    {% set _ = fallback_codes.append(code) %}
+  {% endif %}
+{% endfor %}
+
+{% if item.ssl_enabled | default(false) %}
+server {
+    listen 80;
+    {% if core_enable_ipv6 | default(false) %}
+    listen [::]:80;
+    {% endif %}
+    server_name {{ item.domain }};
+    
+    server_tokens {{ item.server_tokens | default(nginx_server_tokens) }};
+    set $endpoint_name "redirect";
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    {% if core_enable_ipv6 | default(false) %}
+    listen [::]:443 ssl http2;
+    {% endif %}
+    server_name {{ item.domain }};
+
+    server_tokens {{ item.server_tokens | default(nginx_server_tokens) }};
+    
+    # Initialize endpoint tracking for metrics
+    set $endpoint_name "root";
+
+    access_log /var/log/nginx/{{ item.domain }}_access.log json_analytics;
+    error_log /var/log/nginx/{{ item.domain }}_error.log warn;
+
+    ssl_certificate {{ item.ssl_cert }};
+    ssl_certificate_key {{ item.ssl_key }};
+
+    ssl_protocols {{ item.ssl_protocols | default(nginx_ssl_protocols) }};
+    ssl_prefer_server_ciphers {{ item.ssl_prefer_server_ciphers | default(nginx_ssl_prefer_server_ciphers) }};
+    ssl_ciphers '{{ item.ssl_ciphers | default(nginx_ssl_ciphers) }}';
+    ssl_session_cache {{ item.ssl_session_cache | default(nginx_ssl_session_cache) }};
+    ssl_session_timeout {{ item.ssl_session_timeout | default(nginx_ssl_session_timeout) }};
+    ssl_session_tickets {{ item.ssl_session_tickets | default(nginx_ssl_session_tickets) }};
+
+    {% set opt_x_frame = item.header_x_frame_options | default(nginx_header_x_frame_options) %}
+    {% if opt_x_frame %}
+    add_header X-Frame-Options "{{ opt_x_frame }}" always;
+    {% endif %}
+
+    {% set opt_x_xss = item.header_x_xss_protection | default(nginx_header_x_xss_protection) %}
+    {% if opt_x_xss %}
+    add_header X-XSS-Protection "{{ opt_x_xss }}" always;
+    {% endif %}
+
+    add_header X-Content-Type-Options "nosniff" always;
+
+    {% set opt_ref_pol = item.header_referrer_policy | default(nginx_header_referrer_policy) %}
+    {% if opt_ref_pol %}
+    add_header Referrer-Policy "{{ opt_ref_pol }}" always;
+    {% endif %}
+
+    {% set opt_perm_pol = item.header_permissions_policy | default(nginx_header_permissions_policy) %}
+    {% if opt_perm_pol %}
+    add_header Permissions-Policy "{{ opt_perm_pol }}" always;
+    {% endif %}
+
+    {% set opt_csp = item.header_csp | default(nginx_header_csp) %}
+    {% if opt_csp %}
+    add_header Content-Security-Policy "{{ opt_csp }}" always;
+    {% endif %}
+
+    {% if item.waf_enabled | default(false) %}
+    modsecurity on;
+    modsecurity_rules_file /etc/nginx/modsec/main.conf;
+    {% if item.waf_config is defined or item.waf_extra_rules is defined %}
+    modsecurity_rules '
+        {% for k, v in (item.waf_config | default({})).items() %}
+        {{ k }} {{ v }}
+        {% endfor %}
+{{ item.waf_extra_rules | default('') | indent(8, true) }}
+    ';
+    {% endif %}
+    {% endif %}
+
+    {% for k, v in (item.nginx_config | default({})).items() %}
+    {{ k }} {{ v }};
+    {% endfor %}
+
+    {{ item.extra_config | default('') | indent(4) }}
+
+    # Error Pages Configuration
+    {% for code in site_custom_codes %}
+    error_page {{ code }} /site_errors/{{ code }}.html;
+    {% endfor %}
+    {% for code in fallback_codes %}
+    error_page {{ code }} /global_errors/{{ code }}.html;
+    {% endfor %}
+
+    {% if site_custom_codes | length > 0 %}
+    location /site_errors/ {
+        internal;
+        alias /var/www/nginx/errors/{{ item.domain }}/;
+    }
+    {% endif %}
+    location /global_errors/ {
+        internal;
+        alias /var/www/nginx/errors/global/;
+    }
+
+    {% if item.upstream is defined %}
+    location / {
+        set $endpoint_name "/";
+        proxy_pass {{ item.upstream }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    {% endif %}
+
+    {% for loc in item.locations | default([]) %}
+    location {{ loc.path }} {
+        set $endpoint_name "{{ loc.path }}";
+
+        {% if loc.log_prefix is defined %}
+        access_log /var/log/nginx/{{ item.domain }}_{{ loc.log_prefix }}_access.log json_analytics;
+        error_log /var/log/nginx/{{ item.domain }}_{{ loc.log_prefix }}_error.log warn;
+        {% endif %}
+
+        {% if loc.upstream is defined %}
+        proxy_pass {{ loc.upstream }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        {% endif %}
+
+        {% for k, v in (loc.nginx_config | default({})).items() %}
+        {{ k }} {{ v }};
+        {% endfor %}
+
+        {{ loc.extra_config | default('') | indent(8) }}
+    }
+    {% endfor %}
+}
+{% else %}
+server {
+    listen 80;
+    {% if core_enable_ipv6 | default(false) %}
+    listen [::]:80;
+    {% endif %}
+    server_name {{ item.domain }};
+
+    server_tokens {{ item.server_tokens | default(nginx_server_tokens) }};
+    
+    # Initialize endpoint tracking for metrics
+    set $endpoint_name "root";
+
+    access_log /var/log/nginx/{{ item.domain }}_access.log json_analytics;
+    error_log /var/log/nginx/{{ item.domain }}_error.log warn;
+
+    {% set opt_x_frame = item.header_x_frame_options | default(nginx_header_x_frame_options) %}
+    {% if opt_x_frame %}
+    add_header X-Frame-Options "{{ opt_x_frame }}" always;
+    {% endif %}
+
+    {% set opt_x_xss = item.header_x_xss_protection | default(nginx_header_x_xss_protection) %}
+    {% if opt_x_xss %}
+    add_header X-XSS-Protection "{{ opt_x_xss }}" always;
+    {% endif %}
+
+    add_header X-Content-Type-Options "nosniff" always;
+
+    {% set opt_ref_pol = item.header_referrer_policy | default(nginx_header_referrer_policy) %}
+    {% if opt_ref_pol %}
+    add_header Referrer-Policy "{{ opt_ref_pol }}" always;
+    {% endif %}
+
+    {% set opt_perm_pol = item.header_permissions_policy | default(nginx_header_permissions_policy) %}
+    {% if opt_perm_pol %}
+    add_header Permissions-Policy "{{ opt_perm_pol }}" always;
+    {% endif %}
+
+    {% set opt_csp = item.header_csp | default(nginx_header_csp) %}
+    {% if opt_csp %}
+    add_header Content-Security-Policy "{{ opt_csp }}" always;
+    {% endif %}
+
+    {% if item.waf_enabled | default(false) %}
+    modsecurity on;
+    modsecurity_rules_file /etc/nginx/modsec/main.conf;
+    {% if item.waf_config is defined or item.waf_extra_rules is defined %}
+    modsecurity_rules '
+        {% for k, v in (item.waf_config | default({})).items() %}
+        {{ k }} {{ v }}
+        {% endfor %}
+{{ item.waf_extra_rules | default('') | indent(8, true) }}
+    ';
+    {% endif %}
+    {% endif %}
+
+    {% for k, v in (item.nginx_config | default({})).items() %}
+    {{ k }} {{ v }};
+    {% endfor %}
+
+    {{ item.extra_config | default('') | indent(4) }}
+
+    # Error Pages Configuration
+    {% for code in site_custom_codes %}
+    error_page {{ code }} /site_errors/{{ code }}.html;
+    {% endfor %}
+    {% for code in fallback_codes %}
+    error_page {{ code }} /global_errors/{{ code }}.html;
+    {% endfor %}
+
+    {% if site_custom_codes | length > 0 %}
+    location /site_errors/ {
+        internal;
+        alias /var/www/nginx/errors/{{ item.domain }}/;
+    }
+    {% endif %}
+    location /global_errors/ {
+        internal;
+        alias /var/www/nginx/errors/global/;
+    }
+
+    {% if item.upstream is defined %}
+    location / {
+        set $endpoint_name "/";
+        proxy_pass {{ item.upstream }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    {% endif %}
+
+    {% for loc in item.locations | default([]) %}
+    location {{ loc.path }} {
+        set $endpoint_name "{{ loc.path }}";
+
+        {% if loc.log_prefix is defined %}
+        access_log /var/log/nginx/{{ item.domain }}_{{ loc.log_prefix }}_access.log json_analytics;
+        error_log /var/log/nginx/{{ item.domain }}_{{ loc.log_prefix }}_error.log warn;
+        {% endif %}
+
+        {% if loc.upstream is defined %}
+        proxy_pass {{ loc.upstream }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        {% endif %}
+
+        {% for k, v in (loc.nginx_config | default({})).items() %}
+        {{ k }} {{ v }};
+        {% endfor %}
+
+        {{ loc.extra_config | default('') | indent(8) }}
+    }
+    {% endfor %}
+}
+{% endif %}

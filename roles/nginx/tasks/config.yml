@@ -1,0 +1,68 @@
+---
+- name: Remove default site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  when: nginx_remove_default_site
+  notify: Reload nginx
+
+- name: Ensure ssl directory
+  ansible.builtin.file:
+    path: /etc/nginx/ssl
+    state: directory
+    mode: '0755'
+
+- name: Tune worker_processes in nginx.conf
+  ansible.builtin.replace:
+    path: /etc/nginx/nginx.conf
+    regexp: '^worker_processes\s+.*;'
+    replace: 'worker_processes auto;'
+  notify: Reload nginx
+
+- name: Tune worker_connections in nginx.conf
+  ansible.builtin.replace:
+    path: /etc/nginx/nginx.conf
+    regexp: 'worker_connections\s+\d+;'
+    replace: 'worker_connections {{ nginx_worker_connections }};'
+  notify: Reload nginx
+
+- name: Configure custom logging
+  ansible.builtin.template:
+    src: logging.conf.j2
+    dest: /etc/nginx/conf.d/logging.conf
+    mode: '0644'
+  notify: Reload nginx
+
+- name: Configure real IP and trusted proxies
+  ansible.builtin.template:
+    src: realip.conf.j2
+    dest: /etc/nginx/conf.d/realip.conf
+    mode: '0644'
+  notify: Reload nginx
+
+- name: Configure global rate limiting
+  ansible.builtin.template:
+    src: limit.conf.j2
+    dest: /etc/nginx/conf.d/limit.conf
+    mode: '0644'
+  notify: Reload nginx
+
+- name: Configure gzip compression
+  ansible.builtin.template:
+    src: compression.conf.j2
+    dest: /etc/nginx/conf.d/compression.conf
+    mode: '0644'
+  notify: Reload nginx
+
+- name: Disable default gzip in nginx.conf to prevent duplicates
+  ansible.builtin.replace:
+    path: /etc/nginx/nginx.conf
+    regexp: '^\s*gzip\s+on;'
+    replace: '# gzip on;'
+  notify: Reload nginx
+
+- name: Configure Nginx logrotate
+  ansible.builtin.template:
+    src: logrotate.j2
+    dest: /etc/logrotate.d/nginx
+    mode: '0644'

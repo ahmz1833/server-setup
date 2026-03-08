@@ -1,0 +1,68 @@
+---
+- name: Configure stub_status for Nginx internals
+  ansible.builtin.template:
+    src: metrics.conf.j2
+    dest: /etc/nginx/conf.d/metrics.conf
+    mode: '0644'
+  notify: Reload nginx
+
+- name: Create nginx_exporter system user
+  ansible.builtin.user:
+    name: nginx_exporter
+    system: true
+    shell: /sbin/nologin
+    state: present
+
+- name: Check if nginx_exporter is installed
+  ansible.builtin.command: /usr/local/bin/nginx-prometheus-exporter -version
+  register: nginx_exporter_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Download nginx_exporter archive locally
+  ansible.builtin.get_url:
+    url: >-
+      {{
+        'https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v' ~
+        nginx_exporter_version ~
+        '/nginx-prometheus-exporter_' ~ nginx_exporter_version ~ '_linux_amd64.tar.gz'
+      }}
+    dest: "/tmp/nginx-prometheus-exporter-{{ nginx_exporter_version }}.tar.gz"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: nginx_exporter_check.rc != 0
+
+- name: Extract nginx_exporter archive locally
+  ansible.builtin.unarchive:
+    src: "/tmp/nginx-prometheus-exporter-{{ nginx_exporter_version }}.tar.gz"
+    dest: "/tmp/"
+    remote_src: true
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: nginx_exporter_check.rc != 0
+
+- name: Copy nginx_exporter binary to target node
+  ansible.builtin.copy:
+    src: "/tmp/nginx-prometheus-exporter"
+    dest: "/usr/local/bin/nginx-prometheus-exporter"
+    mode: '0755'
+    owner: root
+    group: root
+  when: nginx_exporter_check.rc != 0
+
+- name: Configure nginx_exporter systemd service
+  ansible.builtin.template:
+    src: nginx_exporter.service.j2
+    dest: /etc/systemd/system/nginx_exporter.service
+    mode: '0644'
+  notify: Restart nginx_exporter
+
+- name: Enable and start nginx_exporter
+  ansible.builtin.systemd:
+    name: nginx_exporter
+    state: "{{ 'started' if nginx_exporter_enabled | default(false) else 'stopped' }}"
+    enabled: "{{ nginx_exporter_enabled | default(false) }}"
+    daemon_reload: true
