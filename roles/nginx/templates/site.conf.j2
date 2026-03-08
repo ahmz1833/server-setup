@@ -89,14 +89,18 @@ server {
 
     {% if item.waf_enabled | default(false) %}
     modsecurity on;
-    modsecurity_rules_file /etc/nginx/modsec/main.conf;
     {% if item.waf_config is defined or item.waf_extra_rules is defined %}
     modsecurity_rules '
+        Include /etc/modsecurity/modsecurity.conf
         {% for k, v in (item.waf_config | default({})).items() %}
         {{ k }} {{ v }}
         {% endfor %}
+        Include /etc/modsecurity/crs-setup.conf
+        Include /usr/share/modsecurity-crs/rules/*.conf
 {{ item.waf_extra_rules | default('') | indent(8, true) }}
     ';
+    {% else %}
+    modsecurity_rules_file /etc/nginx/modsec/main.conf;
     {% endif %}
     {% endif %}
 
@@ -142,7 +146,7 @@ server {
     {% for loc in item.locations | default([]) %}
     location {{ loc.path }} {
         set $endpoint_name "{{ loc.path }}";
-
+        
         {% if loc.log_prefix is defined %}
         access_log /var/log/nginx/{{ item.domain }}_{{ loc.log_prefix }}_access.log json_analytics;
         error_log /var/log/nginx/{{ item.domain }}_{{ loc.log_prefix }}_error.log warn;
@@ -212,14 +216,18 @@ server {
 
     {% if item.waf_enabled | default(false) %}
     modsecurity on;
-    modsecurity_rules_file /etc/nginx/modsec/main.conf;
     {% if item.waf_config is defined or item.waf_extra_rules is defined %}
     modsecurity_rules '
+        Include /etc/modsecurity/modsecurity.conf
         {% for k, v in (item.waf_config | default({})).items() %}
         {{ k }} {{ v }}
         {% endfor %}
+        Include /etc/modsecurity/crs-setup.conf
+        Include /usr/share/modsecurity-crs/rules/*.conf
 {{ item.waf_extra_rules | default('') | indent(8, true) }}
     ';
+    {% else %}
+    modsecurity_rules_file /etc/nginx/modsec/main.conf;
     {% endif %}
     {% endif %}
 

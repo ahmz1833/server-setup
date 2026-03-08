@@ -79,13 +79,13 @@ nginx_waf_global_settings:
 
 # Exporter Configuration
 nginx_exporter_install: true
-nginx_exporter_enabled: true
+nginx_exporter_enabled: false
 nginx_exporter_version: "1.5.1"
 nginx_exporter_port: 9113
 nginx_dummy_metric_port: 29182
 
 # Promtail Configuration (Log to Metrics)
-nginx_promtail_install: true
+nginx_promtail_install: false
 nginx_promtail_enabled: false
 nginx_promtail_version: "3.6.7"
 nginx_promtail_port: 9080

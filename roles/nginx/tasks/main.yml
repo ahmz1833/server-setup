@@ -19,7 +19,7 @@
 - name: Configure Metrics
   ansible.builtin.import_tasks: metrics.yml
   tags:
-    - nginx-metrics
+    - nginx-monitoring
   when: nginx_exporter_install
 
 - name: Configure Error Pages
@@ -31,9 +31,11 @@
   ansible.builtin.import_tasks: sites.yml
   tags:
     - nginx-sites
+    - nginx-error-pages
 
 - name: Configure Promtail
   ansible.builtin.import_tasks: promtail.yml
   tags:
+    - nginx-monitoring
     - nginx-promtail
   when: nginx_promtail_install
