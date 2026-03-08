@@ -16,6 +16,27 @@
   loop: "{{ nginx_sites }}"
   notify: Reload nginx
 
+- name: Find all enabled site configurations
+  ansible.builtin.find:
+    paths:
+      - /etc/nginx/sites-enabled
+    file_type: any
+  register: nginx_enabled_sites
+
+- name: Disable unmanaged site configurations
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ nginx_enabled_sites.files }}"
+  vars:
+    expected_configs: >-
+      {{
+        (nginx_sites | map(attribute='domain') | map('regex_replace', '^(.*)$', '\1.conf') | list)
+        + (['default'] if not (nginx_remove_default_site | default(true)) else [])
+      }}
+  when: item.path | basename not in expected_configs
+  notify: Reload nginx
+
 - name: Ensure nginx service
   ansible.builtin.systemd:
     name: nginx
