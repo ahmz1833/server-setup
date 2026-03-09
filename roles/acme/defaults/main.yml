@@ -1,0 +1,27 @@
+---
+# acme_directory_url: "https://acme-staging-v02.api.letsencrypt.org/directory"
+acme_directory_url: "https://acme-v02.api.letsencrypt.org/directory"
+acme_account_email: "admin@example.com"
+acme_local_workspace: "/tmp/ansible_acme_workspace"
+acme_renew_days: 30
+acme_default_cert_dir: "/etc/ssl/certs"
+
+acme_certificates: []
+
+# Example certificate configuration:
+# acme_certificates:
+#   - domains:
+#       - "salam.com"    # Automatically saves in /etc/ssl/certs/salam.com/*
+#
+#   - domains:
+#       - "example.com"
+#       - "www.example.com"
+#     cert_dir: "/etc/ssl/certs/example.com"
+#
+#   - domains:
+#       - "anotherdomain.com"
+#       - "*.anotherdomain.com"
+#     challenge: "http-01"
+#     fullchain_path: "/etc/ssl/certs/anotherdomain_fullchain.pem"
+#     privkey_path: "/etc/ssl/certs/anotherdomain_privkey.pem"
+#     renew_days: 15

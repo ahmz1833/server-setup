@@ -15,6 +15,16 @@
   roles:
     - role: node
 
+- name: Renew or Issue SSL Certificates with ACME
+  hosts: all
+  become: true
+  tags:
+    - cert
+    - certificate
+    - acme
+  roles:
+    - role: acme
+
 - name: Provision Nginx & WAF System
   hosts: all
   become: true

@@ -1,0 +1,52 @@
+---
+- name: Ensure local directory for domain exists
+  ansible.builtin.file:
+    path: "{{ acme_local_cert_dir }}"
+    state: directory
+    mode: '0700'
+  delegate_to: localhost
+  become: false
+
+- name: Generate domain private key locally
+  community.crypto.openssl_privatekey:
+    path: "{{ acme_local_cert_dir }}/privkey.pem"
+    size: 2048
+  delegate_to: localhost
+  become: false
+
+- name: Generate CSR locally
+  community.crypto.openssl_csr:
+    path: "{{ acme_local_cert_dir }}/domain.csr"
+    privatekey_path: "{{ acme_local_cert_dir }}/privkey.pem"
+    common_name: "{{ acme_current_cn }}"
+    subject_alt_name: "{{ (acme_current_sans | length > 0) | ternary(acme_current_sans | map('regex_replace', '^', 'DNS:') | list, omit) }}"
+  delegate_to: localhost
+  become: false
+
+- name: Execute DNS-01 challenge
+  ansible.builtin.include_tasks: issue_dns01.yml
+  when: acme_current_challenge == 'dns-01'
+
+- name: Execute HTTP-01 standalone challenge
+  ansible.builtin.include_tasks: issue_http01.yml
+  when: acme_current_challenge == 'http-01'
+
+- name: Deploy private key to remote server
+  ansible.builtin.copy:
+    src: "{{ acme_local_cert_dir }}/privkey.pem"
+    dest: "{{ acme_remote_key_path }}"
+    mode: '0600'
+    owner: root
+    group: root
+  become: true
+  notify: Reload NGINX
+
+- name: Deploy fullchain certificate to remote server
+  ansible.builtin.copy:
+    src: "{{ acme_local_cert_dir }}/fullchain.pem"
+    dest: "{{ acme_remote_cert_path }}"
+    mode: '0644'
+    owner: root
+    group: root
+  become: true
+  notify: Reload NGINX

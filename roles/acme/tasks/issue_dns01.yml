@@ -1,0 +1,56 @@
+---
+- name: Initiate ACME DNS-01 challenge locally
+  community.crypto.acme_certificate:
+    account_key_src: "{{ acme_local_workspace }}/account.key"
+    account_email: "{{ acme_account_email }}"
+    src: "{{ acme_local_cert_dir }}/domain.csr"
+    cert: "{{ acme_local_cert_dir }}/cert.pem"
+    challenge: dns-01
+    acme_directory: "{{ acme_directory_url }}"
+    acme_version: 2
+    terms_agreed: true
+    modify_account: false
+  register: acme_challenge
+  delegate_to: localhost
+  become: false
+
+- name: Prompt for DNS and validate    # noqa: no-handler
+  when: acme_challenge is changed
+  block:
+    - name: Prompt for manual DNS TXT record creation
+      ansible.builtin.pause:
+        prompt: >
+          [ACTION REQUIRED] DNS-01 Challenge for {{ acme_current_cn }}
+          {% if acme_current_sans | length > 0 %}
+          (Including SANs: {{ acme_current_sans | join(', ') }})
+          {% endif %}
+
+          Please create the following TXT records:
+
+          {% for k, v in acme_challenge.challenge_data.items() %}
+          Name: {{ v['dns-01'].record }}
+
+          Value: {{ v['dns-01'].resource_value }}
+
+          {% endfor %}
+
+          Press ENTER when all records have propagated globally.
+      when: acme_challenge.challenge_data is defined
+      delegate_to: localhost
+      become: false
+
+    - name: Validate ACME challenge and fetch certificates
+      community.crypto.acme_certificate:
+        account_key_src: "{{ acme_local_workspace }}/account.key"
+        account_email: "{{ acme_account_email }}"
+        src: "{{ acme_local_cert_dir }}/domain.csr"
+        cert: "{{ acme_local_cert_dir }}/cert.pem"
+        fullchain: "{{ acme_local_cert_dir }}/fullchain.pem"
+        challenge: dns-01
+        acme_directory: "{{ acme_directory_url }}"
+        acme_version: 2
+        terms_agreed: true
+        modify_account: false
+        data: "{{ acme_challenge }}"
+      delegate_to: localhost
+      become: false

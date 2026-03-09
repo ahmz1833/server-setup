@@ -1,0 +1,62 @@
+---
+- name: Assert certificate definition is valid
+  ansible.builtin.assert:
+    that:
+      - acme_cert_item.domains is defined
+      - acme_cert_item.domains | length > 0
+      - acme_cert_item.challenge | default('dns-01') in ['dns-01', 'http-01']
+    fail_msg: "Invalid certificate configuration. Check domains and challenge type."
+
+- name: Set certificate variables
+  ansible.builtin.set_fact:
+    acme_current_cn: "{{ acme_cert_item.domains[0] }}"
+    acme_current_sans: "{{ acme_cert_item.domains[1:] | default([]) }}"
+    acme_current_renew_days: "{{ acme_cert_item.renew_days | default(acme_renew_days) }}"
+    acme_current_challenge: "{{ acme_cert_item.challenge | default('dns-01') }}"
+
+- name: Set certificate paths
+  ansible.builtin.set_fact:
+    acme_remote_cert_dir: "{{ acme_cert_item.cert_dir | default(acme_default_cert_dir ~ '/' ~ acme_current_cn) }}"
+
+- name: Set remote certificate and key paths
+  ansible.builtin.set_fact:
+    acme_remote_cert_path: "{{ acme_cert_item.fullchain_path | default(acme_remote_cert_dir ~ '/' ~ 'fullchain.pem') }}"
+    acme_remote_key_path: "{{ acme_cert_item.privkey_path | default(acme_remote_cert_dir ~ '/' ~ 'privkey.pem') }}"
+    acme_local_cert_dir: "{{ acme_local_workspace }}/{{ acme_cert_item.domains[0] }}"
+
+- name: Ensure remote destination directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ acme_remote_cert_path | dirname }}"
+    - "{{ acme_remote_key_path | dirname }}"
+  become: true
+
+- name: Check if certificate already exists on remote
+  ansible.builtin.stat:
+    path: "{{ acme_remote_cert_path }}"
+  register: acme_remote_cert_stat
+  become: true
+
+- name: Verify certificate expiration on remote
+  community.crypto.x509_certificate_info:
+    path: "{{ acme_remote_cert_path }}"
+    valid_at:
+      point_in_time: "+{{ acme_current_renew_days }}d"
+  register: acme_remote_cert_info
+  when: acme_remote_cert_stat.stat.exists
+  become: true
+
+- name: Set renewal flag
+  ansible.builtin.set_fact:
+    acme_needs_renewal: >-
+      {{
+        not acme_remote_cert_stat.stat.exists or
+        (acme_remote_cert_stat.stat.exists and not acme_remote_cert_info.valid_at.point_in_time | default(false))
+      }}
+
+- name: Execute ACME process if renewal is needed
+  ansible.builtin.include_tasks: issue.yml
+  when: acme_needs_renewal | bool

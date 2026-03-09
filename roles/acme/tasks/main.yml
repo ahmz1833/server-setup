@@ -1,0 +1,36 @@
+---
+- name: Ensure local ACME workspace exists
+  ansible.builtin.file:
+    path: "{{ acme_local_workspace }}"
+    state: directory
+    mode: '0700'
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Generate ACME account private key locally
+  community.crypto.openssl_privatekey:
+    path: "{{ acme_local_workspace }}/account.key"
+    size: 4096
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Ensure ACME account is registered
+  community.crypto.acme_account:
+    account_key_src: "{{ acme_local_workspace }}/account.key"
+    state: present
+    terms_agreed: true
+    acme_directory: "{{ acme_directory_url }}"
+    acme_version: 2
+    contact:
+      - "mailto:{{ acme_account_email }}"
+  delegate_to: localhost
+  run_once: true
+  become: false
+
+- name: Process each certificate definition
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ acme_certificates }}"
+  loop_control:
+    loop_var: acme_cert_item
