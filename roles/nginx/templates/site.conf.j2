@@ -25,12 +25,16 @@ server {
 {% if core_enable_ipv6 | default(false) %}
     listen [::]:80;
 {% endif %}
-    server_name {{ item.domain }};
+    server_name {{ item.domain }}{% if item.aliases is defined %} {{ item.aliases | join(' ') }}{% endif %};
     server_tokens {{ item.server_tokens | default(nginx_server_tokens) }};
     set $endpoint_name "redirect";
 
     location / {
+{% if item.redirect_to is defined %}
+        return 301 {{ item.redirect_to }}$request_uri;
+{% else %}
         return 301 https://$host$request_uri;
+{% endif %}
     }
 }
 
@@ -39,11 +43,11 @@ server {
 {% if core_enable_ipv6 | default(false) %}
     listen [::]:443 ssl http2;
 {% endif %}
-    server_name {{ item.domain }};
+    server_name {{ item.domain }}{% if item.aliases is defined %} {{ item.aliases | join(' ') }}{% endif %};
     server_tokens {{ item.server_tokens | default(nginx_server_tokens) }};
     
     # Initialize endpoint tracking for metrics
-    set $endpoint_name "root";
+    set $endpoint_name "{% if item.redirect_to is defined %}redirect{% else %}root{% endif %}";
 
     access_log /var/log/nginx/{{ item.domain }}_access.log json_analytics;
     error_log /var/log/nginx/{{ item.domain }}_error.log warn;
@@ -58,6 +62,12 @@ server {
     ssl_session_timeout {{ item.ssl_session_timeout | default(nginx_ssl_session_timeout) }};
     ssl_session_tickets {{ item.ssl_session_tickets | default(nginx_ssl_session_tickets) }};
 
+{% if item.redirect_to is defined %}
+    location / {
+        return 301 {{ item.redirect_to }}$request_uri;
+    }
+{% else %}
+
 {% set opt_x_frame = item.header_x_frame_options | default(nginx_header_x_frame_options) %}
 {% if opt_x_frame %}
     add_header X-Frame-Options "{{ opt_x_frame }}" always;
@@ -163,6 +173,7 @@ server {
         {{ loc.extra_config | default('') | indent(8) }}
     }
 {% endfor %}
+{% endif %}
 }
 {% else %}
 server {
@@ -170,14 +181,20 @@ server {
 {% if core_enable_ipv6 | default(false) %}
     listen [::]:80;
 {% endif %}
-    server_name {{ item.domain }};
+    server_name {{ item.domain }}{% if item.aliases is defined %} {{ item.aliases | join(' ') }}{% endif %};
     server_tokens {{ item.server_tokens | default(nginx_server_tokens) }};
     
     # Initialize endpoint tracking for metrics
-    set $endpoint_name "root";
+    set $endpoint_name "{% if item.redirect_to is defined %}redirect{% else %}root{% endif %}";
 
     access_log /var/log/nginx/{{ item.domain }}_access.log json_analytics;
     error_log /var/log/nginx/{{ item.domain }}_error.log warn;
+
+{% if item.redirect_to is defined %}
+    location / {
+        return 301 {{ item.redirect_to }}$request_uri;
+    }
+{% else %}
 
 {% set opt_x_frame = item.header_x_frame_options | default(nginx_header_x_frame_options) %}
 {% if opt_x_frame %}
@@ -284,5 +301,6 @@ server {
         {{ loc.extra_config | default('') | indent(8) }}
     }
 {% endfor %}
+{% endif %}
 }
 {% endif %}
