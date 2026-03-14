@@ -1,7 +1,9 @@
 ---
 # High-level Meta Variables
-core_is_iran: false
-core_enable_ipv6: false
+core_is_iran: '{{ is_iran | default(false) }}'
+core_enable_ipv6: '{{ enable_ipv6 | default(false) }}'
+core_download_locally: '{{ download_locally | default(false) }}'
+core_primary_user: '{{ primary_user | default("root") }}'
 
 # Timezone is automatically determined by 'core_is_iran' unless explicitly overridden
 core_timezone: "{{ 'Asia/Tehran' if core_is_iran else 'Etc/UTC' }}"
@@ -24,7 +26,13 @@ core_manage_users: true
 core_users: []
 
 core_manage_ssh: true
-core_ssh_port: 22
+core_ssh_port: >-
+  {{
+    ansible_port | default(ansible_ssh_port | default(
+      lookup('pipe', 'ssh -G ' ~ inventory_hostname ~ ' | grep "^port " | cut -d" " -f2', errors='ignore') | default('22', true),
+      true
+    )) | int
+  }}
 core_ssh_ensure_pub_key_user: "{{ core_primary_user | default(omit) }}"
 core_ssh_password_auth: false
 core_ssh_permit_root_login: false

@@ -23,44 +23,39 @@
       http://mirror.arvancloud.ir/ubuntu
       {% endif %}
 
-- name: Find core OS APT source files
-  ansible.builtin.find:
-    paths:
-      - /etc/apt/
-      - /etc/apt/sources.list.d/
-    patterns:
-      - "sources.list"
-      - "ubuntu.sources"
-      - "debian.sources"
-  register: core_apt_files
+- name: Configure APT mirrors
   when:
     - ansible_os_family == 'Debian'
     - core_active_apt_mirror is defined
+    - core_active_apt_mirror is not none
     - core_active_apt_mirror | length > 0
+  block:
+    - name: Find core OS APT source files
+      ansible.builtin.find:
+        paths:
+          - /etc/apt/
+          - /etc/apt/sources.list.d/
+        patterns:
+          - "sources.list"
+          - "ubuntu.sources"
+          - "debian.sources"
+      register: core_apt_files
 
-- name: Configure custom APT mirror (Legacy .list format)
-  ansible.builtin.replace:
-    path: "{{ item.path }}"
-    regexp: '^(deb(?:-src)?\s+)(?:https?://[^\s]+)(\s+.*)$'
-    replace: '\g<1>{{ core_active_apt_mirror }}\g<2>'
-  loop: "{{ core_apt_files.files | default([]) }}"
-  when:
-    - item.path.endswith('.list')
-    - ansible_os_family == 'Debian'
-    - core_active_apt_mirror is defined
-    - core_active_apt_mirror | length > 0
+    - name: Configure custom APT mirror (Legacy .list format)
+      ansible.builtin.replace:
+        path: "{{ item.path }}"
+        regexp: '^(deb(?:-src)?\s+)(?:https?://[^\s]+)(\s+.*)$'
+        replace: '\g<1>{{ core_active_apt_mirror }}\g<2>'
+      loop: "{{ core_apt_files.files | default([]) }}"
+      when: item.path.endswith('.list')
 
-- name: Configure custom APT mirror (Modern DEB822 .sources format)
-  ansible.builtin.replace:
-    path: "{{ item.path }}"
-    regexp: '^URIs:\s+https?://.*$'
-    replace: 'URIs: {{ core_active_apt_mirror }}'
-  loop: "{{ core_apt_files.files | default([]) }}"
-  when:
-    - item.path.endswith('.sources')
-    - ansible_os_family == 'Debian'
-    - core_active_apt_mirror is defined
-    - core_active_apt_mirror | length > 0
+    - name: Configure custom APT mirror (Modern DEB822 .sources format)
+      ansible.builtin.replace:
+        path: "{{ item.path }}"
+        regexp: '^URIs:\s+https?://.*$'
+        replace: 'URIs: {{ core_active_apt_mirror }}'
+      loop: "{{ core_apt_files.files | default([]) }}"
+      when: item.path.endswith('.sources')
 
 - name: Update package cache (Debian)
   ansible.builtin.apt:

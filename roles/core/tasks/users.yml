@@ -1,6 +1,8 @@
 ---
 - name: Get all users
-  ansible.builtin.shell: "set -o pipefail && getent passwd | awk -F: '$3 > 999 {print $1}'"
+  ansible.builtin.shell: "set -o pipefail && awk -F: '$3 > 999 {print $1}' /etc/passwd"
+  args:
+    executable: /bin/bash
   register: core_users_in_vm
   check_mode: false
   changed_when: false

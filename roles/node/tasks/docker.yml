@@ -4,22 +4,17 @@
   register: node_docker_check
   ignore_errors: true
   changed_when: false
-  when: node_docker_enabled
 
 - name: Download Docker installation script
   ansible.builtin.get_url:
     url: https://get.docker.com
     dest: /tmp/get-docker.sh
     mode: '0755'
-  when:
-    - node_docker_enabled
-    - node_docker_check.rc != 0
+  when: node_docker_check.rc != 0
 
 - name: Execute Docker installation script
   ansible.builtin.command: /tmp/get-docker.sh
-  when:
-    - node_docker_enabled
-    - node_docker_check.rc != 0
+  when: node_docker_check.rc != 0
   changed_when: true
 
 - name: Add primary user to docker group
@@ -27,13 +22,23 @@
     name: "{{ node_primary_user }}"
     groups: docker
     append: true
-  when:
-    - node_docker_enabled
-    - node_primary_user is defined
+  when: node_primary_user is defined
+
+- name: Ensure docker configuration directory exists
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    mode: '0755'
+
+- name: Configure docker daemon
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+  notify: Restart docker
 
 - name: Enable and start Docker service
   ansible.builtin.systemd:
     name: docker
     state: started
     enabled: true
-  when: node_docker_enabled
