@@ -9,39 +9,35 @@
     state: present
 
 - name: Check if promtail is installed
-  ansible.builtin.command: /usr/local/bin/promtail -version
+  ansible.builtin.command: which promtail
   register: nginx_promtail_check
   ignore_errors: true
   changed_when: false
 
-- name: Download promtail archive locally
-  ansible.builtin.get_url:
-    url: "https://github.com/grafana/loki/releases/download/v{{ nginx_promtail_version }}/promtail-linux-amd64.zip"
-    dest: "/tmp/promtail-linux-amd64-{{ nginx_promtail_version }}.zip"
-    mode: '0644'
-  delegate_to: localhost
-  run_once: true
-  become: false
-  when: nginx_promtail_check.rc != 0
+- name: Set promtail binary path
+  ansible.builtin.set_fact:
+    nginx_promtail_bin_path: "{{ nginx_promtail_check.stdout | default('/usr/local/bin/promtail', true) }}"
 
-- name: Extract promtail archive locally
-  ansible.builtin.unarchive:
-    src: "/tmp/promtail-linux-amd64-{{ nginx_promtail_version }}.zip"
-    dest: "/tmp/"
-    remote_src: true
-  delegate_to: localhost
-  run_once: true
-  become: false
+- name: Download and extract promtail archive
   when: nginx_promtail_check.rc != 0
+  block:
+    - name: Download and extract promtail archive
+      ansible.builtin.unarchive:
+        src: "https://github.com/grafana/loki/releases/download/v{{ nginx_promtail_version }}/promtail-linux-amd64.zip"
+        dest: "/tmp/"
+        remote_src: true
+      delegate_to: "{{ 'localhost' if nginx_download_locally | default(false) else inventory_hostname }}"
+      run_once: "{{ nginx_download_locally | default(false) }}"
+      become: "{{ not (nginx_download_locally | default(false)) }}"
 
-- name: Copy promtail binary to target node
-  ansible.builtin.copy:
-    src: "/tmp/promtail-linux-amd64"
-    dest: "/usr/local/bin/promtail"
-    mode: '0755'
-    owner: root
-    group: root
-  when: nginx_promtail_check.rc != 0
+    - name: Copy promtail binary to target node
+      ansible.builtin.copy:
+        src: "/tmp/promtail-linux-amd64"
+        dest: "/usr/local/bin/promtail"
+        mode: '0755'
+        owner: root
+        group: root
+        remote_src: "{{ not (nginx_download_locally | default(false)) }}"
 
 - name: Ensure promtail config directory exists
   ansible.builtin.file:

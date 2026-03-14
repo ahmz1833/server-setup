@@ -10,48 +10,52 @@
     path: /etc/modsecurity/modsecurity.conf-recommended
   register: nginx_modsec_rec_conf
 
-- name: Download modsecurity recommended config locally
-  ansible.builtin.get_url:
-    url: https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/modsecurity.conf-recommended
-    dest: /tmp/modsecurity.conf-recommended
-    mode: '0644'
-  delegate_to: localhost
-  run_once: true
-  become: false
+- name: Download and copy modsecurity recommended config
   when: not nginx_modsec_rec_conf.stat.exists
+  block:
+    - name: Download modsecurity recommended config
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/modsecurity.conf-recommended
+        dest: /tmp/modsecurity.conf-recommended
+        mode: '0644'
+      delegate_to: "{{ 'localhost' if nginx_download_locally | default(false) else inventory_hostname }}"
+      run_once: "{{ nginx_download_locally | default(false) }}"
+      become: "{{ not (nginx_download_locally | default(false)) }}"
 
-- name: Copy modsecurity recommended config to target
-  ansible.builtin.copy:
-    src: /tmp/modsecurity.conf-recommended
-    dest: /etc/modsecurity/modsecurity.conf-recommended
-    mode: '0644'
-    owner: root
-    group: root
-  when: not nginx_modsec_rec_conf.stat.exists
+    - name: Copy modsecurity recommended config to target
+      ansible.builtin.copy:
+        src: /tmp/modsecurity.conf-recommended
+        dest: /etc/modsecurity/modsecurity.conf-recommended
+        mode: '0644'
+        owner: root
+        group: root
+        remote_src: "{{ not (nginx_download_locally | default(false)) }}"
 
 - name: Check unicode mapping file
   ansible.builtin.stat:
     path: /etc/modsecurity/unicode.mapping
   register: nginx_unicode_mapping_check
 
-- name: Download unicode mapping file locally
-  ansible.builtin.get_url:
-    url: https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/unicode.mapping
-    dest: /tmp/unicode.mapping
-    mode: '0644'
-  delegate_to: localhost
-  run_once: true
-  become: false
+- name: Download and copy unicode mapping file
   when: not nginx_unicode_mapping_check.stat.exists
+  block:
+    - name: Download unicode mapping file
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/unicode.mapping
+        dest: /tmp/unicode.mapping
+        mode: '0644'
+      delegate_to: "{{ 'localhost' if nginx_download_locally | default(false) else inventory_hostname }}"
+      run_once: "{{ nginx_download_locally | default(false) }}"
+      become: "{{ not (nginx_download_locally | default(false)) }}"
 
-- name: Copy unicode mapping file to target
-  ansible.builtin.copy:
-    src: /tmp/unicode.mapping
-    dest: /etc/modsecurity/unicode.mapping
-    mode: '0644'
-    owner: root
-    group: root
-  when: not nginx_unicode_mapping_check.stat.exists
+    - name: Copy unicode mapping file to target
+      ansible.builtin.copy:
+        src: /tmp/unicode.mapping
+        dest: /etc/modsecurity/unicode.mapping
+        mode: '0644'
+        owner: root
+        group: root
+        remote_src: "{{ not (nginx_download_locally | default(false)) }}"
 
 - name: Initialize modsecurity config
   ansible.builtin.copy:
@@ -75,25 +79,27 @@
     path: /etc/modsecurity/crs-setup.conf
   register: nginx_crs_setup_check
 
-- name: Download CRS setup config locally
-  ansible.builtin.get_url:
-    url: https://raw.githubusercontent.com/coreruleset/coreruleset/v3.3/master/crs-setup.conf.example
-    dest: /tmp/crs-setup.conf
-    mode: '0644'
-  delegate_to: localhost
-  run_once: true
-  become: false
+- name: Download and copy CRS setup config
   when: not nginx_crs_setup_check.stat.exists
+  block:
+    - name: Download CRS setup config
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/coreruleset/coreruleset/v3.3/master/crs-setup.conf.example
+        dest: /tmp/crs-setup.conf
+        mode: '0644'
+      delegate_to: "{{ 'localhost' if nginx_download_locally | default(false) else inventory_hostname }}"
+      run_once: "{{ nginx_download_locally | default(false) }}"
+      become: "{{ not (nginx_download_locally | default(false)) }}"
 
-- name: Copy CRS setup config to target
-  ansible.builtin.copy:
-    src: /tmp/crs-setup.conf
-    dest: /etc/modsecurity/crs-setup.conf
-    mode: '0644'
-    owner: root
-    group: root
-  when: not nginx_crs_setup_check.stat.exists
-  notify: Reload nginx
+    - name: Copy CRS setup config to target
+      ansible.builtin.copy:
+        src: /tmp/crs-setup.conf
+        dest: /etc/modsecurity/crs-setup.conf
+        mode: '0644'
+        owner: root
+        group: root
+        remote_src: "{{ not (nginx_download_locally | default(false)) }}"
+      notify: Reload nginx
 
 - name: Create nginx modsec directory
   ansible.builtin.file:

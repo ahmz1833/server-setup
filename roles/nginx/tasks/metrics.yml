@@ -14,44 +14,40 @@
     state: present
 
 - name: Check if nginx_exporter is installed
-  ansible.builtin.command: /usr/local/bin/nginx-prometheus-exporter -version
+  ansible.builtin.command: which nginx-prometheus-exporter
   register: nginx_exporter_check
   ignore_errors: true
   changed_when: false
 
-- name: Download nginx_exporter archive locally
-  ansible.builtin.get_url:
-    url: >-
-      {{
-        'https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v' ~
-        nginx_exporter_version ~
-        '/nginx-prometheus-exporter_' ~ nginx_exporter_version ~ '_linux_amd64.tar.gz'
-      }}
-    dest: "/tmp/nginx-prometheus-exporter-{{ nginx_exporter_version }}.tar.gz"
-    mode: '0644'
-  delegate_to: localhost
-  run_once: true
-  become: false
-  when: nginx_exporter_check.rc != 0
+- name: Set nginx-prometheus-exporter binary path
+  ansible.builtin.set_fact:
+    nginx_exporter_bin_path: "{{ nginx_exporter_check.stdout | default('/usr/local/bin/nginx-prometheus-exporter', true) }}"
 
-- name: Extract nginx_exporter archive locally
-  ansible.builtin.unarchive:
-    src: "/tmp/nginx-prometheus-exporter-{{ nginx_exporter_version }}.tar.gz"
-    dest: "/tmp/"
-    remote_src: true
-  delegate_to: localhost
-  run_once: true
-  become: false
+- name: Download and extract nginx_exporter archive
   when: nginx_exporter_check.rc != 0
+  block:
+    - name: Download and extract nginx_exporter archive
+      ansible.builtin.unarchive:
+        src: >-
+          {{
+            'https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v' ~
+            nginx_exporter_version ~
+            '/nginx-prometheus-exporter_' ~ nginx_exporter_version ~ '_linux_amd64.tar.gz'
+          }}
+        dest: "/tmp/"
+        remote_src: true
+      delegate_to: "{{ 'localhost' if nginx_download_locally | default(false) else inventory_hostname }}"
+      run_once: "{{ nginx_download_locally | default(false) }}"
+      become: "{{ not (nginx_download_locally | default(false)) }}"
 
-- name: Copy nginx_exporter binary to target node
-  ansible.builtin.copy:
-    src: "/tmp/nginx-prometheus-exporter"
-    dest: "/usr/local/bin/nginx-prometheus-exporter"
-    mode: '0755'
-    owner: root
-    group: root
-  when: nginx_exporter_check.rc != 0
+    - name: Copy nginx_exporter binary to target node
+      ansible.builtin.copy:
+        src: "/tmp/nginx-prometheus-exporter"
+        dest: "/usr/local/bin/nginx-prometheus-exporter"
+        mode: '0755'
+        owner: root
+        group: root
+        remote_src: "{{ not (nginx_download_locally | default(false)) }}"
 
 - name: Configure nginx_exporter systemd service
   ansible.builtin.template:

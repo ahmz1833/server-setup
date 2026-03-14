@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=promtail
 Group=adm
-ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/config.yml
+ExecStart={{ nginx_promtail_bin_path }} -config.file=/etc/promtail/config.yml
 Restart=on-failure
 RestartSec=5
 

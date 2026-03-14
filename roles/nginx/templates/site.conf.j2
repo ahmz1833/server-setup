@@ -22,7 +22,7 @@
 {% if item.ssl_enabled | default(false) %}
 server {
     listen 80;
-{% if core_enable_ipv6 | default(false) %}
+{% if nginx_enable_ipv6 | default(false) %}
     listen [::]:80;
 {% endif %}
     server_name {{ item.domain }}{% if item.aliases is defined %} {{ item.aliases | join(' ') }}{% endif %};
@@ -40,7 +40,7 @@ server {
 
 server {
     listen 443 ssl http2;
-{% if core_enable_ipv6 | default(false) %}
+{% if nginx_enable_ipv6 | default(false) %}
     listen [::]:443 ssl http2;
 {% endif %}
     server_name {{ item.domain }}{% if item.aliases is defined %} {{ item.aliases | join(' ') }}{% endif %};
@@ -180,7 +180,7 @@ server {
 {% else %}
 server {
     listen 80;
-{% if core_enable_ipv6 | default(false) %}
+{% if nginx_enable_ipv6 | default(false) %}
     listen [::]:80;
 {% endif %}
     server_name {{ item.domain }}{% if item.aliases is defined %} {{ item.aliases | join(' ') }}{% endif %};

@@ -1,4 +1,8 @@
 ---
+# Global vars
+nginx_enable_ipv6: '{{ enable_ipv6 | default(false) }}'
+nginx_download_locally: '{{ is_iran | default(false) }}'
+
 nginx_managed: false
 nginx_sites: []
 nginx_remove_default_site: true

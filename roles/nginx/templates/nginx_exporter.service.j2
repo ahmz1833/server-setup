@@ -6,7 +6,7 @@ After=network.target nginx.service
 Type=simple
 User=nginx_exporter
 Group=nginx_exporter
-ExecStart=/usr/local/bin/nginx-prometheus-exporter -nginx.scrape-uri=http://127.0.0.1:{{ nginx_dummy_metric_port }}/metrics -web.listen-address=0.0.0.0:{{ nginx_exporter_port }}
+ExecStart={{ nginx_exporter_bin_path }} -nginx.scrape-uri=http://127.0.0.1:{{ nginx_dummy_metric_port }}/metrics -web.listen-address=0.0.0.0:{{ nginx_exporter_port }}
 Restart=on-failure
 RestartSec=5
 
