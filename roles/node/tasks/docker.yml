@@ -17,6 +17,12 @@
   when: node_docker_check.rc != 0
   changed_when: true
 
+- name: Clean up Docker installation script
+  ansible.builtin.file:
+    path: /tmp/get-docker.sh
+    state: absent
+  when: node_docker_check.rc != 0
+
 - name: Add primary user to docker group
   ansible.builtin.user:
     name: "{{ node_primary_user }}"

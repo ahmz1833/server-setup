@@ -1,0 +1,84 @@
+_legacy
+
+# ===============================
+# Ansible Collection Build
+# ===============================
+*.tar.gz
+
+# ===============================
+# Python
+# ===============================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+.tox/
+.nox/
+.venv/
+venv/
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ===============================
+# Ansible Runtime
+# ===============================
+*.retry
+.ansible/
+
+# ===============================
+# IDE / Editor
+# ===============================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+*.sublime-project
+*.sublime-workspace
+
+# ===============================
+# OS Junk
+# ===============================
+.DS_Store
+Thumbs.db
+Desktop.ini
+._*
+
+# ===============================
+# Secrets & Credentials
+# ===============================
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+vault_password
+vault_pass.txt
+.vault_pass
+
+# ===============================
+# Temporary / Local Files
+# ===============================
+tmp/
+.tmp/
+*.log
+*.bak
+*.orig
+*.backup
+
+# ===============================
+# Binaries
+# ===============================
+*.exe
+*.dll
+*.so
+*.dylib
+*.out

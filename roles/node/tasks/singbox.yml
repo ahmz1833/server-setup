@@ -28,6 +28,14 @@
         mode: '0755'
         remote_src: "{{ not (node_download_locally | default(false)) }}"
 
+  always:
+    - name: Clean up sing-box temp files
+      ansible.builtin.file:
+        path: "/tmp/sing-box-{{ node_singbox_version }}-linux-amd64"
+        state: absent
+      delegate_to: "{{ 'localhost' if node_download_locally | default(false) else inventory_hostname }}"
+      become: "{{ not (node_download_locally | default(false)) }}"
+
 - name: Create sing-box config directory
   ansible.builtin.file:
     path: /etc/sing-box

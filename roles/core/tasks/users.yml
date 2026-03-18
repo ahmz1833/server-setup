@@ -1,8 +1,29 @@
 ---
-- name: Get all users
-  ansible.builtin.shell: "set -o pipefail && awk -F: '$3 > 999 {print $1}' /etc/passwd"
-  args:
-    executable: /bin/bash
+- name: Get all human users (UID > 999)
+  ansible.builtin.getent:
+    database: passwd
+
+- name: Build list of human users
+  ansible.builtin.set_fact:
+    core_users_in_vm: >-
+      {% set _users = [] -%}
+      {% for name, fields in ansible_facts.getent_passwd.items() -%}
+        {% if fields[1] | int >= 1000 -%}
+          {% set _ = _users.append(name) -%}
+        {% endif -%}
+      {% endfor -%}
+      {{ _users }}
+
+- name: Remove unknown users
+  ansible.builtin.user:
+    name: "{{ item }}"
+    state: absent
+    remove: true
+  loop: "{{ core_users_in_vm }}"
+  when: >
+    item != 'nobody' and
+    item not in (core_users_whitelist | default([])) and
+    item not in (core_users | map(attribute='name') | list)
   register: core_users_in_vm
   check_mode: false
   changed_when: false

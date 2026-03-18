@@ -1,0 +1,31 @@
+---
+galaxy_info:
+  role_name: acme
+  author: AHMZ
+  description: >-
+    ACME/Let's Encrypt certificate issuance and renewal via DNS-01
+    or HTTP-01 challenges using community.crypto modules. All crypto
+    operations happen on the Ansible controller.
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - ssl
+    - tls
+    - acme
+    - letsencrypt
+    - certificates
+
+dependencies: []

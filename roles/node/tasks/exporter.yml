@@ -38,6 +38,14 @@
         group: root
         remote_src: "{{ not (node_download_locally | default(false)) }}"
 
+  always:
+    - name: Clean up node_exporter temp files
+      ansible.builtin.file:
+        path: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64"
+        state: absent
+      delegate_to: "{{ 'localhost' if node_download_locally | default(false) else inventory_hostname }}"
+      become: "{{ not (node_download_locally | default(false)) }}"
+
 - name: Configure node_exporter systemd service
   ansible.builtin.template:
     src: node_exporter.service.j2

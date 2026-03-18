@@ -1,0 +1,29 @@
+---
+galaxy_info:
+  role_name: nginx
+  author: AHMZ
+  description: >-
+    Full Nginx setup — installation, ModSecurity WAF, global tuning
+    (logging, compression, rate limiting, real IP), SSL/TLS, per-site
+    vhost generation, custom error pages, nginx-prometheus-exporter,
+    and Promtail log shipping.
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+  galaxy_tags:
+    - nginx
+    - waf
+    - ssl
+    - monitoring
+    - webserver
+    - reverseproxy
+
+dependencies: []

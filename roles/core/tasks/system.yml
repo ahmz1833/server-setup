@@ -25,7 +25,7 @@
 
 - name: Configure APT mirrors
   when:
-    - ansible_os_family == 'Debian'
+    - ansible_facts['os_family'] == 'Debian'
     - core_active_apt_mirror is defined
     - core_active_apt_mirror is not none
     - core_active_apt_mirror | length > 0
@@ -61,7 +61,7 @@
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
-  when: ansible_os_family == 'Debian'
+  when: ansible_facts['os_family'] == 'Debian'
 
 - name: Install common packages
   ansible.builtin.package:

@@ -1,0 +1,26 @@
+---
+galaxy_info:
+  role_name: node
+  author: AHMZ
+  description: >-
+    Node-level services — sing-box proxy/tunnel, GOST tunnel, Docker
+    engine, Prometheus node_exporter, shell bootstrap and utility tools.
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+  galaxy_tags:
+    - docker
+    - proxy
+    - tunnel
+    - monitoring
+    - tools
+
+dependencies: []

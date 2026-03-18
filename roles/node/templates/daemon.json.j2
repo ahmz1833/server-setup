@@ -1,28 +1,14 @@
-{
-  "bip": "{{ node_docker_bip }}",
-  "default-address-pools": [
-{% for pool in node_docker_default_address_pools %}
-    {
-      "base": "{{ pool.base }}",
-      "size": {{ pool.size }}
-    }{% if not loop.last %},{% endif %}
-{% endfor %}
-  ],
-  "log-driver": "{{ node_docker_log_driver }}",
-  "log-opts": {
-{% for key, value in node_docker_log_opts.items() %}
-    "{{ key }}": "{{ value }}"{% if not loop.last %},{% endif %}
-{% endfor %}
-  },
-  "live-restore": {{ node_docker_live_restore | to_json }}
-{% if node_docker_metrics_enabled %}
-  ,
-  "metrics-addr": "{{ node_docker_metrics_addr }}",
-  "experimental": true
-{% endif %}
-{% if node_enable_ipv6 | default(false) %}
-  ,
-  "ipv6": true,
-  "fixed-cidr-v6": "fd00:dead:beef::/48"
-{% endif %}
-}
+{% set _cfg = {
+  "bip": node_docker_bip,
+  "default-address-pools": node_docker_default_address_pools,
+  "log-driver": node_docker_log_driver,
+  "log-opts": node_docker_log_opts,
+  "live-restore": node_docker_live_restore
+} -%}
+{% if node_docker_metrics_enabled -%}
+  {% set _ = _cfg.update({"metrics-addr": node_docker_metrics_addr, "experimental": true}) -%}
+{% endif -%}
+{% if node_enable_ipv6 | default(false) -%}
+  {% set _ = _cfg.update({"ipv6": true, "fixed-cidr-v6": "fd00:dead:beef::/48"}) -%}
+{% endif -%}
+{{ _cfg | to_nice_json }}

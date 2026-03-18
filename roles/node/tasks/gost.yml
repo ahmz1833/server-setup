@@ -37,6 +37,14 @@
         mode: '0755'
         remote_src: "{{ not (node_download_locally | default(false)) }}"
 
+  always:
+    - name: Clean up gost temp files
+      ansible.builtin.file:
+        path: "/tmp/gost-{{ node_gost_version }}"
+        state: absent
+      delegate_to: "{{ 'localhost' if node_download_locally | default(false) else inventory_hostname }}"
+      become: "{{ not (node_download_locally | default(false)) }}"
+
 - name: Create gost configuration directory
   ansible.builtin.file:
     path: /etc/gost

@@ -18,6 +18,7 @@ core_packages:
   - htop
   - ca-certificates
   - net-tools
+  - ipset
   - vim
   - iotop
   - iftop
@@ -28,7 +29,7 @@ core_users: []
 core_manage_ssh: true
 core_ssh_port: >-
   {{
-    ansible_port | default(ansible_ssh_port | default(
+    ansible_facts['port'] | default(ansible_facts['ssh_port'] | default(
       lookup('pipe', 'ssh -G ' ~ inventory_hostname ~ ' | grep "^port " | cut -d" " -f2', errors='ignore') | default('22', true),
       true
     )) | int

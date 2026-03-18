@@ -12,7 +12,7 @@
         "query_type": "A",
         "rcode": "NOERROR"
       },
-      {% if node_enable_ipv6 | default(false) %}
+{% if node_enable_ipv6 | default(false) %}
       {
         "action": "predefined",
         "answer": "localhost. IN AAAA ::1",
@@ -20,7 +20,7 @@
         "query_type": "AAAA",
         "rcode": "NOERROR"
       },
-      {% endif %}
+{% endif %}
       {
         "action": "route",
         "query_type": ["A"{% if node_enable_ipv6 | default(false) %}, "AAAA"{% endif %}],
@@ -51,9 +51,9 @@
       },
       {
         "inet4_range": "198.18.0.0/15",
-        {% if node_enable_ipv6 | default(false) %}
+{% if node_enable_ipv6 | default(false) %}
         "inet6_range": "fc00::/18",
-        {% endif %}
+{% endif %}
         "tag": "dns-fake",
         "type": "fakeip"
       },
@@ -87,9 +87,9 @@
     {
       "address": [
         "172.19.0.1/24"
-        {% if node_enable_ipv6 | default(false) %}
+{% if node_enable_ipv6 | default(false) %}
         , "fdfe:dcba:9876::1/96"
-        {% endif %}
+{% endif %}
       ],
       "auto_redirect": true,
       "auto_route": true,
@@ -101,7 +101,7 @@
       "tag": "tun-in",
       "type": "tun"
     }
-    {% endif %}
+{% endif %}
   ],
   "outbounds": [
     {{ node_singbox_outbound | default({"type": "direct"}) | combine({"tag": "proxy"}) | to_json }},

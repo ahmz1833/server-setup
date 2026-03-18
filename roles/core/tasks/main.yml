@@ -1,7 +1,7 @@
 ---
 - name: Gather facts if they are missing
   ansible.builtin.setup:
-  when: ansible_os_family is undefined
+  when: ansible_facts is undefined
   tags:
     - always
 
