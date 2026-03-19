@@ -7,6 +7,7 @@ galaxy_info:
     (logging, compression, rate limiting, real IP), SSL/TLS, per-site
     vhost generation, custom error pages, nginx-prometheus-exporter,
     and Promtail log shipping.
+  license: MIT
   min_ansible_version: "2.14"
   platforms:
     - name: Ubuntu

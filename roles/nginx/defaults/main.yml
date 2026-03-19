@@ -1,85 +1,229 @@
 ---
-# Global vars
+# Meta Variables (inherited from playbook-level)
 nginx_enable_ipv6: '{{ enable_ipv6 | default(false) }}'
 nginx_download_locally: '{{ is_iran | default(false) }}'
 
+# -----------------------------------------------------------------------------
+# Role Control
+# -----------------------------------------------------------------------------
 nginx_managed: false
-nginx_sites: []
+
+# Remove the default Nginx site configuration
 nginx_remove_default_site: true
 
+# -----------------------------------------------------------------------------
 # Global Nginx Tuning
+# -----------------------------------------------------------------------------
+# Maximum number of simultaneous connections per worker process
+# Recommended: 65535 for high-traffic servers
 nginx_worker_connections: 65535
+
+# Number of days to keep rotated log files
 nginx_logrotate_days: 14
 
+# -----------------------------------------------------------------------------
 # Gzip Compression
+# -----------------------------------------------------------------------------
 nginx_enable_gzip: true
+
+# Compression level (1-9, higher = more compression but more CPU)
+# Recommended: 5-6 for balance between compression and CPU usage
 nginx_gzip_comp_level: 5
+
+# Minimum response size to compress (bytes)
+# Responses smaller than this are not worth compressing
 nginx_gzip_min_length: 256
 
-# Rate Limiting & Real IP
+# MIME types to compress (in addition to text/html which is always compressed)
+# Default covers most text-based content types
+nginx_gzip_types:
+  - application/atom+xml
+  - application/javascript
+  - application/json
+  - application/rss+xml
+  - application/vnd.ms-fontobject
+  - application/x-font-ttf
+  - application/x-web-app-manifest+json
+  - application/xhtml+xml
+  - application/xml
+  - font/opentype
+  - image/svg+xml
+  - image/x-icon
+  - text/css
+  - text/plain
+  - text/x-component
+
+# -----------------------------------------------------------------------------
+# Rate Limiting
+# -----------------------------------------------------------------------------
+# Enable global rate limiting zone definition
 nginx_enable_rate_limit: true
+
+# Rate limit zone name (referenced in site configurations)
 nginx_rate_limit_zone_name: "global_limit"
+
+# Shared memory zone size for storing rate limit states
+# 10m can hold ~160,000 IP addresses
 nginx_rate_limit_zone_size: "10m"
+
+# Request rate limit (requests per second)
+# Format: <number>r/s or <number>r/m
 nginx_rate_limit_rate: "10r/s"
+
+# Default burst size for rate limiting (can be overridden per-location)
+nginx_rate_limit_burst: 20
+
+# Use nodelay for rate limiting by default
+nginx_rate_limit_nodelay: true
+
+# -----------------------------------------------------------------------------
+# Real IP / Trusted Proxies
+# -----------------------------------------------------------------------------
+# Header containing real client IP
+# Common: X-Forwarded-For, X-Real-IP, CF-Connecting-IP
 nginx_real_ip_header: "X-Forwarded-For"
+
+# Trusted proxy sources - supports multiple formats:
+#   - Direct CIDR: "10.0.0.0/8"
+#   - IPSet reference: { ipset: "cloudflare-v4" }
+#       Reads from /var/lib/ipset/{name}.save at runtime
+#   - URL reference: { url: "https://example.com/ips.txt" }
+#       Fetches plain text list of CIDRs at Ansible runtime
+#
+# Example:
+#   nginx_trusted_proxies:
+#     - "10.0.0.0/8"
+#     - { ipset: "cloudflare-v4" }
+#     - { url: "https://www.cloudflare.com/ips-v4" }
 nginx_trusted_proxies:
+  # Private networks
   - "10.0.0.0/8"
   - "172.16.0.0/12"
   - "192.168.0.0/16"
-  # Cloudflare
-  - "173.245.48.0/20"
-  - "103.21.244.0/22"
-  - "103.22.200.0/22"
-  - "103.31.4.0/22"
-  - "141.101.64.0/18"
-  - "108.162.192.0/18"
-  - "190.93.240.0/20"
-  - "188.114.96.0/20"
-  - "197.234.240.0/22"
-  - "198.41.128.0/17"
-  - "162.158.0.0/15"
-  - "104.16.0.0/13"
-  - "104.24.0.0/14"
-  - "172.64.0.0/13"
-  - "131.0.72.0/22"
-  # Arvan
-  - "185.143.232.0/22"
-  - "188.229.116.16/30"
-  - "94.101.182.0/27"
-  - "2.144.3.128/28"
-  - "37.32.16.0/27"
-  - "37.32.17.0/27"
-  - "37.32.18.0/27"
-  - "37.32.19.0/27"
-  - "185.215.232.0/22"
-  - "178.131.120.48/28"
 
-# Global Settings
+# Additional proxies (merged with above, same format supported)
+nginx_trusted_proxies_extra: []
+
+# IPSet data directory (for ipset references)
+nginx_ipset_data_dir: "/var/lib/ipset"
+
+# Cache resolved trusted proxies (avoid re-fetching URLs on every run)
+# Set to false to always refresh
+nginx_trusted_proxies_cache: true
+
+# -----------------------------------------------------------------------------
+# Global Security Settings
+# -----------------------------------------------------------------------------
+# Server tokens visibility in error pages and headers
+# Values: on, off, build
 nginx_server_tokens: "off"
-nginx_proxy_intercept_errors: "off"
-nginx_hide_server_header: false
 
+# Intercept and handle upstream error responses with custom error pages
+# Values: on, off
+nginx_proxy_intercept_errors: "off"
+
+# Remove Server header entirely (requires headers-more module)
+nginx_hide_server_header: true
+
+
+# -----------------------------------------------------------------------------
+# Default Security Headers
+# -----------------------------------------------------------------------------
+# Applied to all sites unless overridden. Set to "" to disable.
+
+# X-Frame-Options: Controls iframe embedding
+# Values: DENY, SAMEORIGIN, ALLOW-FROM uri
+nginx_header_x_frame_options: "SAMEORIGIN"
+
+# X-Content-Type-Options: Prevent MIME type sniffing
+# Values: nosniff
+nginx_header_x_content_type_options: "nosniff"
+
+# X-XSS-Protection: XSS filter (legacy, but still useful)
+# Values: 0, 1, 1; mode=block
+nginx_header_x_xss_protection: "1; mode=block"
+
+# Referrer-Policy: Controls referrer information
+# Values: no-referrer, no-referrer-when-downgrade, origin, origin-when-cross-origin,
+#         same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+nginx_header_referrer_policy: "strict-origin-when-cross-origin"
+
+# Permissions-Policy: Controls browser features (formerly Feature-Policy)
+# Example: "geolocation=(), microphone=(), camera=()"
+nginx_header_permissions_policy: ""
+
+# Content-Security-Policy: Controls resource loading
+# Example: "default-src 'self'; script-src 'self' 'unsafe-inline'"
+nginx_header_csp: ""
+
+# HSTS - only applied to SSL-enabled sites
+# Example: "max-age=31536000; includeSubDomains; preload"
+nginx_header_hsts: ""
+
+# -----------------------------------------------------------------------------
+# Default Cache Headers
+# -----------------------------------------------------------------------------
+# Global cache control (can be overridden per-site/location)
+# Set to "" to disable
+
+# Cache-Control for dynamic content (proxied responses)
+nginx_header_cache_control: ""
+
+# X-Cache-Status header (shows HIT/MISS/BYPASS)
+nginx_show_cache_status: false
+
+# -----------------------------------------------------------------------------
+# Default Proxy Settings
+# -----------------------------------------------------------------------------
+nginx_proxy_connect_timeout: "60s"
+nginx_proxy_send_timeout: "60s"
+nginx_proxy_read_timeout: "60s"
+nginx_proxy_buffering: "on"
+nginx_proxy_buffer_size: "4k"
+nginx_proxy_buffers: "8 4k"
+
+# -----------------------------------------------------------------------------
 # SSL/TLS Settings
-nginx_ssl_protocols: "TLSv1.2 TLSv1.3"
+# -----------------------------------------------------------------------------
+# Default directory for SSL certificates
 nginx_ssl_cert_dir: "/etc/ssl/certs"
+
+# Supported TLS protocols
+nginx_ssl_protocols: "TLSv1.2 TLSv1.3"
+
+# SSL cipher suites (modern compatibility)
 nginx_ssl_ciphers: >-
   ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:
   ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:
   ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:
   DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
+
+# Prefer server ciphers over client ciphers
 nginx_ssl_prefer_server_ciphers: "on"
+
+# SSL session cache configuration
 nginx_ssl_session_cache: "shared:SSL:10m"
+
+# SSL session timeout
 nginx_ssl_session_timeout: "1d"
+
+# SSL session tickets (disable for perfect forward secrecy)
 nginx_ssl_session_tickets: "off"
 
-nginx_header_x_frame_options: "SAMEORIGIN"
-nginx_header_x_xss_protection: "1; mode=block"
-nginx_header_referrer_policy: "strict-origin-when-cross-origin"
-nginx_header_permissions_policy: ""
-nginx_header_csp: ""
+# OCSP Stapling
+nginx_ssl_stapling: false
+nginx_ssl_stapling_verify: false
 
+# Path to trusted CA certificates for OCSP stapling
+nginx_ssl_trusted_certificate: ""
 
+# -----------------------------------------------------------------------------
+# WAF (ModSecurity) Configuration
+# -----------------------------------------------------------------------------
+# Install ModSecurity WAF module
 nginx_waf_install: true
+
+# Global ModSecurity settings applied to all WAF-enabled sites
 nginx_waf_global_settings:
   SecRuleEngine: "On"
   SecRequestBodyAccess: "On"
@@ -88,21 +232,53 @@ nginx_waf_global_settings:
   SecResponseBodyAccess: "On"
   SecResponseBodyLimit: "524288"
 
-# Exporter Configuration
+# -----------------------------------------------------------------------------
+# Prometheus Nginx Exporter
+# -----------------------------------------------------------------------------
+# Install nginx-prometheus-exporter
 nginx_exporter_install: true
+
+# Enable and start the exporter service
 nginx_exporter_enabled: false
-nginx_exporter_version: "1.5.1"
+
+# Exporter version to install
+nginx_exporter_version: "1.4.0"
+
+# Port for exporter metrics endpoint
 nginx_exporter_port: 9113
+
+# Internal port for nginx stub_status (localhost only)
 nginx_dummy_metric_port: 29182
 
-# Promtail Configuration (Log to Metrics)
+# -----------------------------------------------------------------------------
+# Promtail (Log Shipping)
+# -----------------------------------------------------------------------------
+# Install Promtail for shipping logs to Loki
 nginx_promtail_install: false
+
+# Enable and start Promtail service
 nginx_promtail_enabled: false
-nginx_promtail_version: "3.6.7"
+
+# Promtail version to install
+nginx_promtail_version: "3.4.2"
+
+# Promtail HTTP server port (for /ready, /metrics endpoints)
 nginx_promtail_port: 9080
+
+# Loki push API URL
+# When empty, logs are sent to a local blackhole endpoint
+# Example: "http://loki.monitoring.svc:3100/loki/api/v1/push"
 nginx_promtail_loki_url: ""
 
-# Standard HTTP Error Codes mapping
+# Additional Promtail labels applied to all log entries
+nginx_promtail_extra_labels: {}
+# Example:
+#   environment: production
+#   datacenter: dc1
+
+# -----------------------------------------------------------------------------
+# Error Pages
+# -----------------------------------------------------------------------------
 nginx_standard_error_codes:
   400: "Bad Request"
   401: "Unauthorized"
@@ -116,3 +292,26 @@ nginx_standard_error_codes:
   502: "Bad Gateway"
   503: "Service Unavailable"
   504: "Gateway Timeout"
+
+# -----------------------------------------------------------------------------
+# Site Definitions
+# -----------------------------------------------------------------------------
+# List of virtual hosts to configure.
+# See examples/sites.yml for comprehensive configuration examples.
+#
+# Quick reference - site fields:
+#   domain:              [Required] Primary domain name
+#   aliases:             [Optional] Additional server names
+#   enabled:             [Optional] Enable site (default: true)
+#   ssl_enabled:         [Optional] Enable HTTPS (default: false)
+#   ssl_cert/ssl_key:    [Optional] Custom certificate paths
+#   upstream:            [Optional] Backend proxy URL
+#   redirect_to:         [Optional] 301 redirect destination
+#   locations:           [Optional] Additional location blocks
+#   waf_enabled:         [Optional] Enable ModSecurity
+#   custom_errors:       [Optional] Custom error page templates
+#   nginx_config:        [Optional] Key-value nginx directives
+#   extra_config:        [Optional] Raw nginx configuration
+#   header_*:            [Optional] Override security headers
+
+nginx_sites: []

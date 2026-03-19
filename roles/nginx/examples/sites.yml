@@ -1,0 +1,398 @@
+---
+# =============================================================================
+# NGINX SITE CONFIGURATION EXAMPLES
+# =============================================================================
+# This file contains comprehensive examples of site configurations.
+# Copy and adapt these examples to your playbook or host_vars.
+#
+# NOTE: This file is for reference only - it is NOT automatically loaded.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 1: Simple Reverse Proxy with SSL
+# -----------------------------------------------------------------------------
+nginx_sites_example_simple:
+  - domain: "app.example.com"
+    aliases:
+      - "www.app.example.com"
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:3000"
+
+# -----------------------------------------------------------------------------
+# Example 2: Multiple Locations with Different Backends
+# -----------------------------------------------------------------------------
+nginx_sites_example_locations:
+  - domain: "api.example.com"
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:8080"
+
+    locations:
+      # API endpoint with separate logging
+      - path: "/api/v1"
+        upstream: "http://127.0.0.1:8081"
+        log_prefix: "api_v1"
+
+      # API v2 with custom error handling
+      - path: "/api/v2"
+        upstream: "http://127.0.0.1:8082"
+        log_prefix: "api_v2"
+        proxy_intercept_errors: "off"
+
+      # Static files with caching
+      - path: "/static"
+        nginx_config:
+          alias: "/var/www/static"
+          expires: "30d"
+        cache_control: "public, max-age=2592000, immutable"
+
+      # WebSocket endpoint
+      - path: "/ws"
+        upstream: "http://127.0.0.1:8083"
+        extra_config: |
+          proxy_read_timeout 3600s;
+          proxy_send_timeout 3600s;
+
+      # Regex location
+      - path: "~ ^/users/(?<user_id>\\d+)/avatar$"
+        upstream: "http://127.0.0.1:8084"
+
+      # Rate limited endpoint
+      - path: "/admin"
+        upstream: "http://127.0.0.1:8085"
+        rate_limit:
+          zone: "global_limit"
+          burst: 5
+          nodelay: true
+
+# -----------------------------------------------------------------------------
+# Example 3: WAF with Custom Rules
+# -----------------------------------------------------------------------------
+nginx_sites_example_waf:
+  - domain: "secure.example.com"
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:9000"
+
+    waf_enabled: true
+    waf_config:
+      SecRuleEngine: "On"
+      SecRequestBodyLimit: "52428800"  # 50MB for uploads
+
+    waf_extra_rules: |
+      # Whitelist internal network
+      SecRule REMOTE_ADDR "@ipMatch 10.0.0.0/8" "id:1000,phase:1,allow,nolog"
+
+      # Disable rule for webhook endpoint
+      SecRule REQUEST_URI "@beginsWith /api/webhook" \
+        "id:1001,phase:1,ctl:ruleRemoveById=942100"
+
+      # Custom blocking rule
+      SecRule REQUEST_HEADERS:User-Agent "@contains BadBot" \
+        "id:1002,phase:1,deny,status:403,msg:'Bad bot blocked'"
+
+# -----------------------------------------------------------------------------
+# Example 4: Custom Security Headers
+# -----------------------------------------------------------------------------
+nginx_sites_example_headers:
+  - domain: "headers.example.com"
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:4000"
+
+    # Override default security headers
+    header_x_frame_options: "DENY"
+    header_x_xss_protection: "1; mode=block"
+    header_referrer_policy: "no-referrer"
+    header_permissions_policy: "geolocation=(), microphone=(), camera=()"
+    header_csp: >-
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' https://cdn.example.com;
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: https:;
+      font-src 'self' https://fonts.gstatic.com;
+      connect-src 'self' https://api.example.com;
+      frame-ancestors 'none';
+    header_hsts: "max-age=31536000; includeSubDomains; preload"
+
+    # Cache control for dynamic content
+    cache_control: "no-store, no-cache, must-revalidate"
+
+# -----------------------------------------------------------------------------
+# Example 5: Custom Error Pages
+# -----------------------------------------------------------------------------
+nginx_sites_example_errors:
+  - domain: "errors.example.com"
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:5000"
+    proxy_intercept_errors: "on"  # Required for custom error pages
+
+    custom_errors:
+      # All 5xx errors
+      - match: "^5..$"
+        template: "templates/errors/5xx.html.j2"
+
+      # Specific 404
+      - match: "^404$"
+        template: "templates/errors/404.html.j2"
+
+      # All other 4xx
+      - match: "^4..$"
+        template: "templates/errors/4xx.html.j2"
+
+    # Template variables available:
+    #   {{ error_code }}    - HTTP status code
+    #   {{ error_message }} - Human-readable message
+
+# -----------------------------------------------------------------------------
+# Example 6: Redirect Site
+# -----------------------------------------------------------------------------
+nginx_sites_example_redirect:
+  - domain: "old.example.com"
+    aliases:
+      - "legacy.example.com"
+      - "www.old.example.com"
+    ssl_enabled: true
+    redirect_to: "https://new.example.com"
+    # All requests redirect to: https://new.example.com{original_uri}
+
+# -----------------------------------------------------------------------------
+# Example 7: HTTP-Only Internal Site
+# -----------------------------------------------------------------------------
+nginx_sites_example_http:
+  - domain: "internal.example.local"
+    ssl_enabled: false
+    upstream: "http://127.0.0.1:6000"
+    server_tokens: "on"
+
+    # No security headers for internal
+    header_x_frame_options: ""
+    header_hsts: ""
+
+# -----------------------------------------------------------------------------
+# Example 8: Custom SSL Configuration
+# -----------------------------------------------------------------------------
+nginx_sites_example_ssl:
+  - domain: "legacy-ssl.example.com"
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:7000"
+
+    # Custom certificate paths
+    ssl_cert: "/etc/letsencrypt/live/legacy-ssl.example.com/fullchain.pem"
+    ssl_key: "/etc/letsencrypt/live/legacy-ssl.example.com/privkey.pem"
+
+    # Legacy client compatibility
+    ssl_protocols: "TLSv1.2"
+    ssl_ciphers: "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256"
+    ssl_prefer_server_ciphers: "on"
+    ssl_session_cache: "shared:SSL:5m"
+    ssl_session_timeout: "4h"
+    ssl_session_tickets: "on"
+
+# -----------------------------------------------------------------------------
+# Example 9: Static Site with Caching
+# -----------------------------------------------------------------------------
+nginx_sites_example_static:
+  - domain: "static.example.com"
+    ssl_enabled: true
+
+    # No upstream - serving files directly
+    nginx_config:
+      root: "/var/www/static.example.com"
+      index: "index.html"
+
+    locations:
+      - path: "/"
+        nginx_config:
+          try_files: "$uri $uri/ =404"
+
+      - path: "/assets"
+        nginx_config:
+          expires: "1y"
+        cache_control: "public, max-age=31536000, immutable"
+
+      - path: "~ \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff2?)$"
+        nginx_config:
+          expires: "30d"
+        cache_control: "public, max-age=2592000"
+
+# -----------------------------------------------------------------------------
+# Example 10: Raw Nginx Configuration
+# -----------------------------------------------------------------------------
+nginx_sites_example_raw:
+  - domain: "custom.example.com"
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:8000"
+
+    # Server-level directives as key-value
+    nginx_config:
+      client_max_body_size: "100M"
+      proxy_read_timeout: "300s"
+      proxy_connect_timeout: "60s"
+      proxy_buffering: "off"
+
+    # Raw nginx configuration block
+    extra_config: |
+      # Custom rewrites
+      rewrite ^/old-path/(.*)$ /new-path/$1 permanent;
+
+      # Health check endpoint
+      location /health {
+          access_log off;
+          return 200 "OK";
+          add_header Content-Type text/plain;
+      }
+
+      # Deny sensitive files
+      location ~ /\.(git|env|htaccess) {
+          deny all;
+          return 404;
+      }
+
+      # Custom caching for specific backend
+      location /cached-api {
+          proxy_pass http://127.0.0.1:8001;
+          proxy_cache_valid 200 10m;
+          proxy_cache_use_stale error timeout updating;
+          add_header X-Cache-Status $upstream_cache_status;
+      }
+
+# -----------------------------------------------------------------------------
+# Example 11: Full-Featured Production Site
+# -----------------------------------------------------------------------------
+nginx_sites_example_full:
+  - domain: "production.example.com"
+    aliases:
+      - "www.production.example.com"
+      - "app.production.example.com"
+    enabled: true
+
+    # SSL with custom paths
+    ssl_enabled: true
+    ssl_cert: "/etc/letsencrypt/live/production.example.com/fullchain.pem"
+    ssl_key: "/etc/letsencrypt/live/production.example.com/privkey.pem"
+
+    # Main backend
+    upstream: "http://127.0.0.1:3000"
+    proxy_intercept_errors: "on"
+
+    # WAF protection
+    waf_enabled: true
+    waf_config:
+      SecRuleEngine: "On"
+    waf_extra_rules: |
+      SecRule REQUEST_URI "@beginsWith /api/" "id:2000,phase:1,ctl:ruleRemoveById=920170"
+
+    # Security headers
+    header_x_frame_options: "DENY"
+    header_csp: "default-src 'self'; script-src 'self' 'unsafe-inline'"
+    header_hsts: "max-age=63072000; includeSubDomains; preload"
+    header_permissions_policy: "geolocation=(), microphone=()"
+
+    # Cache control
+    cache_control: "no-cache"
+
+    # Custom error pages
+    custom_errors:
+      - match: "^5..$"
+        template: "templates/errors/5xx.html.j2"
+      - match: "^4..$"
+        template: "templates/errors/4xx.html.j2"
+
+    # Server-level settings
+    nginx_config:
+      client_max_body_size: "50M"
+
+    # Location blocks
+    locations:
+      # API with rate limiting
+      - path: "/api"
+        upstream: "http://127.0.0.1:8080"
+        log_prefix: "api"
+        rate_limit:
+          burst: 50
+          nodelay: true
+
+      # Static assets
+      - path: "/static"
+        nginx_config:
+          alias: "/var/www/production.example.com/static"
+          expires: "30d"
+        cache_control: "public, max-age=2592000, immutable"
+
+      # Large file uploads
+      - path: "/uploads"
+        upstream: "http://127.0.0.1:8081"
+        nginx_config:
+          client_max_body_size: "500M"
+        extra_config: |
+          proxy_request_buffering off;
+
+      # WebSocket
+      - path: "/ws"
+        upstream: "http://127.0.0.1:8082"
+        extra_config: |
+          proxy_read_timeout 86400s;
+          proxy_send_timeout 86400s;
+
+    # Additional server config
+    extra_config: |
+      # Security: deny dotfiles
+      location ~ /\. {
+          deny all;
+          return 404;
+      }
+
+# =============================================================================
+# LOCATION BLOCK REFERENCE
+# =============================================================================
+#
+# locations:
+#   - path: "/path"                    # [Required] Location path
+#                                      #   Exact: "= /path"
+#                                      #   Prefix: "/path"
+#                                      #   Regex: "~ pattern" or "~* pattern"
+#
+#     upstream: "http://..."           # [Optional] Proxy destination
+#
+#     log_prefix: "name"               # [Optional] Separate log file
+#                                      #   → {domain}_{prefix}_access.log
+#
+#     proxy_intercept_errors: "on"     # [Optional] Override error handling
+#
+#     rate_limit:                      # [Optional] Rate limiting
+#       zone: "zone_name"              #   Zone (default: nginx_rate_limit_zone_name)
+#       burst: 20                      #   Burst allowance
+#       nodelay: true                  #   No delay mode
+#
+#     cache_control: "..."             # [Optional] Cache-Control header
+#
+#     nginx_config:                    # [Optional] Nginx directives
+#       key: "value"                   #   → key value;
+#
+#     extra_config: |                  # [Optional] Raw nginx config
+#       # any nginx directives
+#
+# =============================================================================
+# TRUSTED PROXIES REFERENCE
+# =============================================================================
+#
+# nginx_trusted_proxies supports three formats:
+#
+#   # Direct CIDR notation
+#   - "10.0.0.0/8"
+#   - "192.168.1.0/24"
+#
+#   # IPSet reference (reads from /var/lib/ipset/{name}.save)
+#   - ipset: "cloudflare-v4"
+#   - ipset: "my-custom-proxies"
+#
+#   # URL reference (fetches at Ansible runtime)
+#   - url: "https://www.cloudflare.com/ips-v4"
+#   - url: "https://example.com/trusted-ips.txt"
+#
+# Example combining all formats:
+#   nginx_trusted_proxies:
+#     - "10.0.0.0/8"
+#     - "172.16.0.0/12"
+#     - ipset: "cloudflare-v4"
+#     - url: "https://www.cloudflare.com/ips-v4"
+#
+# =============================================================================

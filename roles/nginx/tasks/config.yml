@@ -33,6 +33,10 @@
     mode: '0644'
   notify: Reload nginx
 
+# Resolve trusted proxies from ipsets and URLs
+- name: Resolve trusted proxies
+  ansible.builtin.include_tasks: realip.yml
+
 - name: Configure real IP and trusted proxies
   ansible.builtin.template:
     src: realip.conf.j2
