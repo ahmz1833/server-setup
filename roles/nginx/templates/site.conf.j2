@@ -1,18 +1,23 @@
 {# ===================================== Macros ===================================== #}
 {# ------------------------------- Security Headers --------------------------------- #}
-{% macro security_headers(site) -%}
+{% macro security_headers(site, is_ssl=false) -%}
 {% set opt_x_frame = site.header_x_frame_options | default(nginx_header_x_frame_options) %}
+{% set opt_x_cto = site.header_x_content_type_options | default(nginx_header_x_content_type_options) %}
 {% set opt_x_xss = site.header_x_xss_protection | default(nginx_header_x_xss_protection) %}
 {% set opt_ref_pol = site.header_referrer_policy | default(nginx_header_referrer_policy) %}
 {% set opt_perm_pol = site.header_permissions_policy | default(nginx_header_permissions_policy) %}
 {% set opt_csp = site.header_csp | default(nginx_header_csp) %}
+{% set opt_hsts = site.header_hsts | default(nginx_header_hsts) %}
+{% set opt_cache = site.cache_control | default(nginx_header_cache_control) %}
 {% if opt_x_frame %}
     add_header X-Frame-Options "{{ opt_x_frame }}" always;
+{% endif %}
+{% if opt_x_cto %}
+    add_header X-Content-Type-Options "{{ opt_x_cto }}" always;
 {% endif %}
 {% if opt_x_xss %}
     add_header X-XSS-Protection "{{ opt_x_xss }}" always;
 {% endif %}
-    add_header X-Content-Type-Options "nosniff" always;
 {% if opt_ref_pol %}
     add_header Referrer-Policy "{{ opt_ref_pol }}" always;
 {% endif %}
@@ -21,6 +26,15 @@
 {% endif %}
 {% if opt_csp %}
     add_header Content-Security-Policy "{{ opt_csp }}" always;
+{% endif %}
+{% if is_ssl and opt_hsts %}
+    add_header Strict-Transport-Security "{{ opt_hsts }}" always;
+{% endif %}
+{% if opt_cache %}
+    add_header Cache-Control "{{ opt_cache }}";
+{% endif %}
+{% if nginx_show_cache_status | default(false) %}
+    add_header X-Cache-Status $upstream_cache_status;
 {% endif %}
 {%- endmacro %}
 {# ------------------------------ WAF Configuration --------------------------------- #}
@@ -44,18 +58,34 @@
 {%- endmacro %}
 {# --------------------------- Proxy Pass Configuration ----------------------------- #}
 {% macro proxy_pass(upstream, site, location=none) -%}
-{% set intercept = location.proxy_intercept_errors | default(site.proxy_intercept_errors | default(nginx_proxy_intercept_errors)) 
-    if location
-    else site.proxy_intercept_errors | default(nginx_proxy_intercept_errors) %}
+{% set intercept = location.proxy_intercept_errors | default(site.proxy_intercept_errors | default(nginx_proxy_intercept_errors)) if location else site.proxy_intercept_errors | default(nginx_proxy_intercept_errors) %}
+{% set timeout_connect = site.proxy_connect_timeout | default(nginx_proxy_connect_timeout) %}
+{% set timeout_send = site.proxy_send_timeout | default(nginx_proxy_send_timeout) %}
+{% set timeout_read = site.proxy_read_timeout | default(nginx_proxy_read_timeout) %}
         proxy_pass {{ upstream }};
         proxy_http_version 1.1;
         proxy_intercept_errors {{ intercept }};
+        proxy_connect_timeout {{ timeout_connect }};
+        proxy_send_timeout {{ timeout_send }};
+        proxy_read_timeout {{ timeout_read }};
+        proxy_buffering {{ site.proxy_buffering | default(nginx_proxy_buffering) }};
+        proxy_buffer_size {{ site.proxy_buffer_size | default(nginx_proxy_buffer_size) }};
+        proxy_buffers {{ site.proxy_buffers | default(nginx_proxy_buffers) }};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+{%- endmacro %}
+{# ---------------------------------- Rate Limiting --------------------------------- #}
+{% macro rate_limit_config(loc) -%}
+{% if loc.rate_limit is defined %}
+{% set zone = loc.rate_limit.zone | default(nginx_rate_limit_zone_name) %}
+{% set burst = loc.rate_limit.burst | default(nginx_rate_limit_burst) %}
+{% set nodelay = loc.rate_limit.nodelay | default(nginx_rate_limit_nodelay) %}
+        limit_req zone={{ zone }} burst={{ burst }}{% if nodelay %} nodelay{% endif %};
+{% endif %}
 {%- endmacro %}
 {# ---------------------------- Error Pages Configuration --------------------------- #}
 {% macro error_pages(site, site_custom_codes, fallback_codes) -%}
@@ -88,8 +118,14 @@
         error_log /var/log/nginx/{{ site.domain }}_{{ loc.log_prefix }}_error.log warn;
 {% endif %}
 
+{{ rate_limit_config(loc) }}
+
 {% if loc.upstream is defined %}
 {{ proxy_pass(loc.upstream, site, loc) }}
+{% endif %}
+
+{% if loc.cache_control is defined %}
+        add_header Cache-Control "{{ loc.cache_control }}";
 {% endif %}
 
 {% for k, v in (loc.nginx_config | default({})).items() %}
@@ -109,10 +145,17 @@
     ssl_session_cache {{ site.ssl_session_cache | default(nginx_ssl_session_cache) }};
     ssl_session_timeout {{ site.ssl_session_timeout | default(nginx_ssl_session_timeout) }};
     ssl_session_tickets {{ site.ssl_session_tickets | default(nginx_ssl_session_tickets) }};
+{% if site.ssl_stapling | default(nginx_ssl_stapling) %}
+    ssl_stapling on;
+    ssl_stapling_verify {{ 'on' if (site.ssl_stapling_verify | default(nginx_ssl_stapling_verify)) else 'off' }};
+{% if site.ssl_trusted_certificate | default(nginx_ssl_trusted_certificate) %}
+    ssl_trusted_certificate {{ site.ssl_trusted_certificate | default(nginx_ssl_trusted_certificate) }};
+{% endif %}
+{% endif %}
 {%- endmacro %}
 {# -------------------- Full Server Block Content (non-redirect) -------------------- #}
-{% macro server_content(site, site_custom_codes, fallback_codes) -%}
-{{ security_headers(site) }}
+{% macro server_content(site, site_custom_codes, fallback_codes, is_ssl=false) -%}
+{{ security_headers(site, is_ssl) }}
 
 {{ waf_config(site) }}
 
@@ -120,7 +163,7 @@
     {{ k }} {{ v }};
 {% endfor %}
 
-{{ site.extra_config | default('') | indent(4, true) }}
+    {{ site.extra_config | default('') | indent(4) }}
 
 {{ error_pages(site, site_custom_codes, fallback_codes) }}
 
@@ -177,7 +220,7 @@ server {
         return 301 {{ site.redirect_to }}$request_uri;
     }
 {% else %}
-{{ server_content(site, site_custom_codes, fallback_codes) }}
+{{ server_content(site, site_custom_codes, fallback_codes, ssl) }}
 {% endif %}
 {% endif %}
 }
@@ -201,7 +244,6 @@ server {
 {% set _ = fallback_codes.append(code) %}
 {% endif %}
 {% endfor %}
-
 {# Generate server blocks #}
 {% if item.ssl_enabled | default(false) %}
 {# HTTP redirect server #}
