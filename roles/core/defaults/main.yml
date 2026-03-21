@@ -36,6 +36,27 @@ core_packages:
 core_extra_packages: []
 
 # -----------------------------------------------------------------------------
+# NTP Configuration
+# -----------------------------------------------------------------------------
+core_manage_ntp: true
+core_ntp_servers:
+  - "0.pool.ntp.org"
+  - "1.pool.ntp.org"
+  - "2.pool.ntp.org"
+  - "3.pool.ntp.org"
+core_ntp_fallback_servers:
+  - "time.cloudflare.com"
+  - "time.google.com"
+
+# -----------------------------------------------------------------------------
+# Swap Configuration
+# -----------------------------------------------------------------------------
+core_manage_swap: true
+core_swap_enabled: false
+core_swap_file: "/swapfile"
+core_swap_size_mb: 2048
+
+# -----------------------------------------------------------------------------
 # User Management
 # -----------------------------------------------------------------------------
 core_manage_users: true
@@ -107,7 +128,9 @@ core_sysctl_base:
   net.ipv4.conf.all.rp_filter: 1
   net.ipv4.conf.default.rp_filter: 1
   net.ipv4.conf.all.log_martians: 1
-  # Performance
+  # Performance & TCP BBR
+  net.core.default_qdisc: fq
+  net.ipv4.tcp_congestion_control: bbr
   net.core.somaxconn: 65535
   net.core.netdev_max_backlog: 65535
   net.ipv4.tcp_max_syn_backlog: 65535
@@ -115,6 +138,9 @@ core_sysctl_base:
   net.ipv4.tcp_keepalive_time: 300
   net.ipv4.tcp_keepalive_probes: 5
   net.ipv4.tcp_keepalive_intvl: 15
+  # Swap tuning
+  vm.swappiness: 10
+  vm.vfs_cache_pressure: 50
 
 # Additional sysctl settings (merged with base)
 core_sysctl_extra: {}

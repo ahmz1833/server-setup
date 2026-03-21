@@ -8,6 +8,16 @@
   ansible.builtin.import_tasks: system.yml
   tags: [core, core-system]
 
+- name: Core Setup - NTP Configuration
+  ansible.builtin.import_tasks: ntp.yml
+  when: core_manage_ntp
+  tags: [core, core-ntp, core-system]
+
+- name: Core Setup - Swap Configuration
+  ansible.builtin.import_tasks: swap.yml
+  when: core_manage_swap
+  tags: [core, core-swap, core-system]
+
 - name: Core Setup - User Management
   ansible.builtin.import_tasks: users.yml
   when: core_manage_users

@@ -1,0 +1,15 @@
+# Managed by Ansible
+
+{% for server in core_ntp_servers %}
+pool {{ server }} iburst
+{% endfor %}
+
+{% for server in core_ntp_fallback_servers %}
+server {{ server }} iburst
+{% endfor %}
+
+sourcedir /run/chrony-dhcp
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+logdir /var/log/chrony

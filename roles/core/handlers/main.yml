@@ -12,3 +12,13 @@
   ansible.builtin.service:
     name: "{{ 'ssh' if ansible_facts['os_family'] == 'Debian' else 'sshd' }}"
     state: restarted
+
+- name: Restart timesyncd
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    state: restarted
+
+- name: Restart chronyd
+  ansible.builtin.systemd:
+    name: chronyd
+    state: restarted

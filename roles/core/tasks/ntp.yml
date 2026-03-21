@@ -1,0 +1,46 @@
+---
+- name: Configure NTP (Debian/Ubuntu)
+  when: ansible_facts['os_family'] == 'Debian'
+  block:
+    - name: Install systemd-timesyncd
+      ansible.builtin.apt:
+        name: systemd-timesyncd
+        state: present
+
+    - name: Configure systemd-timesyncd
+      ansible.builtin.template:
+        src: timesyncd.conf.j2
+        dest: /etc/systemd/timesyncd.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: Restart timesyncd
+
+    - name: Enable systemd-timesyncd
+      ansible.builtin.systemd:
+        name: systemd-timesyncd
+        state: started
+        enabled: true
+
+- name: Configure NTP (RedHat/CentOS)
+  when: ansible_facts['os_family'] == 'RedHat'
+  block:
+    - name: Install chrony
+      ansible.builtin.package:
+        name: chrony
+        state: present
+
+    - name: Configure chrony
+      ansible.builtin.template:
+        src: chrony.conf.j2
+        dest: /etc/chrony.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: Restart chronyd
+
+    - name: Enable chronyd
+      ansible.builtin.systemd:
+        name: chronyd
+        state: started
+        enabled: true

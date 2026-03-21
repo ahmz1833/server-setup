@@ -1,0 +1,76 @@
+---
+- name: Enable and configure swap
+  when: core_swap_enabled | default(true)
+  block:
+    - name: Check if swap file exists
+      ansible.builtin.stat:
+        path: "{{ core_swap_file }}"
+      register: core_swap_file_stat
+
+    - name: Create swap file
+      ansible.builtin.command:
+        cmd: "dd if=/dev/zero of={{ core_swap_file }} bs=1M count={{ core_swap_size_mb }}"
+      changed_when: true
+      when: not core_swap_file_stat.stat.exists
+
+    - name: Set swap file permissions
+      ansible.builtin.file:
+        path: "{{ core_swap_file }}"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Format swap file
+      ansible.builtin.command:
+        cmd: "mkswap {{ core_swap_file }}"
+      changed_when: true
+      when: not core_swap_file_stat.stat.exists
+
+    - name: Ensure swap is mounted and enabled
+      ansible.posix.mount:
+        name: none
+        src: "{{ core_swap_file }}"
+        fstype: swap
+        opts: sw
+        passno: 0
+        dump: 0
+        state: present
+
+    - name: Check if swap is active
+      ansible.builtin.command:
+        cmd: "swapon --show=NAME"
+      register: core_swap_active
+      changed_when: false
+
+    - name: Turn on swap
+      ansible.builtin.command:
+        cmd: "swapon {{ core_swap_file }}"
+      changed_when: true
+      when: core_swap_file not in core_swap_active.stdout
+
+- name: Disable and remove swap
+  when: not (core_swap_enabled | default(true))
+  block:
+    - name: Check if any swap is active
+      ansible.builtin.command:
+        cmd: "swapon --show"
+      register: core_swap_active_check
+      changed_when: false
+
+    - name: Turn off all swap
+      ansible.builtin.command:
+        cmd: "swapoff -a"
+      changed_when: true
+      when: core_swap_active_check.stdout | length > 0
+
+    - name: Remove managed swap from fstab
+      ansible.posix.mount:
+        name: none
+        src: "{{ core_swap_file }}"
+        fstype: swap
+        state: absent
+
+    - name: Delete managed swap file
+      ansible.builtin.file:
+        path: "{{ core_swap_file }}"
+        state: absent
