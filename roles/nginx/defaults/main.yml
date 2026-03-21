@@ -188,6 +188,10 @@ nginx_proxy_buffers: "8 4k"
 # Default directory for SSL certificates
 nginx_ssl_cert_dir: "/etc/ssl/certs"
 
+# Enable serving ACME webroot challenge files automatically for all sites
+nginx_acme_challenge_enabled: false
+nginx_default_acme_dir: /var/www/acme
+
 # Supported TLS protocols
 nginx_ssl_protocols: "TLSv1.2 TLSv1.3"
 

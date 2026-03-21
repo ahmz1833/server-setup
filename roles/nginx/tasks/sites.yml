@@ -37,6 +37,10 @@
   when: item.path | basename not in expected_configs
   notify: Reload nginx
 
+- name: Validate Nginx configuration syntax (Guardrail)
+  ansible.builtin.command: nginx -t
+  changed_when: false
+
 - name: Ensure nginx service
   ansible.builtin.systemd:
     name: nginx

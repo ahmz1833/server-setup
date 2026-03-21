@@ -153,6 +153,17 @@
 {% endif %}
 {% endif %}
 {%- endmacro %}
+{# --------------------------- ACME Webroot Configuration ------------------------- #}
+{% macro acme_challenge(site) -%}
+{% if site.acme_challenge_enabled | default(nginx_acme_challenge_enabled) %}
+    location ^~ /.well-known/acme-challenge/ {
+        allow all;
+        root {{ nginx_default_acme_dir }};
+        default_type "text/plain";
+        access_log off;
+    }
+{% endif %}
+{%- endmacro %}
 {# -------------------- Full Server Block Content (non-redirect) -------------------- #}
 {% macro server_content(site, site_custom_codes, fallback_codes, is_ssl=false) -%}
 {{ security_headers(site, is_ssl) }}
@@ -166,6 +177,8 @@
     {{ site.extra_config | default('') | indent(4) }}
 
 {{ error_pages(site, site_custom_codes, fallback_codes) }}
+
+{{ acme_challenge(site) }}
 
 {% if site.upstream is defined %}
     location / {
@@ -201,6 +214,8 @@ server {
 {% endif %}
 {% if redirect_only %}
     set $endpoint_name "redirect";
+
+{{ acme_challenge(site) }}
 
     location / {
 {% if site.redirect_to is defined %}

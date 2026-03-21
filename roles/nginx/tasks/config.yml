@@ -12,6 +12,14 @@
     state: directory
     mode: '0755'
 
+- name: Ensure ACME challenge webroot directory exists
+  ansible.builtin.file:
+    path: "{{ nginx_default_acme_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ (ansible_facts['os_family'] == 'Debian') | ternary('www-data', 'nginx') }}"
+    group: "{{ (ansible_facts['os_family'] == 'Debian') | ternary('www-data', 'nginx') }}"
+
 - name: Tune worker_processes in nginx.conf
   ansible.builtin.replace:
     path: /etc/nginx/nginx.conf

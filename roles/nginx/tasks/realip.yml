@@ -6,20 +6,20 @@
 
 - name: Initialize resolved trusted proxies list
   ansible.builtin.set_fact:
-    _nginx_resolved_proxies: []
+    nginx_resolved_proxies: []
 
 - name: Combine base and extra trusted proxies
   ansible.builtin.set_fact:
-    _nginx_all_proxy_sources: "{{ nginx_trusted_proxies + nginx_trusted_proxies_extra }}"
+    nginx_all_proxy_sources: "{{ nginx_trusted_proxies + nginx_trusted_proxies_extra }}"
 
 # -----------------------------------------------------------------------------
 # Process Direct CIDRs
 # -----------------------------------------------------------------------------
 - name: Extract direct CIDR entries
   ansible.builtin.set_fact:
-    _nginx_resolved_proxies: >-
-      {{ _nginx_resolved_proxies + [item] }}
-  loop: "{{ _nginx_all_proxy_sources | selectattr('ipset', 'undefined') | selectattr('url', 'undefined') | list }}"
+    nginx_resolved_proxies: >-
+      {{ nginx_resolved_proxies + [item] }}
+  loop: "{{ nginx_all_proxy_sources | selectattr('ipset', 'undefined') | selectattr('url', 'undefined') | list }}"
   when: item is string
 
 # -----------------------------------------------------------------------------
@@ -27,22 +27,22 @@
 # -----------------------------------------------------------------------------
 - name: Get IPSet reference entries
   ansible.builtin.set_fact:
-    _nginx_ipset_refs: >-
-      {{ _nginx_all_proxy_sources | selectattr('ipset', 'defined') | map(attribute='ipset') | list }}
+    nginx_ipset_refs: >-
+      {{ nginx_all_proxy_sources | selectattr('ipset', 'defined') | map(attribute='ipset') | list }}
 
 - name: Read IPSet save files
   ansible.builtin.slurp:
     src: "{{ nginx_ipset_data_dir }}/{{ item }}.save"
-  register: _nginx_ipset_contents
-  loop: "{{ _nginx_ipset_refs }}"
-  when: _nginx_ipset_refs | length > 0
+  register: nginx_ipset_contents
+  loop: "{{ nginx_ipset_refs }}"
+  when: nginx_ipset_refs | length > 0
   failed_when: false
 
 - name: Parse IPSet entries
   ansible.builtin.set_fact:
-    _nginx_resolved_proxies: >-
-      {%- set result = _nginx_resolved_proxies -%}
-      {%- for ipset_file in _nginx_ipset_contents.results | default([]) -%}
+    nginx_resolved_proxies: >-
+      {%- set result = nginx_resolved_proxies -%}
+      {%- for ipset_file in nginx_ipset_contents.results | default([]) -%}
         {%- if ipset_file.content is defined -%}
           {%- set content = ipset_file.content | b64decode -%}
           {%- for line in content.split('\n') -%}
@@ -56,24 +56,24 @@
         {%- endif -%}
       {%- endfor -%}
       {{ result }}
-  when: _nginx_ipset_contents.results is defined
+  when: nginx_ipset_contents.results is defined
 
 # -----------------------------------------------------------------------------
 # Process URL References
 # -----------------------------------------------------------------------------
 - name: Get URL reference entries
   ansible.builtin.set_fact:
-    _nginx_url_refs: >-
-      {{ _nginx_all_proxy_sources | selectattr('url', 'defined') | map(attribute='url') | list }}
+    nginx_url_refs: >-
+      {{ nginx_all_proxy_sources | selectattr('url', 'defined') | map(attribute='url') | list }}
 
 - name: Fetch trusted proxies from URLs
   ansible.builtin.uri:
     url: "{{ item }}"
     return_content: true
     timeout: 30
-  register: _nginx_url_contents
-  loop: "{{ _nginx_url_refs }}"
-  when: _nginx_url_refs | length > 0
+  register: nginx_url_contents
+  loop: "{{ nginx_url_refs }}"
+  when: nginx_url_refs | length > 0
   failed_when: false
   delegate_to: localhost
   become: false
@@ -81,9 +81,9 @@
 
 - name: Parse URL content for CIDRs
   ansible.builtin.set_fact:
-    _nginx_resolved_proxies: >-
-      {%- set result = _nginx_resolved_proxies -%}
-      {%- for url_result in _nginx_url_contents.results | default([]) -%}
+    nginx_resolved_proxies: >-
+      {%- set result = nginx_resolved_proxies -%}
+      {%- for url_result in nginx_url_contents.results | default([]) -%}
         {%- if url_result.content is defined -%}
           {%- for line in url_result.content.split('\n') -%}
             {%- set trimmed = line | trim -%}
@@ -97,14 +97,14 @@
         {%- endif -%}
       {%- endfor -%}
       {{ result }}
-  when: _nginx_url_contents.results is defined
+  when: nginx_url_contents.results is defined
 
 # -----------------------------------------------------------------------------
 # Deduplicate and Finalize
 # -----------------------------------------------------------------------------
 - name: Deduplicate resolved proxies
   ansible.builtin.set_fact:
-    nginx_resolved_trusted_proxies: "{{ _nginx_resolved_proxies | unique | list }}"
+    nginx_resolved_trusted_proxies: "{{ nginx_resolved_proxies | unique | list }}"
 
 - name: Display resolved trusted proxies count
   ansible.builtin.debug:
