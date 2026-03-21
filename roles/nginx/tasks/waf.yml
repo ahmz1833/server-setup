@@ -5,57 +5,29 @@
     state: directory
     mode: '0755'
 
-- name: Check modsecurity recommended config
-  ansible.builtin.stat:
-    path: /etc/modsecurity/modsecurity.conf-recommended
-  register: nginx_modsec_rec_conf
+- name: Install modsecurity recommended config via remote_asset
+  ansible.builtin.include_role:
+    name: asset
+  vars:
+    asset_name: "modsec-conf"
+    asset_type: "file"
+    asset_version: "3.0.0"
+    asset_url: "https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/modsecurity.conf-recommended"
+    asset_dest: "/etc/modsecurity/modsecurity.conf-recommended"
+    asset_extract: false
+    asset_download_locally: "{{ nginx_download_locally | default(false) }}"
 
-- name: Download and copy modsecurity recommended config
-  when: not nginx_modsec_rec_conf.stat.exists
-  block:
-    - name: Download modsecurity recommended config
-      ansible.builtin.get_url:
-        url: https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/modsecurity.conf-recommended
-        dest: /tmp/modsecurity.conf-recommended
-        mode: '0644'
-      delegate_to: "{{ 'localhost' if nginx_download_locally | default(false) else inventory_hostname }}"
-      run_once: "{{ nginx_download_locally | default(false) }}"
-      become: "{{ not (nginx_download_locally | default(false)) }}"
-
-    - name: Copy modsecurity recommended config to target
-      ansible.builtin.copy:
-        src: /tmp/modsecurity.conf-recommended
-        dest: /etc/modsecurity/modsecurity.conf-recommended
-        mode: '0644'
-        owner: root
-        group: root
-        remote_src: "{{ not (nginx_download_locally | default(false)) }}"
-
-- name: Check unicode mapping file
-  ansible.builtin.stat:
-    path: /etc/modsecurity/unicode.mapping
-  register: nginx_unicode_mapping_check
-
-- name: Download and copy unicode mapping file
-  when: not nginx_unicode_mapping_check.stat.exists
-  block:
-    - name: Download unicode mapping file
-      ansible.builtin.get_url:
-        url: https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/unicode.mapping
-        dest: /tmp/unicode.mapping
-        mode: '0644'
-      delegate_to: "{{ 'localhost' if nginx_download_locally | default(false) else inventory_hostname }}"
-      run_once: "{{ nginx_download_locally | default(false) }}"
-      become: "{{ not (nginx_download_locally | default(false)) }}"
-
-    - name: Copy unicode mapping file to target
-      ansible.builtin.copy:
-        src: /tmp/unicode.mapping
-        dest: /etc/modsecurity/unicode.mapping
-        mode: '0644'
-        owner: root
-        group: root
-        remote_src: "{{ not (nginx_download_locally | default(false)) }}"
+- name: Install unicode mapping file via remote_asset
+  ansible.builtin.include_role:
+    name: asset
+  vars:
+    asset_name: "unicode-mapping"
+    asset_type: "file"
+    asset_version: "3.0.0"
+    asset_url: "https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/unicode.mapping"
+    asset_dest: "/etc/modsecurity/unicode.mapping"
+    asset_extract: false
+    asset_download_locally: "{{ nginx_download_locally | default(false) }}"
 
 - name: Initialize modsecurity config
   ansible.builtin.copy:
@@ -74,32 +46,18 @@
   loop: "{{ nginx_waf_global_settings | dict2items }}"
   notify: Reload nginx
 
-- name: Check crs setup example
-  ansible.builtin.stat:
-    path: /etc/modsecurity/crs-setup.conf
-  register: nginx_crs_setup_check
-
-- name: Download and copy CRS setup config
-  when: not nginx_crs_setup_check.stat.exists
-  block:
-    - name: Download CRS setup config
-      ansible.builtin.get_url:
-        url: https://raw.githubusercontent.com/coreruleset/coreruleset/v3.3/master/crs-setup.conf.example
-        dest: /tmp/crs-setup.conf
-        mode: '0644'
-      delegate_to: "{{ 'localhost' if nginx_download_locally | default(false) else inventory_hostname }}"
-      run_once: "{{ nginx_download_locally | default(false) }}"
-      become: "{{ not (nginx_download_locally | default(false)) }}"
-
-    - name: Copy CRS setup config to target
-      ansible.builtin.copy:
-        src: /tmp/crs-setup.conf
-        dest: /etc/modsecurity/crs-setup.conf
-        mode: '0644'
-        owner: root
-        group: root
-        remote_src: "{{ not (nginx_download_locally | default(false)) }}"
-      notify: Reload nginx
+- name: Install CRS setup config via remote_asset
+  ansible.builtin.include_role:
+    name: asset
+  vars:
+    asset_name: "crs-setup"
+    asset_type: "file"
+    asset_version: "3.3.0"
+    asset_url: "https://raw.githubusercontent.com/coreruleset/coreruleset/v3.3/master/crs-setup.conf.example"
+    asset_dest: "/etc/modsecurity/crs-setup.conf"
+    asset_extract: false
+    asset_download_locally: "{{ nginx_download_locally | default(false) }}"
+  notify: Reload nginx
 
 - name: Create nginx modsec directory
   ansible.builtin.file:

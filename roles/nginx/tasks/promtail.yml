@@ -8,36 +8,20 @@
     append: true
     state: present
 
-- name: Check if promtail is installed
-  ansible.builtin.command: which promtail
-  register: nginx_promtail_check
-  ignore_errors: true
-  changed_when: false
-
-- name: Set promtail binary path
-  ansible.builtin.set_fact:
-    nginx_promtail_bin_path: "{{ nginx_promtail_check.stdout | default('/usr/local/bin/promtail', true) }}"
-
-- name: Download and extract promtail archive
-  when: nginx_promtail_check.rc != 0
-  block:
-    - name: Download and extract promtail archive
-      ansible.builtin.unarchive:
-        src: "https://github.com/grafana/loki/releases/download/v{{ nginx_promtail_version }}/promtail-linux-amd64.zip"
-        dest: "/tmp/"
-        remote_src: true
-      delegate_to: "{{ 'localhost' if nginx_download_locally | default(false) else inventory_hostname }}"
-      run_once: "{{ nginx_download_locally | default(false) }}"
-      become: "{{ not (nginx_download_locally | default(false)) }}"
-
-    - name: Copy promtail binary to target node
-      ansible.builtin.copy:
-        src: "/tmp/promtail-linux-amd64"
-        dest: "/usr/local/bin/promtail"
-        mode: '0755'
-        owner: root
-        group: root
-        remote_src: "{{ not (nginx_download_locally | default(false)) }}"
+- name: Install promtail via remote_asset role
+  ansible.builtin.include_role:
+    name: asset
+  vars:
+    asset_name: "promtail"
+    asset_version: "{{ nginx_promtail_version }}"
+    asset_url: "https://github.com/grafana/loki/releases/download/v%v/promtail-linux-amd64.zip"
+    asset_extract: true
+    asset_extract_src: "promtail-linux-amd64"
+    asset_version_cmd: "--version"
+    asset_version_regex: 'promtail,\s+version\s+([0-9.]+)'
+    asset_service_stop: "promtail"
+    asset_download_locally: "{{ nginx_download_locally | default(false) }}"
+    asset_register_path_var: "nginx_promtail_bin_path"
 
 - name: Ensure promtail config directory exists
   ansible.builtin.file:
