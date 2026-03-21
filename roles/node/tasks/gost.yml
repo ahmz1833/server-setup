@@ -1,73 +1,58 @@
 ---
-- name: Check if gost is installed
-  ansible.builtin.command: which gost
-  register: node_gost_check
-  ignore_errors: true
-  changed_when: false
+- name: Install GOST via Binary Install role
+  ansible.builtin.include_role:
+    name: bin
+  vars:
+    bin_name: "gost"
+    bin_version: "{{ node_gost_version }}"
+    bin_url: "{{ 'https://github.com/go-gost/gost/releases' ~
+                 '/download/v' ~ node_gost_version ~ '/gost_' ~ node_gost_version ~ '_linux_amd64.tar.gz' }}"
+    bin_extract: true
+    bin_extract_src: "gost"
+    bin_version_args: "-V"
+    bin_version_regex: 'gost\s+([0-9.]+)'
+    bin_service_stop: "gost"
+    bin_download_locally: "{{ node_download_locally | default(false) }}"
 
-- name: Set gost binary path
+- name: Set GOST binary path
   ansible.builtin.set_fact:
-    node_gost_bin_path: "{{ node_gost_check.stdout | default('/usr/local/bin/gost', true) }}"
+    node_gost_bin_path: "{{ _bin_path | default('/usr/local/bin/gost') }}"
 
-- name: Download and extract gost archive
-  when: node_gost_check.rc != 0
-  block:
-    - name: Create temporary directory for gost extraction
-      ansible.builtin.file:
-        path: "/tmp/gost-{{ node_gost_version }}"
-        state: directory
-        mode: '0755'
-      delegate_to: "{{ 'localhost' if node_download_locally | default(false) else inventory_hostname }}"
-      run_once: "{{ node_download_locally | default(false) }}"
-      become: "{{ not (node_download_locally | default(false)) }}"
-
-    - name: Download and extract gost archive
-      ansible.builtin.unarchive:
-        src: "https://github.com/go-gost/gost/releases/download/v{{ node_gost_version }}/gost_{{ node_gost_version }}_linux_amd64.tar.gz"
-        dest: "/tmp/gost-{{ node_gost_version }}"
-        remote_src: true
-      delegate_to: "{{ 'localhost' if node_download_locally | default(false) else inventory_hostname }}"
-      run_once: "{{ node_download_locally | default(false) }}"
-      become: "{{ not (node_download_locally | default(false)) }}"
-
-    - name: Copy gost binary to target node
-      ansible.builtin.copy:
-        src: "/tmp/gost-{{ node_gost_version }}/gost"
-        dest: "/usr/local/bin/gost"
-        mode: '0755'
-        remote_src: "{{ not (node_download_locally | default(false)) }}"
-
-  always:
-    - name: Clean up gost temp files
-      ansible.builtin.file:
-        path: "/tmp/gost-{{ node_gost_version }}"
-        state: absent
-      delegate_to: "{{ 'localhost' if node_download_locally | default(false) else inventory_hostname }}"
-      become: "{{ not (node_download_locally | default(false)) }}"
-
-- name: Create gost configuration directory
+- name: Create GOST configuration directory
   ansible.builtin.file:
     path: /etc/gost
     state: directory
     mode: '0755'
+    owner: root
+    group: root
 
-- name: Generate gost configuration
+- name: Generate GOST configuration
   ansible.builtin.copy:
     content: "{{ node_gost_config | to_nice_yaml(indent=2) }}"
     dest: /etc/gost/config.yml
-    mode: '0644'
+    mode: '0600'
+    owner: root
+    group: root
   notify: Restart gost
+  when: node_gost_config | length > 0
 
-- name: Configure gost systemd service
+- name: Remove GOST configuration if empty
+  ansible.builtin.file:
+    path: /etc/gost/config.yaml
+    state: absent
+  notify: Restart gost
+  when: node_gost_config | length == 0
+
+- name: Configure GOST systemd service
   ansible.builtin.template:
     src: gost.service.j2
     dest: /etc/systemd/system/gost.service
     mode: '0644'
   notify: Restart gost
 
-- name: Manage gost service state
+- name: Manage GOST service state
   ansible.builtin.systemd:
     name: gost
-    state: "{{ 'started' if node_gost_enabled | default(false) else 'stopped' }}"
-    enabled: "{{ node_gost_enabled | default(false) }}"
+    state: "{{ node_gost_enabled | ternary('started', 'stopped') }}"
+    enabled: "{{ node_gost_enabled }}"
     daemon_reload: true

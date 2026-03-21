@@ -6,45 +6,24 @@
     shell: /sbin/nologin
     state: present
 
-- name: Check if node_exporter is installed
-  ansible.builtin.command: which node_exporter
-  register: node_exporter_check
-  ignore_errors: true
-  changed_when: false
+- name: Install node_exporter via Binary Install role
+  ansible.builtin.include_role:
+    name: bin
+  vars:
+    bin_name: "node_exporter"
+    bin_version: "{{ node_exporter_version }}"
+    bin_url: "{{ 'https://github.com/prometheus/node_exporter/releases' ~
+                 '/download/v' ~ node_exporter_version ~ '/node_exporter-' ~ node_exporter_version ~ '.linux-amd64.tar.gz' }}"
+    bin_extract: true
+    bin_extract_src: "node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+    bin_version_args: "--version"
+    bin_version_regex: 'version\s+([0-9.]+)'
+    bin_service_stop: "node_exporter"
+    bin_download_locally: "{{ node_download_locally | default(false) }}"
 
 - name: Set node_exporter binary path
   ansible.builtin.set_fact:
-    node_exporter_bin_path: "{{ node_exporter_check.stdout | default('/usr/local/bin/node_exporter', true) }}"
-
-- name: Download and extract node_exporter archive
-  when: node_exporter_check.rc != 0
-  block:
-    - name: Download and extract node_exporter archive
-      ansible.builtin.unarchive:
-        src: "{{ 'https://github.com/prometheus/node_exporter/releases/download/v' ~ node_exporter_version ~
-                  '/node_exporter-' ~ node_exporter_version ~ '.linux-amd64.tar.gz' }}"
-        dest: "/tmp/"
-        remote_src: true
-      delegate_to: "{{ 'localhost' if node_download_locally | default(false) else inventory_hostname }}"
-      run_once: "{{ node_download_locally | default(false) }}"
-      become: "{{ not (node_download_locally | default(false)) }}"
-
-    - name: Copy node_exporter binary to target node
-      ansible.builtin.copy:
-        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
-        dest: "/usr/local/bin/node_exporter"
-        mode: '0755'
-        owner: root
-        group: root
-        remote_src: "{{ not (node_download_locally | default(false)) }}"
-
-  always:
-    - name: Clean up node_exporter temp files
-      ansible.builtin.file:
-        path: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64"
-        state: absent
-      delegate_to: "{{ 'localhost' if node_download_locally | default(false) else inventory_hostname }}"
-      become: "{{ not (node_download_locally | default(false)) }}"
+    node_exporter_bin_path: "{{ _bin_path | default('/usr/local/bin/node_exporter') }}"
 
 - name: Configure node_exporter systemd service
   ansible.builtin.template:
@@ -53,9 +32,9 @@
     mode: '0644'
   notify: Restart node_exporter
 
-- name: Manage node_exporter Service State
+- name: Manage node_exporter service state
   ansible.builtin.systemd:
     name: node_exporter
-    state: "{{ 'started' if node_exporter_enabled | default(false) else 'stopped' }}"
-    enabled: "{{ node_exporter_enabled | default(false) }}"
+    state: "{{ node_exporter_enabled | ternary('started', 'stopped') }}"
+    enabled: "{{ node_exporter_enabled }}"
     daemon_reload: true

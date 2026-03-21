@@ -1,50 +1,110 @@
 ---
 - name: Check if Docker is installed
-  ansible.builtin.command: docker --version
+  ansible.builtin.command: which docker
   register: node_docker_check
   ignore_errors: true
   changed_when: false
 
-- name: Download Docker installation script
-  ansible.builtin.get_url:
-    url: https://get.docker.com
-    dest: /tmp/get-docker.sh
-    mode: '0755'
-  when: node_docker_check.rc != 0
+- name: Set Docker binary path
+  ansible.builtin.set_fact:
+    node_docker_bin_path: "{{ node_docker_check.stdout | default('/usr/bin/docker', true) }}"
 
-- name: Execute Docker installation script
-  ansible.builtin.command: /tmp/get-docker.sh
-  when: node_docker_check.rc != 0
-  changed_when: true
+- name: Get Docker version
+  ansible.builtin.command:
+    cmd: "{{ node_docker_bin_path }} --version"
+  register: node_docker_version_check
+  changed_when: false
+  when: node_docker_check.rc == 0
 
-- name: Clean up Docker installation script
-  ansible.builtin.file:
-    path: /tmp/get-docker.sh
-    state: absent
-  when: node_docker_check.rc != 0
+- name: Display Docker version
+  ansible.builtin.debug:
+    msg: "Docker installed: {{ node_docker_version_check.stdout | default('not installed') }}"
+  when: node_docker_check.rc == 0
 
-- name: Add primary user to docker group
+- name: Install Docker
+  when: node_docker_check.rc != 0
+  block:
+    - name: Download Docker install script
+      ansible.builtin.get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
+
+    - name: Execute Docker install script
+      ansible.builtin.command:
+        cmd: /tmp/get-docker.sh
+      register: node_docker_install_result
+      changed_when: node_docker_install_result.rc == 0
+
+    - name: Clean up Docker install script
+      ansible.builtin.file:
+        path: /tmp/get-docker.sh
+        state: absent
+
+- name: Check if Docker Compose (plugin) is installed
+  ansible.builtin.command: docker compose version
+  register: node_docker_compose_plugin_check
+  ignore_errors: true
+  changed_when: false
+  when: node_docker_compose_install
+
+- name: Install Docker Compose plugin
+  ansible.builtin.apt:
+    name: docker-compose-plugin
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when:
+    - node_docker_compose_install
+    - node_docker_compose_plugin_check.rc != 0
+
+- name: Install Docker Compose standalone via Binary Install role
+  ansible.builtin.include_role:
+    name: bin
+  vars:
+    bin_name: "docker-compose"
+    bin_version: "{{ node_docker_compose_version }}"
+    bin_url: "{{ 'https://github.com/docker/compose/releases' ~
+                 '/download/v' ~ node_docker_compose_version ~ '/docker-compose-linux-x86_64' }}"
+    bin_extract: false
+    bin_extract_src: "docker-compose"
+    bin_version_args: "--version"
+    bin_version_regex: 'v?([0-9]+\.[0-9]+\.[0-9]+)'
+    bin_download_locally: "{{ node_download_locally | default(false) }}"
+  when: node_docker_compose_install
+
+- name: Set docker-compose binary path
+  ansible.builtin.set_fact:
+    node_docker_compose_bin_path: "{{ _bin_path | default('/usr/local/bin/docker-compose') }}"
+  when: node_docker_compose_install
+
+- name: Add user to docker group
   ansible.builtin.user:
     name: "{{ node_primary_user }}"
     groups: docker
     append: true
-  when: node_primary_user is defined
+  when: node_primary_user != 'root'
 
-- name: Ensure docker configuration directory exists
+- name: Create Docker configuration directory
   ansible.builtin.file:
     path: /etc/docker
     state: directory
     mode: '0755'
+    owner: root
+    group: root
 
-- name: Configure docker daemon
+- name: Configure Docker daemon
   ansible.builtin.template:
     src: daemon.json.j2
     dest: /etc/docker/daemon.json
     mode: '0644'
+    owner: root
+    group: root
   notify: Restart docker
 
-- name: Enable and start Docker service
+- name: Manage Docker service state
   ansible.builtin.systemd:
     name: docker
-    state: started
-    enabled: true
+    state: "{{ node_docker_enabled | ternary('started', 'stopped') }}"
+    enabled: "{{ node_docker_enabled }}"
+    daemon_reload: true

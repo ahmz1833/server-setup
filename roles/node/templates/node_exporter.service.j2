@@ -1,13 +1,13 @@
 [Unit]
 Description=Prometheus Node Exporter
-Wants=network-online.target
-After=network-online.target
+Documentation=https://prometheus.io/docs/guides/node-exporter/
+After=network.target
 
 [Service]
+Type=simple
 User=node_exporter
 Group=node_exporter
-Type=simple
-ExecStart={{ node_exporter_bin_path }}
+ExecStart={{ node_exporter_bin_path }} --web.listen-address={{ node_exporter_listen_address }}
 Restart=on-failure
 RestartSec=5
 

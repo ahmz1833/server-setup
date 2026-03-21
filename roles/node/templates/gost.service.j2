@@ -1,9 +1,13 @@
 [Unit]
-Description=GO Simple Tunnel (gost)
-After=network.target
+Description=GOST Tunnel Service
+Documentation=https://gost.run
+After=network.target network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
+User=root
+Group=root
 ExecStart={{ node_gost_bin_path }} -C /etc/gost/config.yml
 Restart=on-failure
 RestartSec=5

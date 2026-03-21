@@ -1,0 +1,928 @@
+---
+# =============================================================================
+# SING-BOX CONFIGURATION EXAMPLES
+# =============================================================================
+# This file contains comprehensive examples for sing-box configuration.
+# Copy relevant sections to your playbook or host_vars.
+#
+# NOTE: This file is for reference only - it is NOT automatically loaded.
+# =============================================================================
+
+# =============================================================================
+# BASIC OUTBOUND EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 1: Single Proxy from Link
+# -----------------------------------------------------------------------------
+# Simplest setup - one proxy link
+example_single_proxy:
+  node_singbox_outbounds:
+    links:
+      - "vless://uuid@server.example.com:443?security=tls&type=ws&path=/ws#proxy"
+    configs: []
+    selectors: []
+
+  node_singbox_final_outbound: "proxy"
+
+# -----------------------------------------------------------------------------
+# Example 2: Multiple Proxies with Auto-Select (URLTest)
+# -----------------------------------------------------------------------------
+# Automatically selects the lowest latency server
+example_urltest:
+  node_singbox_outbounds:
+    links:
+      - "vless://uuid@hk1.example.com:443?security=tls#hk-1"
+      - "vless://uuid@hk2.example.com:443?security=tls#hk-2"
+      - "vmess://eyJhZGQiOiJzZy5leGFtcGxlLmNvbSIsInBvcnQiOjQ0MywiaWQiOiJ1dWlkIn0=#sg-1"
+      - "trojan://password@jp.example.com:443?sni=jp.example.com#jp-1"
+      - "hy2://auth@us.example.com:443?sni=us.example.com#us-1"
+
+    configs: []
+
+    selectors:
+      - tag: auto
+        type: urltest
+        use_provider: true
+        url: "https://www.gstatic.com/generate_204"
+        interval: "3m"
+        tolerance: 50           # Switch only if 50ms faster
+
+  node_singbox_final_outbound: "auto"
+
+# -----------------------------------------------------------------------------
+# Example 3: Fallback Group
+# -----------------------------------------------------------------------------
+# Uses first available server, falls back to next if unavailable
+example_fallback:
+  node_singbox_outbounds:
+    links:
+      - "vless://uuid@primary.example.com:443?security=tls#primary"
+      - "vless://uuid@backup1.example.com:443?security=tls#backup-1"
+      - "vless://uuid@backup2.example.com:443?security=tls#backup-2"
+
+    configs: []
+
+    selectors:
+      - tag: fallback
+        type: fallback
+        use_provider: true
+        url: "https://www.gstatic.com/generate_204"
+        interval: "1m"
+
+  node_singbox_final_outbound: "fallback"
+
+# -----------------------------------------------------------------------------
+# Example 4: Manual Selector
+# -----------------------------------------------------------------------------
+# Manually choose which server to use (controllable via sing-box API)
+example_selector:
+  node_singbox_outbounds:
+    links:
+      - "vless://uuid@fast.example.com:443?security=tls#fast"
+      - "vless://uuid@stable.example.com:443?security=tls#stable"
+      - "hy2://auth@gaming.example.com:443?sni=gaming.example.com#gaming"
+
+    configs: []
+
+    selectors:
+      - tag: manual
+        type: selector
+        use_provider: true
+        default: "fast"
+
+  node_singbox_final_outbound: "manual"
+
+# -----------------------------------------------------------------------------
+# Example 5: Mixed Links and Direct Configs
+# -----------------------------------------------------------------------------
+# Combine link-parsed proxies with manually configured ones
+example_mixed:
+  node_singbox_outbounds:
+    links:
+      - "vless://uuid@server1.example.com:443?security=tls#server-1"
+      - "vless://uuid@server2.example.com:443?security=tls#server-2"
+
+    configs:
+      # Local SOCKS proxy
+      - tag: local-socks
+        type: socks
+        server: "127.0.0.1"
+        server_port: 1080
+
+      # Cloudflare WARP
+      - tag: warp
+        type: wireguard
+        server: "engage.cloudflareclient.com"
+        server_port: 2408
+        local_address:
+          - "172.16.0.2/32"
+        private_key: "YOUR_PRIVATE_KEY"
+        peer_public_key: "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo="
+
+    selectors:
+      - tag: auto
+        type: urltest
+        use_provider: true      # Only links (server-1, server-2)
+        interval: "3m"
+
+      - tag: main
+        type: selector
+        outbounds:
+          - auto
+          - local-socks
+          - warp
+          - direct
+        default: "auto"
+
+  node_singbox_final_outbound: "main"
+
+# =============================================================================
+# CHAINING EXAMPLES
+# =============================================================================
+# Chaining routes traffic through multiple proxies in sequence.
+# Use 'detour' field on selectors or configs to specify the entry point.
+
+# -----------------------------------------------------------------------------
+# Example 6: Chain All Links Through Entry Point
+# -----------------------------------------------------------------------------
+# Traffic flow: You → entry → (best link from urltest) → Internet
+example_chain_links_through_entry:
+  node_singbox_outbounds:
+    links:
+      - "vless://uuid@hk1.example.com:443?security=tls#hk-1"
+      - "vless://uuid@hk2.example.com:443?security=tls#hk-2"
+      - "vless://uuid@sg1.example.com:443?security=tls#sg-1"
+
+    configs:
+      - tag: entry
+        type: socks
+        server: "relay.example.com"
+        server_port: 1080
+
+    selectors:
+      - tag: auto
+        type: urltest
+        use_provider: true      # Uses hk-1, hk-2, sg-1
+        detour: "entry"         # All go through entry first
+        url: "https://www.gstatic.com/generate_204"
+        interval: "3m"
+
+  node_singbox_final_outbound: "auto"
+
+# -----------------------------------------------------------------------------
+# Example 7: Chain Links Through Another Link
+# -----------------------------------------------------------------------------
+# One link as entry, others as exits
+# Traffic flow: You → entry-link → (exit links via selector) → Internet
+example_chain_link_to_links:
+  node_singbox_outbounds:
+    links:
+      # Entry point link
+      - "vless://uuid@entry.example.com:443?security=tls#entry"
+      # Exit point links
+      - "vless://uuid@hk.example.com:443?security=tls#hk"
+      - "vless://uuid@sg.example.com:443?security=tls#sg"
+      - "vless://uuid@jp.example.com:443?security=tls#jp"
+
+    configs: []
+
+    selectors:
+      - tag: auto
+        type: urltest
+        outbounds: [hk, sg, jp]   # Explicit list (not entry)
+        detour: "entry"           # Chain through entry link
+        url: "https://www.gstatic.com/generate_204"
+        interval: "3m"
+
+  node_singbox_final_outbound: "auto"
+
+# -----------------------------------------------------------------------------
+# Example 8: Fallback Entry with Load-Balanced Exits
+# -----------------------------------------------------------------------------
+# If entry-1 fails, use entry-2; exits are load-balanced
+example_chain_fallback_entry:
+  node_singbox_outbounds:
+    links:
+      # Entry points (with fallback)
+      - "socks://user:pass@entry1.example.com:1080#entry-1"
+      - "socks://user:pass@entry2.example.com:1080#entry-2"
+      # Exit points (with urltest)
+      - "vless://uuid@exit1.example.com:443?security=tls#exit-1"
+      - "vless://uuid@exit2.example.com:443?security=tls#exit-2"
+      - "vless://uuid@exit3.example.com:443?security=tls#exit-3"
+
+    configs: []
+
+    selectors:
+      # Fallback for entry points
+      - tag: entry-group
+        type: fallback
+        outbounds: [entry-1, entry-2]
+        url: "https://www.gstatic.com/generate_204"
+        interval: "1m"
+
+      # URLTest for exit points, all through entry-group
+      - tag: exit-group
+        type: urltest
+        outbounds: [exit-1, exit-2, exit-3]
+        detour: "entry-group"
+        url: "https://www.gstatic.com/generate_204"
+        interval: "3m"
+
+  node_singbox_final_outbound: "exit-group"
+
+# -----------------------------------------------------------------------------
+# Example 9: Multi-Layer Chain (3 hops)
+# -----------------------------------------------------------------------------
+# Traffic flow: You → relay → middle → exit → Internet
+example_chain_multilayer:
+  node_singbox_outbounds:
+    links:
+      # Layer 1: Relay servers
+      - "socks://u:p@relay1.example.com:1080#relay-1"
+      - "socks://u:p@relay2.example.com:1080#relay-2"
+      # Layer 2: Middle servers
+      - "vless://uuid@mid1.example.com:443?security=tls#mid-1"
+      - "vless://uuid@mid2.example.com:443?security=tls#mid-2"
+      # Layer 3: Exit servers
+      - "vless://uuid@exit1.example.com:443?security=tls#exit-1"
+      - "vless://uuid@exit2.example.com:443?security=tls#exit-2"
+
+    configs: []
+
+    selectors:
+      # Layer 1: Best relay
+      - tag: relay-select
+        type: urltest
+        outbounds: [relay-1, relay-2]
+        interval: "1m"
+
+      # Layer 2: Best middle, through relay
+      - tag: mid-select
+        type: urltest
+        outbounds: [mid-1, mid-2]
+        detour: "relay-select"
+        interval: "2m"
+
+      # Layer 3: Best exit, through middle (which goes through relay)
+      - tag: exit-select
+        type: urltest
+        outbounds: [exit-1, exit-2]
+        detour: "mid-select"
+        interval: "3m"
+
+  node_singbox_final_outbound: "exit-select"
+
+# -----------------------------------------------------------------------------
+# Example 10: Direct Config Chaining (Full Control)
+# -----------------------------------------------------------------------------
+# When you need maximum control over proxy settings
+example_chain_configs:
+  node_singbox_outbounds:
+    links: []
+
+    configs:
+      # Entry: SOCKS relay
+      - tag: socks-entry
+        type: socks
+        server: "relay.example.com"
+        server_port: 1080
+        username: "user"
+        password: "pass"
+
+      # Exit: VLESS with Reality, chained through entry
+      - tag: vless-reality
+        type: vless
+        server: "exit.example.com"
+        server_port: 443
+        uuid: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+        flow: "xtls-rprx-vision"
+        tls:
+          enabled: true
+          server_name: "www.microsoft.com"
+          utls:
+            enabled: true
+            fingerprint: "chrome"
+          reality:
+            enabled: true
+            public_key: "xxxx"
+            short_id: "xxxx"
+        detour: "socks-entry"       # Chain through entry
+
+    selectors: []
+
+  node_singbox_final_outbound: "vless-reality"
+
+# =============================================================================
+# DNS CONFIGURATION EXAMPLES
+# =============================================================================
+# DNS rules support all sing-box DNS rule fields.
+# Server shortcuts: "remote", "direct", "block"
+# Full server names: "dns-remote", "dns-direct", etc.
+
+# -----------------------------------------------------------------------------
+# Example 11: Default DNS (Recommended for Iran)
+# -----------------------------------------------------------------------------
+example_dns_default:
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"       # Google DoT, queries through proxy
+    direct: "local"               # System DNS for bypass domains
+    fakeip: true                  # Recommended
+    strategy: "ipv4_only"         # Most compatible
+    rules: []                     # Use default rules only
+
+# -----------------------------------------------------------------------------
+# Example 12: DNS with Domain Rules
+# -----------------------------------------------------------------------------
+example_dns_domain_rules:
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"
+    direct: "local"
+    fakeip: true
+    strategy: "ipv4_only"
+    rules:
+      # Exact domain match
+      - domain:
+          - "google.com"
+          - "youtube.com"
+          - "github.com"
+        server: "remote"
+
+      # Domain suffix (includes subdomains)
+      - domain_suffix:
+          - ".ir"                 # Already handled by default, but can override
+          - ".cn"
+          - ".local"
+        server: "direct"
+
+      # Domain keyword (contains)
+      - domain_keyword:
+          - "microsoft"
+          - "windows"
+          - "office"
+        server: "remote"
+
+      # Domain regex
+      - domain_regex:
+          - "^api\\."
+          - ".*\\.internal$"
+        server: "direct"
+
+# -----------------------------------------------------------------------------
+# Example 13: DNS with Ad/Tracker Blocking
+# -----------------------------------------------------------------------------
+example_dns_adblock:
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"
+    direct: "local"
+    fakeip: true
+    strategy: "ipv4_only"
+    rules:
+      # Block ad domains
+      - domain_keyword:
+          - "adservice"
+          - "adsserver"
+          - "adtrack"
+          - "advertising"
+          - "analytics"
+          - "tracker"
+          - "tracking"
+          - "telemetry"
+        server: "block"
+
+      # Block ad domain patterns
+      - domain_regex:
+          - "^ads?\\."
+          - "^adserver"
+          - "^tracking\\."
+          - "^telemetry\\."
+          - "^metrics\\."
+          - "^pixel\\."
+          - "^beacon\\."
+        server: "block"
+
+      # Block known ad domains
+      - domain_suffix:
+          - ".doubleclick.net"
+          - ".googlesyndication.com"
+          - ".googleadservices.com"
+          - ".facebook.com"         # Optional: block Facebook
+          - ".fbcdn.net"
+        server: "block"
+
+# -----------------------------------------------------------------------------
+# Example 14: DNS with Rule Sets
+# -----------------------------------------------------------------------------
+# Using sing-box rule_set for DNS routing
+example_dns_rulesets:
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"
+    direct: "local"
+    fakeip: true
+    strategy: "ipv4_only"
+    rules:
+      # Use geosite rule sets (must be defined in route.rule_set)
+      - rule_set: "geosite-google"
+        server: "remote"
+
+      - rule_set: "geosite-cn"
+        server: "direct"
+
+      # Combine rule_set with other conditions
+      - rule_set: "geosite-category-ads"
+        server: "block"
+
+# -----------------------------------------------------------------------------
+# Example 15: DNS Predefined Answers
+# -----------------------------------------------------------------------------
+# Return hardcoded DNS responses without querying upstream servers.
+# Useful for localhost, internal domains, split-horizon DNS, etc.
+example_dns_predefined:
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"
+    direct: "local"
+    fakeip: true
+    strategy: "ipv4_only"
+    rules:
+      # Localhost resolution
+      - action: "predefined"
+        domain: "localhost"
+        query_type: "A"
+        rcode: "NOERROR"
+        answer: "localhost. IN A 127.0.0.1"
+
+      - action: "predefined"
+        domain: "localhost"
+        query_type: "AAAA"
+        rcode: "NOERROR"
+        answer: "localhost. IN AAAA ::1"
+
+      # Custom internal domain
+      - action: "predefined"
+        domain: "myapp.local"
+        query_type: "A"
+        rcode: "NOERROR"
+        answer: "myapp.local. IN A 192.168.1.100"
+
+      # Wildcard internal domain (using domain_suffix)
+      - action: "predefined"
+        domain_suffix:
+          - ".internal.example.com"
+        query_type: "A"
+        rcode: "NOERROR"
+        answer: "*.internal.example.com. IN A 10.0.0.1"
+
+      # Multiple answers (A record with multiple IPs)
+      - action: "predefined"
+        domain: "lb.example.com"
+        query_type: "A"
+        rcode: "NOERROR"
+        answer:
+          - "lb.example.com. IN A 10.0.0.1"
+          - "lb.example.com. IN A 10.0.0.2"
+          - "lb.example.com. IN A 10.0.0.3"
+
+      # CNAME record
+      - action: "predefined"
+        domain: "www.example.local"
+        query_type: "CNAME"
+        rcode: "NOERROR"
+        answer: "www.example.local. IN CNAME example.local."
+
+      # Block domain with NXDOMAIN
+      - action: "predefined"
+        domain_suffix:
+          - ".malware.com"
+          - ".phishing.net"
+        rcode: "NXDOMAIN"
+
+      # Return empty response (NOERROR but no answer)
+      - action: "predefined"
+        domain_keyword:
+          - "tracking"
+        query_type: "A"
+        rcode: "NOERROR"
+        answer: []
+
+# -----------------------------------------------------------------------------
+# Example 16: Split-Horizon DNS (Internal vs External)
+# -----------------------------------------------------------------------------
+# Different responses for internal services
+example_dns_split_horizon:
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"
+    direct: "local"
+    fakeip: true
+    strategy: "ipv4_only"
+    rules:
+      # Internal services - predefined answers
+      - action: "predefined"
+        domain: "api.mycompany.com"
+        query_type: "A"
+        rcode: "NOERROR"
+        answer: "api.mycompany.com. IN A 10.10.1.50"
+
+      - action: "predefined"
+        domain: "db.mycompany.com"
+        query_type: "A"
+        rcode: "NOERROR"
+        answer: "db.mycompany.com. IN A 10.10.1.100"
+
+      - action: "predefined"
+        domain: "cache.mycompany.com"
+        query_type: "A"
+        rcode: "NOERROR"
+        answer: "cache.mycompany.com. IN A 10.10.1.101"
+
+      # All other *.mycompany.com goes to direct DNS
+      - domain_suffix:
+          - ".mycompany.com"
+        server: "direct"
+
+# -----------------------------------------------------------------------------
+# Example 17: DNS with Pass-through Rules
+# -----------------------------------------------------------------------------
+# Using full sing-box DNS rule format (any field supported)
+example_dns_passthrough:
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"
+    direct: "local"
+    fakeip: true
+    strategy: "ipv4_only"
+    rules:
+      # Full action specification
+      - action: "route"
+        domain_suffix:
+          - ".example.com"
+        server: "dns-remote"
+
+      # Reject with custom method
+      - action: "reject"
+        domain_keyword:
+          - "malware"
+          - "phishing"
+
+      # Using query_type filter
+      - query_type:
+          - "AAAA"
+          - "HTTPS"
+        action: "reject"            # Block IPv6 and HTTPS DNS queries
+
+      # Clash mode integration
+      - clash_mode: "direct"
+        server: "direct"
+
+      # Source-based rule
+      - inbound:
+          - "mixed-in"
+        domain_suffix:
+          - ".local"
+        server: "direct"
+
+# -----------------------------------------------------------------------------
+# Example 18: Different DNS Providers
+# -----------------------------------------------------------------------------
+example_dns_providers:
+  # Cloudflare DoH (privacy-focused)
+  cloudflare:
+    node_singbox_dns:
+      remote: "https://1.1.1.1/dns-query"
+      direct: "local"
+      fakeip: true
+      strategy: "ipv4_only"
+
+  # Cloudflare DoH with malware blocking
+  cloudflare_security:
+    node_singbox_dns:
+      remote: "https://security.cloudflare-dns.com/dns-query"
+      direct: "local"
+      fakeip: true
+      strategy: "ipv4_only"
+
+  # Cloudflare DoH with family filter
+  cloudflare_family:
+    node_singbox_dns:
+      remote: "https://family.cloudflare-dns.com/dns-query"
+      direct: "local"
+      fakeip: true
+      strategy: "ipv4_only"
+
+  # AdGuard DNS (ad blocking built-in)
+  adguard:
+    node_singbox_dns:
+      remote: "tls://dns.adguard.com"
+      direct: "local"
+      fakeip: true
+      strategy: "ipv4_only"
+
+  # Quad9 (security/malware blocking)
+  quad9:
+    node_singbox_dns:
+      remote: "tls://dns.quad9.net"
+      direct: "local"
+      fakeip: true
+      strategy: "ipv4_only"
+
+  # NextDNS (customizable)
+  nextdns:
+    node_singbox_dns:
+      remote: "https://dns.nextdns.io/YOUR_CONFIG_ID"
+      direct: "local"
+      fakeip: true
+      strategy: "ipv4_only"
+
+  # DNS over QUIC (fastest, if supported)
+  adguard_quic:
+    node_singbox_dns:
+      remote: "quic://dns.adguard.com"
+      direct: "local"
+      fakeip: true
+      strategy: "ipv4_only"
+
+# -----------------------------------------------------------------------------
+# Example 19: Disable FakeIP
+# -----------------------------------------------------------------------------
+# Only disable if you have specific compatibility issues
+example_dns_no_fakeip:
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"
+    direct: "local"
+    fakeip: false                 # Real IPs (may cause leaks)
+    strategy: "ipv4_only"
+
+# -----------------------------------------------------------------------------
+# Example 20: IPv6 Support
+# -----------------------------------------------------------------------------
+example_dns_ipv6:
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"
+    direct: "local"
+    fakeip: true
+    strategy: "prefer_ipv4"       # IPv4 first, IPv6 fallback
+    # Also requires: node_enable_ipv6: true
+
+# =============================================================================
+# INBOUND CONFIGURATION EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 21: Default Inbound (localhost only)
+# -----------------------------------------------------------------------------
+example_inbound_local:
+  node_singbox_mixed_listen: "127.0.0.1"
+  node_singbox_mixed_port: 10808
+  node_singbox_tun_enabled: true
+
+# -----------------------------------------------------------------------------
+# Example 22: LAN Access
+# -----------------------------------------------------------------------------
+# Allow other devices on network to use this proxy
+example_inbound_lan:
+  node_singbox_mixed_listen: "0.0.0.0"
+  node_singbox_mixed_port: 10808
+  node_singbox_tun_enabled: true
+
+# -----------------------------------------------------------------------------
+# Example 23: Custom Port
+# -----------------------------------------------------------------------------
+example_inbound_custom_port:
+  node_singbox_mixed_listen: "127.0.0.1"
+  node_singbox_mixed_port: 7890    # Clash-compatible port
+  node_singbox_tun_enabled: true
+
+# -----------------------------------------------------------------------------
+# Example 24: SOCKS/HTTP Only (No TUN)
+# -----------------------------------------------------------------------------
+# Useful in containers or when TUN is not available
+example_inbound_no_tun:
+  node_singbox_mixed_listen: "127.0.0.1"
+  node_singbox_mixed_port: 10808
+  node_singbox_tun_enabled: false
+
+# -----------------------------------------------------------------------------
+# Example 25: TUN with Custom Settings
+# -----------------------------------------------------------------------------
+example_inbound_tun_custom:
+  node_singbox_tun_enabled: true
+  node_singbox_tun_interface: "tun0"
+  node_singbox_tun_stack: "gvisor"      # Better compatibility
+  node_singbox_tun_mtu: 9000            # Jumbo frames
+  node_singbox_tun_auto_route: true
+  node_singbox_tun_strict_route: false  # Less strict routing
+
+# =============================================================================
+# COMPLETE PRODUCTION EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 26: Simple Production Setup
+# -----------------------------------------------------------------------------
+example_production_simple:
+  node_singbox_enabled: true
+
+  node_singbox_mixed_listen: "127.0.0.1"
+  node_singbox_mixed_port: 10808
+  node_singbox_tun_enabled: true
+
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"
+    direct: "local"
+    fakeip: true
+    strategy: "ipv4_only"
+
+  node_singbox_outbounds:
+    links:
+      - "vless://uuid@hk.example.com:443?security=tls&type=ws&path=/ws#hk"
+      - "vless://uuid@sg.example.com:443?security=tls&type=grpc&serviceName=grpc#sg"
+      - "hy2://auth@jp.example.com:443?sni=jp.example.com#jp"
+
+    configs: []
+
+    selectors:
+      - tag: auto
+        type: urltest
+        use_provider: true
+        interval: "3m"
+
+  node_singbox_final_outbound: "auto"
+
+# -----------------------------------------------------------------------------
+# Example 27: Full Production Setup with Everything
+# -----------------------------------------------------------------------------
+example_production_full:
+  node_singbox_enabled: true
+
+  # Inbound
+  node_singbox_mixed_listen: "127.0.0.1"
+  node_singbox_mixed_port: 10808
+  node_singbox_tun_enabled: true
+  node_singbox_tun_stack: "system"
+
+  # DNS with ad blocking and predefined
+  node_singbox_dns:
+    remote: "tls://8.8.8.8"
+    direct: "local"
+    fakeip: true
+    strategy: "ipv4_only"
+    rules:
+      # Localhost
+      - action: "predefined"
+        domain: "localhost"
+        query_type: "A"
+        rcode: "NOERROR"
+        answer: "localhost. IN A 127.0.0.1"
+
+      # Block ads
+      - domain_keyword: ["adservice", "tracking", "analytics"]
+        server: "block"
+
+      - domain_regex: ["^ads?\\.", "^tracking\\."]
+        server: "block"
+
+  # Outbounds with chaining
+  node_singbox_outbounds:
+    links:
+      # Entry relay
+      - "socks://user:pass@relay.example.com:1080#relay"
+      # Exit proxies
+      - "vless://uuid@hk1.example.com:443?security=tls&type=ws&path=/ws#hk-1"
+      - "vless://uuid@hk2.example.com:443?security=tls&type=ws&path=/ws#hk-2"
+      - "vless://uuid@sg1.example.com:443?security=tls&type=grpc&serviceName=grpc#sg-1"
+      - "hy2://auth@jp1.example.com:443?sni=jp1.example.com#jp-1"
+      - "tuic://uuid:pass@us1.example.com:443?sni=us1.example.com#us-1"
+
+    configs: []
+
+    selectors:
+      # Auto-select best exit, all through relay
+      - tag: auto
+        type: urltest
+        outbounds: [hk-1, hk-2, sg-1, jp-1, us-1]
+        detour: "relay"
+        url: "https://www.gstatic.com/generate_204"
+        interval: "3m"
+        tolerance: 50
+
+      # Manual selector for override
+      - tag: manual
+        type: selector
+        outbounds:
+          - auto
+          - hk-1
+          - hk-2
+          - sg-1
+          - jp-1
+          - us-1
+          - direct
+        default: "auto"
+
+  node_singbox_final_outbound: "manual"
+
+  node_singbox_provider_healthcheck:
+    enabled: true
+    url: "https://www.gstatic.com/generate_204"
+    interval: "3m"
+
+# =============================================================================
+# SUPPORTED LINK FORMATS
+# =============================================================================
+#
+# VLESS:
+#   vless://uuid@server:port?params#tag
+#   Params: security, type, path, host, sni, fp, pbk, sid, flow, alpn
+#
+#   Examples:
+#   - vless://uuid@server:443?security=tls&type=ws&path=/ws&host=cdn.com#name
+#   - vless://uuid@server:443?security=reality&pbk=xxx&sid=xxx&fp=chrome#name
+#   - vless://uuid@server:443?security=tls&type=grpc&serviceName=svc#name
+#
+# VMess (base64 JSON):
+#   vmess://eyJhZGQiOiJzZXJ2ZXIiLCJwb3J0Ijo0NDMsImlkIjoidXVpZCJ9#tag
+#
+# Shadowsocks:
+#   ss://base64(method:password)@server:port#tag
+#   ss://method:password@server:port#tag
+#
+# Trojan:
+#   trojan://password@server:port?params#tag
+#   Params: sni, type, path, host, alpn, fp
+#
+# Hysteria2:
+#   hy2://auth@server:port?params#tag
+#   hysteria2://auth@server:port?params#tag
+#   Params: sni, insecure, obfs, obfs-password
+#
+# TUIC:
+#   tuic://uuid:password@server:port?params#tag
+#   Params: sni, alpn, congestion_control
+#
+# SOCKS:
+#   socks://[user:pass@]server:port#tag
+#
+# HTTP:
+#   http://[user:pass@]server:port#tag
+#
+# =============================================================================
+# CHAINING SUMMARY
+# =============================================================================
+#
+# All chaining is done via 'detour' field on selectors or configs:
+#
+# 1. Links through config entry:
+#    configs: [{tag: entry, type: socks, ...}]
+#    selectors: [{use_provider: true, detour: "entry"}]
+#
+# 2. Links through link entry:
+#    links: ["...#entry", "...#exit1", "...#exit2"]
+#    selectors: [{outbounds: [exit1, exit2], detour: "entry"}]
+#
+# 3. Selector through selector:
+#    selectors:
+#      - {tag: inner, outbounds: [...]}
+#      - {tag: outer, outbounds: [...], detour: "inner"}
+#
+# 4. Config with detour:
+#    configs:
+#      - {tag: entry, type: socks, ...}
+#      - {tag: exit, type: vless, ..., detour: "entry"}
+#
+# =============================================================================
+# DNS RULES SUMMARY
+# =============================================================================
+#
+# Rules support all sing-box DNS rule fields. Common patterns:
+#
+# Server shortcuts:
+#   server: "remote"   → dns-remote (through proxy)
+#   server: "direct"   → dns-direct (bypass)
+#   server: "block"    → reject query (action: reject)
+#
+# Domain matching:
+#   domain: ["exact.com"]
+#   domain_suffix: [".example.com"]
+#   domain_keyword: ["google"]
+#   domain_regex: ["^api\\."]
+#
+# Rule sets:
+#   rule_set: "geosite-category-ads"
+#
+# Predefined answers:
+#   action: "predefined"
+#   domain: "localhost"
+#   query_type: "A"                           # A, AAAA, CNAME, MX, TXT, etc.
+#   rcode: "NOERROR"                          # NOERROR, NXDOMAIN, SERVFAIL
+#   answer: "localhost. IN A 127.0.0.1"       # RR format, or list for multiple
+#
+# Block with NXDOMAIN:
+#   action: "predefined"
+#   domain_suffix: [".malware.com"]
+#   rcode: "NXDOMAIN"
+#
+# Pass-through (any sing-box field):
+#   action: "route"
+#   query_type: ["A", "AAAA"]
+#   inbound: ["mixed-in"]
+#   clash_mode: "direct"
+#
+# =============================================================================

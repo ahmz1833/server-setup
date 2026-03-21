@@ -20,3 +20,16 @@
     name: "{{ node_primary_user }}"
     shell: /bin/zsh
   when: node_bootstrap_enabled
+
+- name: Install lazydocker
+  ansible.builtin.include_role:
+    name: bin
+  vars:
+    bin_name: "lazydocker"
+    bin_version: "{{ node_lazydocker_version }}"
+    bin_url: "{{ 'https://github.com/jesseduffield/lazydocker/releases' ~
+                 '/download/v' ~ node_lazydocker_version ~ '/lazydocker_' ~ node_lazydocker_version ~ '_Linux_x86_64.tar.gz' }}"
+    bin_version_args: "--version"
+    bin_version_regex: "Version:\\s*([0-9.]+)"
+    bin_download_locally: "{{ node_download_locally | default(false) }}"
+  when: node_lazydocker_install

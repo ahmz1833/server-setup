@@ -1,52 +1,76 @@
 ---
-- name: Check if sing-box is installed
-  ansible.builtin.command: which sing-box
-  register: node_singbox_check
-  ignore_errors: true
-  changed_when: false
+- name: Install sing-box via Binary Install role
+  ansible.builtin.include_role:
+    name: bin
+  vars:
+    bin_name: "sing-box"
+    bin_version: "{{ node_singbox_version }}"
+    bin_url: "{{ 'https://github.com/SagerNet/sing-box/releases' ~
+                 '/download/v' ~ node_singbox_version ~ '/sing-box-' ~ node_singbox_version ~ '-linux-amd64.tar.gz' }}"
+    bin_extract: true
+    bin_extract_src: "sing-box-{{ node_singbox_version }}-linux-amd64/sing-box"
+    bin_version_args: "version"
+    bin_version_regex: 'sing-box version ([0-9.]+)'
+    bin_service_stop: "sing-box"
+    bin_download_locally: "{{ node_download_locally | default(false) }}"
 
 - name: Set sing-box binary path
   ansible.builtin.set_fact:
-    node_singbox_bin_path: "{{ node_singbox_check.stdout | default('/usr/local/bin/sing-box', true) }}"
+    node_singbox_bin_path: "{{ _bin_path | default('/usr/local/bin/sing-box') }}"
 
-- name: Download and extract sing-box archive
-  when: node_singbox_check.rc != 0
-  block:
-    - name: Download and extract sing-box archive
-      ansible.builtin.unarchive:
-        src: "https://github.com/SagerNet/sing-box/releases/download/v{{ node_singbox_version }}/sing-box-{{ node_singbox_version }}-linux-amd64.tar.gz"
-        dest: "/tmp/"
-        remote_src: true
-      delegate_to: "{{ 'localhost' if node_download_locally | default(false) else inventory_hostname }}"
-      run_once: "{{ node_download_locally | default(false) }}"
-      become: "{{ not (node_download_locally | default(false)) }}"
-
-    - name: Copy sing-box binary to target node
-      ansible.builtin.copy:
-        src: "/tmp/sing-box-{{ node_singbox_version }}-linux-amd64/sing-box"
-        dest: "/usr/local/bin/sing-box"
-        mode: '0755'
-        remote_src: "{{ not (node_download_locally | default(false)) }}"
-
-  always:
-    - name: Clean up sing-box temp files
-      ansible.builtin.file:
-        path: "/tmp/sing-box-{{ node_singbox_version }}-linux-amd64"
-        state: absent
-      delegate_to: "{{ 'localhost' if node_download_locally | default(false) else inventory_hostname }}"
-      become: "{{ not (node_download_locally | default(false)) }}"
-
-- name: Create sing-box config directory
+- name: Create sing-box directories
   ansible.builtin.file:
-    path: /etc/sing-box
+    path: "{{ item }}"
     state: directory
     mode: '0755'
+    owner: root
+    group: root
+  loop:
+    - /etc/sing-box
+    - /etc/sing-box/providers
+
+- name: Validate links have tags (fragment)
+  ansible.builtin.assert:
+    that:
+      - "'#' in item"
+    fail_msg: >-
+      Link must have a tag (fragment): {{ item | truncate(60) }}...
+      Add #tag-name at the end of the link.
+    quiet: true
+  loop: "{{ node_singbox_outbounds.links | default([]) }}"
+  loop_control:
+    label: "{{ item | regex_search('#([^#]+)$', '\\1') | first | default('NO TAG') }}"
+
+- name: Write local links to provider file
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible - Proxy links
+      # Parsed by sing-box outbound_providers
+      {% for link in node_singbox_outbounds.links | default([]) %}
+      {{ link }}
+      {% endfor %}
+    dest: /etc/sing-box/providers/local.txt
+    mode: '0600'
+    owner: root
+    group: root
+  notify: Restart singbox
+  when: (node_singbox_outbounds.links | default([]) | length) > 0
+
+- name: Remove provider file if no links
+  ansible.builtin.file:
+    path: /etc/sing-box/providers/local.txt
+    state: absent
+  notify: Restart singbox
+  when: (node_singbox_outbounds.links | default([]) | length) == 0
 
 - name: Generate sing-box configuration
   ansible.builtin.template:
     src: singbox_config.json.j2
     dest: /etc/sing-box/config.json
-    mode: '0644'
+    mode: '0600'
+    owner: root
+    group: root
+    validate: "{{ node_singbox_bin_path }} check -c %s"
   notify: Restart singbox
 
 - name: Configure sing-box systemd service
@@ -59,8 +83,8 @@
 - name: Manage sing-box service state
   ansible.builtin.systemd:
     name: sing-box
-    state: "{{ 'started' if node_singbox_enabled | default(false) else 'stopped' }}"
-    enabled: "{{ node_singbox_enabled | default(false) }}"
+    state: "{{ node_singbox_enabled | ternary('started', 'stopped') }}"
+    enabled: "{{ node_singbox_enabled }}"
     daemon_reload: true
 
 - name: Force flush handlers to start tunnel immediately

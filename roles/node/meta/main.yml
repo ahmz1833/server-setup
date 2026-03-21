@@ -5,6 +5,7 @@ galaxy_info:
   description: >-
     Node-level services — sing-box proxy/tunnel, GOST tunnel, Docker
     engine, Prometheus node_exporter, shell bootstrap and utility tools.
+  license: MIT
   min_ansible_version: "2.14"
   platforms:
     - name: Ubuntu

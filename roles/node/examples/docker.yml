@@ -1,0 +1,185 @@
+---
+# =============================================================================
+# DOCKER CONFIGURATION EXAMPLES
+# =============================================================================
+# Docker configuration for the node role.
+# =============================================================================
+
+# =============================================================================
+# BASIC EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 1: Default Configuration
+# -----------------------------------------------------------------------------
+# Standard setup with metrics enabled
+example_default:
+  node_docker_enabled: true
+  node_docker_bip: "172.29.0.1/16"
+  node_docker_default_address_pools:
+    - base: "172.30.0.0/16"
+      size: 24
+  node_docker_log_driver: "json-file"
+  node_docker_log_opts:
+    max-size: "50m"
+    max-file: "3"
+  node_docker_live_restore: true
+  node_docker_metrics_enabled: true
+  node_docker_metrics_addr: "127.0.0.1:9323"
+
+# -----------------------------------------------------------------------------
+# Example 2: Minimal Configuration
+# -----------------------------------------------------------------------------
+# Bare minimum, no metrics
+example_minimal:
+  node_docker_enabled: true
+  node_docker_metrics_enabled: false
+
+# -----------------------------------------------------------------------------
+# Example 3: Production Configuration
+# -----------------------------------------------------------------------------
+# Full production setup
+example_production:
+  node_docker_enabled: true
+  node_docker_bip: "172.29.0.1/16"
+  node_docker_default_address_pools:
+    - base: "172.30.0.0/16"
+      size: 24
+    - base: "172.31.0.0/16"
+      size: 24
+  node_docker_log_driver: "json-file"
+  node_docker_log_opts:
+    max-size: "100m"
+    max-file: "5"
+  node_docker_live_restore: true
+  node_docker_experimental: false
+  node_docker_metrics_enabled: true
+  node_docker_metrics_addr: "127.0.0.1:9323"
+  node_docker_compose_install: true
+  node_docker_compose_version: "2.29.2"
+
+# -----------------------------------------------------------------------------
+# Example 4: Custom Network Pools
+# -----------------------------------------------------------------------------
+# Multiple address pools for many containers
+example_large_scale:
+  node_docker_enabled: true
+  node_docker_bip: "10.200.0.1/16"
+  node_docker_default_address_pools:
+    - base: "10.201.0.0/16"
+      size: 24
+    - base: "10.202.0.0/16"
+      size: 24
+    - base: "10.203.0.0/16"
+      size: 24
+  node_docker_log_driver: "json-file"
+  node_docker_log_opts:
+    max-size: "200m"
+    max-file: "10"
+  node_docker_metrics_enabled: true
+
+# -----------------------------------------------------------------------------
+# Example 5: Without Compose
+# -----------------------------------------------------------------------------
+example_no_compose:
+  node_docker_enabled: true
+  node_docker_compose_install: false
+
+# =============================================================================
+# LOGGING DRIVER EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 6: JSON File (Default)
+# -----------------------------------------------------------------------------
+example_log_json:
+  node_docker_log_driver: "json-file"
+  node_docker_log_opts:
+    max-size: "50m"
+    max-file: "3"
+    compress: "true"
+
+# -----------------------------------------------------------------------------
+# Example 7: Syslog
+# -----------------------------------------------------------------------------
+example_log_syslog:
+  node_docker_log_driver: "syslog"
+  node_docker_log_opts:
+    syslog-address: "udp://localhost:514"
+    syslog-facility: "daemon"
+    tag: "docker/{{.Name}}"
+
+# -----------------------------------------------------------------------------
+# Example 8: Journald
+# -----------------------------------------------------------------------------
+example_log_journald:
+  node_docker_log_driver: "journald"
+  node_docker_log_opts:
+    tag: "docker/{{.Name}}"
+
+# -----------------------------------------------------------------------------
+# Example 9: Local (Optimized)
+# -----------------------------------------------------------------------------
+# Local driver is optimized for performance
+example_log_local:
+  node_docker_log_driver: "local"
+  node_docker_log_opts:
+    max-size: "100m"
+    max-file: "5"
+
+# =============================================================================
+# DOCKER COMPOSE USAGE
+# =============================================================================
+#
+# After installation, both methods are available:
+#
+# Plugin (recommended):
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose down
+#
+# Standalone (legacy):
+#   docker-compose up -d
+#   docker-compose logs -f
+#   docker-compose down
+#
+# Version check:
+#   docker compose version
+#   docker-compose --version
+#
+# =============================================================================
+# DAEMON.JSON REFERENCE
+# =============================================================================
+#
+# The generated daemon.json includes only defined options:
+#
+# {
+#   "bip": "172.29.0.1/16",              // Bridge IP
+#   "default-address-pools": [...],      // Container network pools
+#   "log-driver": "json-file",           // Logging driver
+#   "log-opts": {...},                   // Logging options
+#   "live-restore": true,                // Keep containers on daemon restart
+#   "experimental": true,                // Enable experimental (auto with metrics)
+#   "metrics-addr": "127.0.0.1:9323"     // Prometheus metrics endpoint
+# }
+#
+# =============================================================================
+# METRICS ENDPOINT
+# =============================================================================
+#
+# When metrics_enabled is true, Docker exposes Prometheus metrics at:
+#   http://127.0.0.1:9323/metrics
+#
+# Prometheus scrape config:
+#   - job_name: 'docker'
+#     static_configs:
+#       - targets: ['localhost:9323']
+#
+# Available metrics:
+#   - docker_engine_daemon_*
+#   - docker_builder_*
+#   - docker_container_*
+#   - process_*
+#   - go_*
+#
+# =============================================================================

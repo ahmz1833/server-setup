@@ -1,10 +1,107 @@
 ---
-# Global vars
+# Meta Variables (inherited from playbook-level)
 node_primary_user: '{{ primary_user | default("root") }}'
 node_download_locally: '{{ download_locally | default(false) }}'
-node_internet_problem: '{{ is_iran | default(false) }}'
+node_internet_restricted: '{{ is_iran | default(false) }}'
 node_enable_ipv6: '{{ enable_ipv6 | default(false) }}'
 
+# -----------------------------------------------------------------------------
+# SING-BOX CONFIGURATION
+#
+# Sing-box is a universal proxy platform. Links are parsed natively using
+# the outbound_providers feature.
+#
+# Documentation: https://sing-box.sagernet.org/
+# Examples: examples/singbox.yml
+# -----------------------------------------------------------------------------
+node_singbox_install: '{{ node_internet_restricted }}'
+node_singbox_enabled: false
+node_singbox_version: "1.13.1"
+
+# Mixed inbound (SOCKS5 + HTTP proxy)
+node_singbox_mixed_listen: "127.0.0.1"
+node_singbox_mixed_port: 10808
+
+# TUN inbound (transparent proxy)
+node_singbox_tun_enabled: true
+node_singbox_tun_interface: "tun-sb"
+node_singbox_tun_stack: "system"              # system, gvisor, mixed
+node_singbox_tun_mtu: 1500
+node_singbox_tun_auto_route: true
+node_singbox_tun_strict_route: true
+node_singbox_tun_inet4_address: "172.19.0.1/30"
+node_singbox_tun_inet6_address: "fdfe:dcba:9876::1/126"
+
+# DNS Configuration (Examples in examples/singbox.yml)
+node_singbox_dns:
+  remote: "tls://8.8.8.8"
+  direct: "local"
+  fakeip: true
+  strategy: "ipv4_only"
+  rules: []
+  # Example rules:
+  #   - domain_suffix: [".example.com"]
+  #     server: "direct"
+  #   - domain_keyword: ["ads", "tracking"]
+  #     server: "block"
+  #   - action: "predefined"
+  #     domain: "localhost"
+  #     rcode: "NOERROR"
+  #     answer: "localhost. IN A 127.0.0.1"
+
+# Outbound Configuration
+# Three ways to define outbounds:
+# 1. LINKS (parsed by sing-box natively):
+#    Written to provider file, sing-box parses at runtime.
+#    Tag extracted from fragment (#tag-name).
+#    NOTE: Cannot add 'detour' directly to links - use selectors for chaining.
+# 2. CONFIGS (direct sing-box format):
+#    Full control, supports all fields including 'detour' for chaining.
+# 3. SELECTORS (urltest, fallback, selector):
+#    Reference other outbounds by tag or use_provider: true.
+#    Can have 'detour' field for chaining.
+node_singbox_outbounds:
+  links: []
+  # Example:
+  #   - "vless://uuid@server:443?security=tls#my-proxy"
+  #   - "vmess://eyJ..."
+  configs: []
+  # Example:
+  #   - tag: socks-entry
+  #     type: socks
+  #     server: "127.0.0.1"
+  #     server_port: 1080
+  #   - tag: vless-exit
+  #     type: vless
+  #     server: "exit.example.com"
+  #     server_port: 443
+  #     uuid: "xxx"
+  #     detour: "socks-entry"
+  selectors: []
+  # Example:
+  #   - tag: auto
+  #     type: urltest
+  #     use_provider: true
+  #     detour: "entry"           # Chain all through entry
+  #     interval: "3m"
+
+# Final outbound for unmatched traffic
+node_singbox_final_outbound: "proxy"
+
+# Provider health check settings
+node_singbox_provider_healthcheck:
+  enabled: true
+  url: "https://www.gstatic.com/generate_204"
+  interval: "3m"
+
+# Rule Sets
+# node_singbox_ruleset_base_url: "https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/release"
+node_singbox_ruleset_base_url: "https://s3.ahmz.ir/rule-set/Iran-sing-box-rules/Chocolate4U"
+
+# -----------------------------------------------------------------------------
+# TOOLS & BOOTSTRAP
+# System packages and shell environment setup.
+# -----------------------------------------------------------------------------
 node_tools_packages:
   - zsh
   - ripgrep
@@ -22,38 +119,75 @@ node_tools_packages:
   - jq
   - netcat-openbsd
 
-# URL for custom dotfiles/shell setup script
+# Downloads and executes bootstrap script for shell environment setup
+# (zsh, dotfiles, etc.)
 node_bootstrap_enabled: true
-node_bootstrap_script_url: "{{ node_internet_problem | default(false) |
+node_bootstrap_script_url: "{{ node_internet_restricted | default(false) |
   ternary('https://s3.ahmz.ir/dots/bootstrap.sh',
   'https://raw.githubusercontent.com/ahmz1833/dots/main/bootstrap.sh') }}"
 
-node_singbox_install: "{{ node_internet_problem }}"
-node_singbox_enabled: false
-node_singbox_version: "1.13.1"
-node_singbox_outbound:
-  type: socks
-  server: 127.0.0.1
-  server_port: 1080
-node_singbox_enable_tun: true
+# lazydocker is a brilliant terminal UI that lets you view container logs,
+# restart them, and check their resource usage instantly.
+node_lazydocker_install: "{{ node_docker_enabled }}"
+node_lazydocker_version: '0.25.0'
 
+# -----------------------------------------------------------------------------
+# GOST TUNNEL
+#
+# GOST is a versatile tunnel tool supporting multiple protocols.
+# Configuration is passed directly to GOST (YAML format).
+#
+# Documentation: https://gost.run/en/
+# Examples: examples/gost.yml
+# -----------------------------------------------------------------------------
 node_gost_install: true
 node_gost_enabled: false
 node_gost_version: "3.2.6"
+
+# Configuration passed directly to GOST
+# Example:
+#   node_gost_config:
+#     services:
+#       - name: socks5
+#         addr: ":1080"
+#         handler:
+#           type: socks5
+#         listener:
+#           type: tcp
 node_gost_config: {}
 
+# -----------------------------------------------------------------------------
+# DOCKER
+# Docker container runtime with optional Compose installation.
+# Examples: examples/docker.yml
+# -----------------------------------------------------------------------------
 node_docker_enabled: true
+
+# Network Configuration
 node_docker_bip: "172.29.0.1/16"
 node_docker_default_address_pools:
   - base: "172.30.0.0/16"
     size: 24
-node_docker_log_driver: "json-file"
+
+# Logging Configuration
+node_docker_log_driver: "json-file" # Drivers: json-file, syslog, journald, local, none
 node_docker_log_opts:
   max-size: "50m"
   max-file: "3"
+
+# Features
 node_docker_live_restore: true
+node_docker_experimental: false
+
+# Metrics (Prometheus endpoint)
+# When enabled, exposes metrics at http://<metrics_addr>/metrics
+# Note: Enabling metrics automatically enables experimental mode
 node_docker_metrics_enabled: true
 node_docker_metrics_addr: "127.0.0.1:9323"
+
+# Installs both plugin (docker compose) and standalone (docker-compose)
+node_docker_compose_install: true
+node_docker_compose_version: "5.1.1"
 
 node_exporter_install: true
 node_exporter_enabled: false

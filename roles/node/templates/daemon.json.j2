@@ -1,14 +1,29 @@
-{% set _cfg = {
-  "bip": node_docker_bip,
-  "default-address-pools": node_docker_default_address_pools,
-  "log-driver": node_docker_log_driver,
-  "log-opts": node_docker_log_opts,
-  "live-restore": node_docker_live_restore
-} -%}
-{% if node_docker_metrics_enabled -%}
-  {% set _ = _cfg.update({"metrics-addr": node_docker_metrics_addr, "experimental": true}) -%}
-{% endif -%}
-{% if node_enable_ipv6 | default(false) -%}
-  {% set _ = _cfg.update({"ipv6": true, "fixed-cidr-v6": "fd00:dead:beef::/48"}) -%}
-{% endif -%}
-{{ _cfg | to_nice_json }}
+{# ==================== DOCKER DAEMON CONFIGURATION ==================== #}
+{%- set config = {} -%}
+{#- Network Configuration -#}
+{%- if node_docker_bip is defined and node_docker_bip -%}
+{%- set _ = config.update({'bip': node_docker_bip}) -%}
+{%- endif -%}
+{%- if node_docker_default_address_pools is defined and node_docker_default_address_pools | length > 0 -%}
+{%- set _ = config.update({'default-address-pools': node_docker_default_address_pools}) -%}
+{%- endif -%}
+{#- Logging Configuration -#}
+{%- if node_docker_log_driver is defined and node_docker_log_driver -%}
+{%- set _ = config.update({'log-driver': node_docker_log_driver}) -%}
+{%- endif -%}
+{%- if node_docker_log_opts is defined and node_docker_log_opts | length > 0 -%}
+{%- set _ = config.update({'log-opts': node_docker_log_opts}) -%}
+{%- endif -%}
+{#- Feature Flags -#}
+{%- if node_docker_live_restore is defined -%}
+{%- set _ = config.update({'live-restore': node_docker_live_restore}) -%}
+{%- endif -%}
+{%- if node_docker_experimental is defined and node_docker_experimental -%}
+{%- set _ = config.update({'experimental': node_docker_experimental}) -%}
+{%- endif -%}
+{#- Metrics Configuration -#}
+{%- if node_docker_metrics_enabled is defined and node_docker_metrics_enabled -%}
+{%- set _ = config.update({'metrics-addr': node_docker_metrics_addr}) -%}
+{%- set _ = config.update({'experimental': true}) -%}
+{%- endif -%}
+{{ config | to_nice_json(indent=2) }}

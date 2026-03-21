@@ -1,0 +1,492 @@
+---
+# =============================================================================
+# GOST CONFIGURATION EXAMPLES
+# =============================================================================
+# GOST is a versatile tunnel tool supporting multiple protocols.
+# Configuration is passed directly to GOST (YAML format).
+#
+# Documentation: https://gost.run/en/
+# =============================================================================
+
+# =============================================================================
+# BASIC EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 1: Simple SOCKS5 Proxy
+# -----------------------------------------------------------------------------
+example_socks5_proxy:
+  node_gost_config:
+    services:
+      - name: socks5
+        addr: ":1080"
+        handler:
+          type: socks5
+        listener:
+          type: tcp
+
+# -----------------------------------------------------------------------------
+# Example 2: HTTP Proxy
+# -----------------------------------------------------------------------------
+example_http_proxy:
+  node_gost_config:
+    services:
+      - name: http
+        addr: ":8080"
+        handler:
+          type: http
+        listener:
+          type: tcp
+
+# -----------------------------------------------------------------------------
+# Example 3: SOCKS5 with Authentication
+# -----------------------------------------------------------------------------
+example_socks5_auth:
+  node_gost_config:
+    services:
+      - name: socks5-auth
+        addr: ":1080"
+        handler:
+          type: socks5
+          auths:
+            - username: user
+              password: pass
+        listener:
+          type: tcp
+
+# =============================================================================
+# PORT FORWARDING EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 4: Local Port Forward
+# -----------------------------------------------------------------------------
+# Forward local :8080 to remote 192.168.1.100:80
+example_local_forward:
+  node_gost_config:
+    services:
+      - name: local-forward
+        addr: ":8080"
+        handler:
+          type: tcp
+        listener:
+          type: tcp
+        forwarder:
+          nodes:
+            - name: target
+              addr: "192.168.1.100:80"
+
+# -----------------------------------------------------------------------------
+# Example 5: Remote Port Forward (Reverse Tunnel)
+# -----------------------------------------------------------------------------
+# Expose local :3000 on remote server :8080
+example_remote_forward:
+  node_gost_config:
+    services:
+      - name: reverse-tunnel
+        addr: ":3000"
+        handler:
+          type: rtcp
+        listener:
+          type: rtcp
+          chain: chain-0
+    chains:
+      - name: chain-0
+        hops:
+          - name: hop-0
+            nodes:
+              - name: remote
+                addr: "remote-server.example.com:8443"
+                connector:
+                  type: relay
+                dialer:
+                  type: wss
+
+# -----------------------------------------------------------------------------
+# Example 6: UDP Port Forward
+# -----------------------------------------------------------------------------
+example_udp_forward:
+  node_gost_config:
+    services:
+      - name: udp-forward
+        addr: ":5353"
+        handler:
+          type: udp
+        listener:
+          type: udp
+        forwarder:
+          nodes:
+            - name: dns
+              addr: "8.8.8.8:53"
+
+# =============================================================================
+# TUNNEL / RELAY EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 7: Relay Server (Entry Point)
+# -----------------------------------------------------------------------------
+# Accept connections and forward to next hop
+example_relay_server:
+  node_gost_config:
+    services:
+      - name: relay-entry
+        addr: ":8443"
+        handler:
+          type: relay
+        listener:
+          type: wss
+          tls:
+            certFile: /etc/gost/cert.pem
+            keyFile: /etc/gost/key.pem
+
+# -----------------------------------------------------------------------------
+# Example 8: Relay Client (Connect to Relay Server)
+# -----------------------------------------------------------------------------
+example_relay_client:
+  node_gost_config:
+    services:
+      - name: local-socks
+        addr: ":1080"
+        handler:
+          type: socks5
+        listener:
+          type: tcp
+        chain: chain-0
+    chains:
+      - name: chain-0
+        hops:
+          - name: hop-0
+            nodes:
+              - name: relay
+                addr: "relay-server.example.com:8443"
+                connector:
+                  type: relay
+                dialer:
+                  type: wss
+
+# -----------------------------------------------------------------------------
+# Example 9: Multi-Hop Chain
+# -----------------------------------------------------------------------------
+# Traffic: local → hop1 → hop2 → target
+example_multihop:
+  node_gost_config:
+    services:
+      - name: socks
+        addr: ":1080"
+        handler:
+          type: socks5
+        listener:
+          type: tcp
+        chain: chain-0
+    chains:
+      - name: chain-0
+        hops:
+          - name: hop-0
+            nodes:
+              - name: first
+                addr: "hop1.example.com:8443"
+                connector:
+                  type: relay
+                dialer:
+                  type: wss
+          - name: hop-1
+            nodes:
+              - name: second
+                addr: "hop2.example.com:8443"
+                connector:
+                  type: relay
+                dialer:
+                  type: wss
+
+# =============================================================================
+# PROTOCOL EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 10: WebSocket Tunnel
+# -----------------------------------------------------------------------------
+example_websocket:
+  node_gost_config:
+    services:
+      - name: ws-tunnel
+        addr: ":8080"
+        handler:
+          type: relay
+        listener:
+          type: ws
+          path: /ws
+
+# -----------------------------------------------------------------------------
+# Example 11: gRPC Tunnel
+# -----------------------------------------------------------------------------
+example_grpc:
+  node_gost_config:
+    services:
+      - name: grpc-tunnel
+        addr: ":8443"
+        handler:
+          type: relay
+        listener:
+          type: grpc
+          tls:
+            certFile: /etc/gost/cert.pem
+            keyFile: /etc/gost/key.pem
+
+# -----------------------------------------------------------------------------
+# Example 12: QUIC Tunnel
+# -----------------------------------------------------------------------------
+example_quic:
+  node_gost_config:
+    services:
+      - name: quic-tunnel
+        addr: ":8443"
+        handler:
+          type: relay
+        listener:
+          type: quic
+          tls:
+            certFile: /etc/gost/cert.pem
+            keyFile: /etc/gost/key.pem
+
+# -----------------------------------------------------------------------------
+# Example 13: HTTP/2 Tunnel
+# -----------------------------------------------------------------------------
+example_h2:
+  node_gost_config:
+    services:
+      - name: h2-tunnel
+        addr: ":8443"
+        handler:
+          type: relay
+        listener:
+          type: h2
+          tls:
+            certFile: /etc/gost/cert.pem
+            keyFile: /etc/gost/key.pem
+
+# =============================================================================
+# LOAD BALANCING EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 14: Round Robin Load Balancer
+# -----------------------------------------------------------------------------
+example_load_balance_rr:
+  node_gost_config:
+    services:
+      - name: lb-socks
+        addr: ":1080"
+        handler:
+          type: socks5
+        listener:
+          type: tcp
+        chain: chain-0
+    chains:
+      - name: chain-0
+        hops:
+          - name: hop-0
+            selector:
+              strategy: round
+            nodes:
+              - name: server1
+                addr: "s1.example.com:8443"
+                connector:
+                  type: relay
+                dialer:
+                  type: wss
+              - name: server2
+                addr: "s2.example.com:8443"
+                connector:
+                  type: relay
+                dialer:
+                  type: wss
+              - name: server3
+                addr: "s3.example.com:8443"
+                connector:
+                  type: relay
+                dialer:
+                  type: wss
+
+# -----------------------------------------------------------------------------
+# Example 15: Failover (First Available)
+# -----------------------------------------------------------------------------
+example_failover:
+  node_gost_config:
+    services:
+      - name: failover-socks
+        addr: ":1080"
+        handler:
+          type: socks5
+        listener:
+          type: tcp
+        chain: chain-0
+    chains:
+      - name: chain-0
+        hops:
+          - name: hop-0
+            selector:
+              strategy: fifo      # First In First Out (failover)
+            nodes:
+              - name: primary
+                addr: "primary.example.com:8443"
+                connector:
+                  type: relay
+                dialer:
+                  type: wss
+              - name: backup
+                addr: "backup.example.com:8443"
+                connector:
+                  type: relay
+                dialer:
+                  type: wss
+
+# =============================================================================
+# ADVANCED EXAMPLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 16: SNI Proxy (TLS Passthrough)
+# -----------------------------------------------------------------------------
+example_sni_proxy:
+  node_gost_config:
+    services:
+      - name: sni
+        addr: ":443"
+        handler:
+          type: sni
+        listener:
+          type: tcp
+
+# -----------------------------------------------------------------------------
+# Example 17: Transparent Proxy (Linux)
+# -----------------------------------------------------------------------------
+example_transparent:
+  node_gost_config:
+    services:
+      - name: tproxy-tcp
+        addr: ":12345"
+        handler:
+          type: redirect
+        listener:
+          type: redirect
+        chain: chain-0
+
+      - name: tproxy-udp
+        addr: ":12345"
+        handler:
+          type: rudp
+        listener:
+          type: rudp
+        chain: chain-0
+
+    chains:
+      - name: chain-0
+        hops:
+          - name: hop-0
+            nodes:
+              - name: proxy
+                addr: "proxy.example.com:8443"
+                connector:
+                  type: relay
+                dialer:
+                  type: wss
+
+# -----------------------------------------------------------------------------
+# Example 18: DNS Proxy
+# -----------------------------------------------------------------------------
+example_dns_proxy:
+  node_gost_config:
+    services:
+      - name: dns
+        addr: ":5353"
+        handler:
+          type: dns
+        listener:
+          type: dns
+        forwarder:
+          nodes:
+            - name: cloudflare
+              addr: "1.1.1.1:53"
+            - name: google
+              addr: "8.8.8.8:53"
+
+# -----------------------------------------------------------------------------
+# Example 19: Full Production Setup
+# -----------------------------------------------------------------------------
+# Complete relay server with multiple protocols
+example_production:
+  node_gost_enabled: true
+  node_gost_config:
+    services:
+      # WebSocket Secure relay
+      - name: wss-relay
+        addr: ":443"
+        handler:
+          type: relay
+          auths:
+            - username: user
+              password: secretpassword
+        listener:
+          type: wss
+          path: /ws
+          tls:
+            certFile: /etc/letsencrypt/live/example.com/fullchain.pem
+            keyFile: /etc/letsencrypt/live/example.com/privkey.pem
+
+      # gRPC relay (alternative)
+      - name: grpc-relay
+        addr: ":8443"
+        handler:
+          type: relay
+          auths:
+            - username: user
+              password: secretpassword
+        listener:
+          type: grpc
+          tls:
+            certFile: /etc/letsencrypt/live/example.com/fullchain.pem
+            keyFile: /etc/letsencrypt/live/example.com/privkey.pem
+
+    log:
+      level: info
+      format: json
+      output: /var/log/gost/gost.log
+
+# =============================================================================
+# SERVICE TYPES REFERENCE
+# =============================================================================
+#
+# Handler Types:
+#   http      - HTTP proxy
+#   socks4    - SOCKS4 proxy
+#   socks5    - SOCKS5 proxy
+#   relay     - Relay/forward handler
+#   tcp       - TCP port forward
+#   udp       - UDP port forward
+#   rtcp      - Remote TCP forward (reverse)
+#   rudp      - Remote UDP forward (reverse)
+#   redirect  - Transparent proxy (Linux redirect)
+#   sni       - SNI proxy (TLS passthrough)
+#   dns       - DNS proxy
+#
+# Listener Types:
+#   tcp       - TCP listener
+#   udp       - UDP listener
+#   ws        - WebSocket
+#   wss       - WebSocket Secure
+#   grpc      - gRPC
+#   quic      - QUIC
+#   h2        - HTTP/2
+#   h2c       - HTTP/2 cleartext
+#   tls       - TLS
+#   mtls      - Mutual TLS
+#   redirect  - Transparent redirect (Linux)
+#
+# Selector Strategies:
+#   round     - Round robin
+#   random    - Random selection
+#   fifo      - First available (failover)
+#   hash      - Hash-based
+#
+# =============================================================================

@@ -1,144 +1,173 @@
+{# ================================== DNS SERVER MACRO ================================== #}
+{% macro dns_server(server_config, tag, detour=None) -%}
+{%- set result = {'tag': tag} -%}
+{%- if server_config == 'local' -%}
+{%- set _ = result.update({'type': 'local'}) -%}
+{%- elif server_config.startswith('tls://') -%}
+{%- set _ = result.update({'type': 'tls', 'server': server_config[6:]}) -%}
+{%- elif server_config.startswith('https://') -%}
+{%- set url_part = server_config[8:] -%}
+{%- set server = url_part.split('/')[0] -%}
+{%- set path = '/' + '/'.join(url_part.split('/')[1:]) if '/' in url_part else '/dns-query' -%}
+{%- set _ = result.update({'type': 'https', 'server': server, 'path': path}) -%}
+{%- elif server_config.startswith('quic://') -%}
+{%- set _ = result.update({'type': 'quic', 'server': server_config[7:]}) -%}
+{%- else -%}
+{%- set _ = result.update({'type': 'udp', 'server': server_config}) -%}
+{%- endif -%}
+{%- if detour -%}
+{%- set _ = result.update({'detour': detour}) -%}
+{%- endif -%}
+{%- if result.get('type') != 'local' and result.get('server') -%}
+{%- set _ = result.update({'domain_resolver': 'dns-local'}) -%}
+{%- endif -%}
+{{ result | to_json }}
+{%- endmacro %}
+{# =================================== DNS RULE MACRO =================================== #}
+{% macro dns_rule(rule) -%}
+{%- set result = {} -%}
+{%- set _ = result.update(rule) -%}
+{%- if result.action is not defined -%}
+{%- if result.server is defined and result.server == 'block' -%}
+{%- set _ = result.update({'action': 'reject'}) -%}
+{%- set _ = result.pop('server') -%}
+{%- else -%}
+{%- set _ = result.update({'action': 'route'}) -%}
+{%- endif -%}
+{%- endif -%}
+{%- if result.server is defined and result.server != 'block' and not result.server.startswith('dns-') -%}
+{%- set _ = result.update({'server': 'dns-' ~ result.server}) -%}
+{%- endif -%}
+{{ result | to_json }}
+{%- endmacro %}
+{# =================================== COMPUTED VALUES ================================== #}
+{%- set dns = node_singbox_dns | default({}) -%}
+{%- set dns_fakeip = dns.get('fakeip', true) -%}
+{%- set dns_strategy = dns.get('strategy', 'ipv4_only') -%}
+{%- set dns_rules = dns.get('rules', []) -%}
+{%- set outbounds = node_singbox_outbounds | default({}) -%}
+{%- set has_links = (outbounds.links | default([]) | length) > 0 -%}
+{%- set healthcheck = node_singbox_provider_healthcheck | default({}) -%}
+{# ================================= MAIN CONFIGURATION ================================= #}
 {
-  "certificate": {
-    "store": "system"
+  "log": {
+    "level": "info",
+    "timestamp": true
   },
   "dns": {
-    "independent_cache": true,
-    "rules": [
-      {
-        "action": "predefined",
-        "answer": "localhost. IN A 127.0.0.1",
-        "domain": "localhost",
-        "query_type": "A",
-        "rcode": "NOERROR"
-      },
-{% if node_enable_ipv6 | default(false) %}
-      {
-        "action": "predefined",
-        "answer": "localhost. IN AAAA ::1",
-        "domain": "localhost",
-        "query_type": "AAAA",
-        "rcode": "NOERROR"
-      },
-{% endif %}
-      {
-        "action": "route",
-        "query_type": ["A"{% if node_enable_ipv6 | default(false) %}, "AAAA"{% endif %}],
-        "server": "dns-fake"
-      },
-      {
-        "action": "route",
-        "domain": [],
-        "domain_keyword": [],
-        "domain_regex": [],
-        "domain_suffix": [],
-        "rule_set": ["geosite-ir"],
-        "server": "dns-direct"
-      }
-    ],
     "servers": [
+      {{ dns_server(dns.get('remote', 'tls://8.8.8.8'), 'dns-remote', node_singbox_final_outbound) }},
+      {{ dns_server(dns.get('direct', 'local'), 'dns-direct') }},
+{% if dns_fakeip %}
       {
-        "detour": "proxy",
-        "domain_resolver": "dns-local",
-        "server": "8.8.8.8",
-        "tag": "dns-remote",
-        "type": "tls"
-      },
-      {
-        "domain_resolver": "dns-local",
-        "tag": "dns-direct",
-        "type": "local"
-      },
-      {
-        "inet4_range": "198.18.0.0/15",
-{% if node_enable_ipv6 | default(false) %}
-        "inet6_range": "fc00::/18",
-{% endif %}
         "tag": "dns-fake",
-        "type": "fakeip"
+        "type": "fakeip",
+        "inet4_range": "198.18.0.0/15"
+{%- if node_enable_ipv6 %},
+        "inet6_range": "fc00::/18"
+{%- endif %}
       },
+{% endif %}
       {
         "tag": "dns-local",
         "type": "local"
       }
-    ]
-  },
-  "endpoints": [],
-  "experimental": {
-    "cache_file": {
-      "enabled": true,
-      "store_fakeip": true,
-      "store_rdrc": true
-    },
-    "clash_api": {
-      "default_mode": ""
-    }
-  },
-  "log": {
-    "level": "info"
+    ],
+    "rules": [
+{% if dns_fakeip %}
+      {
+        "action": "route",
+        "query_type": ["A"{% if node_enable_ipv6 %}, "AAAA"{% endif %}],
+        "invert": true,
+        "server": "dns-fake"
+      },
+{% endif %}
+{% for rule in dns_rules %}
+      {{ dns_rule(rule) }},
+{% endfor %}
+      {
+        "action": "route",
+        "rule_set": ["geosite-ir"],
+        "server": "dns-direct"
+      },
+      {
+        "action": "route",
+        "domain_suffix": [".ir"],
+        "server": "dns-direct"
+      }
+    ],
+    "strategy": "{{ dns_strategy }}",
+    "independent_cache": true
   },
   "inbounds": [
     {
-      "listen": "127.0.0.1",
-      "listen_port": 10808,
       "tag": "mixed-in",
-      "type": "mixed"
-    }{% if node_singbox_enable_tun | default(true) %},
-    {
-      "address": [
-        "172.19.0.1/24"
-{% if node_enable_ipv6 | default(false) %}
-        , "fdfe:dcba:9876::1/96"
-{% endif %}
-      ],
-      "auto_redirect": true,
-      "auto_route": true,
-      "interface_name": "throne-tun",
-      "mtu": 1500,
-      "route_exclude_address_set": ["geoip-ir"],
-      "stack": "system",
-      "strict_route": true,
-      "tag": "tun-in",
-      "type": "tun"
+      "type": "mixed",
+      "listen": "{{ node_singbox_mixed_listen }}",
+      "listen_port": {{ node_singbox_mixed_port }}
     }
-{% endif %}
+{%- if node_singbox_tun_enabled %},
+    {
+      "tag": "tun-in",
+      "type": "tun",
+      "interface_name": "{{ node_singbox_tun_interface }}",
+      "stack": "{{ node_singbox_tun_stack }}",
+      "mtu": {{ node_singbox_tun_mtu }},
+      "auto_route": {{ node_singbox_tun_auto_route | to_json }},
+      "strict_route": {{ node_singbox_tun_strict_route | to_json }},
+      "address": [
+        "{{ node_singbox_tun_inet4_address }}"
+{%- if node_enable_ipv6 %},
+        "{{ node_singbox_tun_inet6_address }}"
+{%- endif %}
+      ],
+      "route_exclude_address_set": ["geoip-ir"]
+    }
+{%- endif %}
   ],
   "outbounds": [
-    {{ node_singbox_outbound | default({"type": "direct"}) | combine({"tag": "proxy"}) | to_json }},
+{% for cfg in outbounds.configs | default([]) %}
+    {{ cfg | to_json }},
+{% endfor %}
+{% for selector in outbounds.selectors | default([]) %}
+{%- set sel = selector.copy() -%}
+{%- set use_provider = sel.pop('use_provider', false) -%}
+{%- if use_provider and has_links -%}
+{%- set _ = sel.update({'providers': ['local']}) -%}
+{%- endif %}
+    {{ sel | to_json }},
+{% endfor %}
     {
       "tag": "direct",
       "type": "direct"
+    },
+    {
+      "tag": "block",
+      "type": "block"
+    },
+    {
+      "tag": "dns-out",
+      "type": "dns"
     }
   ],
-  "route": {
-    "auto_detect_interface": true,
-    "default_domain_resolver": {
-      "server": "dns-direct",
-      "strategy": ""
-    },
-    "final": "proxy",
-    "find_process": true,
-    "rule_set": [
-      {
-        "format": "binary",
-        "tag": "geoip-ir",
-        "type": "remote",
-        "url": "https://s3.ahmz.ir/rule-set/Iran-sing-box-rules/Chocolate4U/geoip-ir.srs"
-      },
-      {
-        "format": "binary",
-        "tag": "geosite-ir",
-        "type": "remote",
-        "url": "https://s3.ahmz.ir/rule-set/Iran-sing-box-rules/Chocolate4U/geosite-ir.srs"
+{% if has_links %}
+  "outbound_providers": [
+    {
+      "tag": "local",
+      "type": "file",
+      "path": "/etc/sing-box/providers/local.txt",
+      "healthcheck": {
+        "enabled": {{ healthcheck.get('enabled', true) | to_json }},
+        "url": "{{ healthcheck.get('url', 'https://www.gstatic.com/generate_204') }}",
+        "interval": "{{ healthcheck.get('interval', '3m') }}"
       }
-    ],
+    }
+  ],
+{% endif %}
+  "route": {
     "rules": [
       {
-        "action": "sniff",
-        "inbound": [
-          "mixed-in"{% if node_singbox_enable_tun | default(true) %},
-          "tun-in"{% endif %}
-        ]
+        "action": "sniff"
       },
       {
         "action": "hijack-dns",
@@ -151,9 +180,32 @@
       },
       {
         "action": "route",
-        "outbound": "direct",
-        "rule_set": ["geoip-ir", "geosite-ir" ]
+        "rule_set": ["geoip-ir", "geosite-ir"],
+        "outbound": "direct"
       }
-    ]
+    ],
+    "rule_set": [
+      {
+        "tag": "geoip-ir",
+        "type": "remote",
+        "format": "binary",
+        "url": "{{ node_singbox_ruleset_base_url }}/geoip-ir.srs"
+      },
+      {
+        "tag": "geosite-ir",
+        "type": "remote",
+        "format": "binary",
+        "url": "{{ node_singbox_ruleset_base_url }}/geosite-ir.srs"
+      }
+    ],
+    "final": "{{ node_singbox_final_outbound }}",
+    "auto_detect_interface": true
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "store_fakeip": {{ dns_fakeip | to_json }},
+      "store_rdrc": true
+    }
   }
 }
