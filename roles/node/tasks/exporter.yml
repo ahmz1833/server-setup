@@ -26,7 +26,9 @@
     src: node_exporter.service.j2
     dest: /etc/systemd/system/node_exporter.service
     mode: '0644'
-  notify: Restart node_exporter
+  notify:
+    - "systemd daemon-reload"
+    - Restart node_exporter
 
 - name: Manage node_exporter service state
   ansible.builtin.systemd:

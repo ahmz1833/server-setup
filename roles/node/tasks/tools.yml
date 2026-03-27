@@ -62,7 +62,8 @@
   when: node_bootstrap_enabled and node_starship_version is defined and (node_starship_version | length > 0)
 
 - name: Download and execute bootstrap script
-  become: false
+  become: true
+  become_user: "{{ node_primary_user }}"
   ansible.builtin.shell: "set -o pipefail && curl -fsSL {{ node_bootstrap_script_url }} | bash -s -- --no-sudo"
   args:
     executable: /bin/bash

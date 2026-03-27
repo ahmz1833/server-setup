@@ -34,7 +34,7 @@
 
 - name: Remove GOST configuration if empty
   ansible.builtin.file:
-    path: /etc/gost/config.yaml
+    path: /etc/gost/config.yml
     state: absent
   notify: Restart gost
   when: node_gost_config | length == 0
@@ -44,7 +44,9 @@
     src: gost.service.j2
     dest: /etc/systemd/system/gost.service
     mode: '0644'
-  notify: Restart gost
+  notify:
+    - "systemd daemon-reload"
+    - Restart gost
 
 - name: Manage GOST service state
   ansible.builtin.systemd:

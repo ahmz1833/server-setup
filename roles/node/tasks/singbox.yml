@@ -28,8 +28,22 @@
   run_once: true
   become: false
   block:
-    - name: Parse links with local vpnparser
-      ansible.builtin.command: "{{ role_path }}/bin/vpnparser sing '{{ item }}'"
+    - name: Check if vpnparser is available
+      ansible.builtin.command: which vpnparser
+      register: _node_vpnparser_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fail if vpnparser is not installed
+      ansible.builtin.fail:
+        msg: |
+          vpnparser is required but not found in PATH.
+          Install it with: go install github.com/ahmz1833/vpnparser@latest
+          Ensure $GOPATH/bin is in your PATH.
+      when: _node_vpnparser_check.rc != 0
+
+    - name: Parse links with vpnparser
+      ansible.builtin.command: "vpnparser sing '{{ item }}'"
       loop: "{{ node_singbox_outbounds.links }}"
       register: _node_parsed_links_raw
       changed_when: false
@@ -61,7 +75,9 @@
     src: singbox.service.j2
     dest: /etc/systemd/system/sing-box.service
     mode: '0644'
-  notify: Restart singbox
+  notify:
+    - "systemd daemon-reload"
+    - Restart singbox
 
 - name: Manage sing-box service state
   ansible.builtin.systemd:

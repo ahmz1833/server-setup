@@ -101,9 +101,25 @@ node_singbox_outbounds:
 # Final outbound for unmatched traffic
 node_singbox_final_outbound: "proxy"
 
-# Rule Sets
+# Rule Sets - configurable for different regions
+# Set to empty list to disable rule-based routing
 # node_singbox_ruleset_base_url: "https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/release"
 node_singbox_ruleset_base_url: "https://s3.ahmz.ir/rule-set/Iran-sing-box-rules/Chocolate4U"
+
+# Direct routing rules (bypass proxy)
+# These rule_sets will be downloaded and used for direct routing
+node_singbox_direct_rulesets:
+  - tag: "geoip-ir"
+    url: "{{ node_singbox_ruleset_base_url }}/geoip-ir.srs"
+  - tag: "geosite-ir"
+    url: "{{ node_singbox_ruleset_base_url }}/geosite-ir.srs"
+
+# Additional domain suffixes to route directly
+node_singbox_direct_domain_suffix:
+  - ".ir"
+
+# Additional IP CIDRs to route directly
+node_singbox_direct_ip_cidr: []
 
 # -----------------------------------------------------------------------------
 # TOOLS & BOOTSTRAP
@@ -221,9 +237,29 @@ node_docker_compose_install: true
 node_docker_compose_version: "5.1.1"
 
 # -----------------------------------------------------------------------------
-# PROMETHEUS EXPORTER
+# PROMETHEUS NODE EXPORTER
 # -----------------------------------------------------------------------------
 node_exporter_install: true
 node_exporter_enabled: false
 node_exporter_version: "1.10.2"
 node_exporter_listen_address: "127.0.0.1:9100"
+
+# Collector Configuration
+# List of collectors to explicitly enable (beyond defaults)
+# See: https://prometheus.io/docs/guides/node-exporter/#enabled-by-default
+node_exporter_enabled_collectors: []
+# Examples:
+#   - systemd
+#   - processes
+
+# List of collectors to disable
+node_exporter_disabled_collectors: []
+# Examples:
+#   - wifi
+#   - infiniband
+
+# Additional command-line arguments
+node_exporter_extra_args: []
+# Examples:
+#   - "--collector.systemd.unit-include=docker.service|nginx.service"
+#   - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev)($|/)"

@@ -35,6 +35,9 @@
 {%- set dns_strategy = dns.get('strategy', 'ipv4_only') -%}
 {%- set dns_rules = dns.get('rules', []) + node_singbox_dns_default_rules | default([]) -%}
 {%- set outbounds = node_singbox_outbounds | default({}) -%}
+{%- set direct_rulesets = node_singbox_direct_rulesets | default([]) -%}
+{%- set direct_domain_suffix = node_singbox_direct_domain_suffix | default([]) -%}
+{%- set direct_ip_cidr = node_singbox_direct_ip_cidr | default([]) -%}
 {# ================================= MAIN CONFIGURATION ================================= #}
 {
   "log": {
@@ -100,8 +103,10 @@
       "auto_redirect": {{ node_singbox_tun_auto_redirect | to_json }},
       "auto_route": {{ node_singbox_tun_auto_route | to_json }},
       "strict_route": {{ node_singbox_tun_strict_route | to_json }},
-      "address": ["{{ node_singbox_tun_inet4_address }}"{% if node_enable_ipv6 %},"{{ node_singbox_tun_inet6_address }}"{% endif %}],
-      "route_exclude_address_set": ["geoip-ir"]
+      "address": ["{{ node_singbox_tun_inet4_address }}"{% if node_enable_ipv6 %},"{{ node_singbox_tun_inet6_address }}"{% endif %}]
+{%- if direct_rulesets | length > 0 %},
+      "route_exclude_address_set": [{% for rs in direct_rulesets %}"{{ rs.tag }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{%- endif %}
     }
 {% endif %}
   ],
@@ -144,29 +149,35 @@
         "action": "route",
         "ip_is_private": true,
         "outbound": "direct"
-      },
+      }
+{%- if direct_rulesets | length > 0 or direct_domain_suffix | length > 0 or direct_ip_cidr | length > 0 %},
       {
         "action": "route",
-        "rule_set": ["geoip-ir", "geosite-ir"],
+{% if direct_rulesets | length > 0 %}
+        "rule_set": [{% for rs in direct_rulesets %}"{{ rs.tag }}"{% if not loop.last %}, {% endif %}{% endfor %}],
+{% endif %}{% if direct_domain_suffix | length > 0 %}
+        "domain_suffix": {{ direct_domain_suffix | to_json }},
+{% endif %}{%- if direct_ip_cidr | length > 0 %}
+        "ip_cidr": {{ direct_ip_cidr | to_json }},
+{% endif %}
         "outbound": "direct"
       }
+{% endif %}
     ],
+{% if direct_rulesets | length > 0 %}
     "rule_set": [
+{% for rs in direct_rulesets %}
       {
-        "tag": "geoip-ir",
+        "tag": "{{ rs.tag }}",
         "type": "remote",
-        "format": "binary",
-        "url": "{{ node_singbox_ruleset_base_url }}/geoip-ir.srs",
-        "download_detour": "direct"
-      },
-      {
-        "tag": "geosite-ir",
-        "type": "remote",
-        "format": "binary",
-        "url": "{{ node_singbox_ruleset_base_url }}/geosite-ir.srs",
-        "download_detour": "direct"
-      }
+        "format": "{{ rs.format | default('binary') }}",
+        "url": "{{ rs.url }}",
+        "download_detour": "{{ rs.download_detour | default('direct') }}"
+      }{% if not loop.last %},{% endif %}
+
+{% endfor %}
     ],
+{% endif %}
     "final": "{{ node_singbox_final_outbound }}",
     "find_process": true,
     "auto_detect_interface": true,

@@ -45,15 +45,40 @@
   changed_when: false
   failed_when: false
 
-- name: Apply X-UI Panel settings (Source of Truth)
+# -----------------------------------------------------------------------------
+# X-UI Settings Management (with change detection)
+# -----------------------------------------------------------------------------
+- name: Get current X-UI settings
+  ansible.builtin.command: /usr/local/x-ui/x-ui setting -show
+  register: _node_xui_current_settings
+  changed_when: false
+  failed_when: false
+
+- name: Parse current X-UI settings
+  ansible.builtin.set_fact:
+    _node_xui_current_port: "{{ _node_xui_current_settings.stdout | regex_search('port:\\s*(\\d+)', '\\1') | first | default('') }}"
+    _node_xui_current_path: "{{ _node_xui_current_settings.stdout | regex_search('webBasePath:\\s*(\\S+)', '\\1') | first | default('') }}"
+    _node_xui_current_user: "{{ _node_xui_current_settings.stdout | regex_search('username:\\s*(\\S+)', '\\1') | first | default('') }}"
+
+- name: Determine if X-UI settings need update
+  ansible.builtin.set_fact:
+    _node_xui_settings_changed: >-
+      {{
+        (_node_xui_current_port | string) != (node_xui_port | string)
+        or _node_xui_current_path != node_xui_web_base_path
+        or _node_xui_current_user != node_xui_username
+      }}
+
+- name: Apply X-UI Panel settings
   ansible.builtin.command: >
     /usr/local/x-ui/x-ui setting
     -username "{{ node_xui_username }}"
     -password "{{ node_xui_password }}"
     -port {{ node_xui_port }}
     -webBasePath "{{ node_xui_web_base_path }}"
-  changed_when: false
+  changed_when: _node_xui_settings_changed
   notify: Restart x-ui
+  no_log: true
 
 - name: Apply X-UI SSL Certificates (if defined)
   ansible.builtin.command: >
@@ -71,7 +96,9 @@
     src: /usr/local/x-ui/x-ui.service
     dest: /etc/systemd/system/x-ui.service
     state: link
-  notify: Restart x-ui
+  notify:
+    - "systemd daemon-reload"
+    - Restart x-ui
 
 - name: Manage x-ui service state
   ansible.builtin.systemd:
