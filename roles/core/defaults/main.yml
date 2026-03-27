@@ -23,6 +23,11 @@ core_hosts_list: []
 # Auto-selects ArvanCloud mirror for Iran
 core_apt_mirror: ""
 
+# APT cache configuration
+# cache_valid_time: Skip apt-get update if cache is newer than this (seconds)
+# Set to 0 to always update, or high value to minimize updates
+core_apt_cache_valid_time: 3600
+
 # Base packages to install on all systems
 core_packages:
   - curl

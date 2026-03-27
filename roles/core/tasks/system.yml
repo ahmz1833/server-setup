@@ -28,6 +28,7 @@
     group: root
     mode: '0644'
     content: |
+      # Managed by Ansible - DO NOT EDIT
       {% for server in core_nameservers %}
       nameserver {{ server }}
       {% endfor %}
@@ -48,6 +49,9 @@
     group: root
     mode: '0644'
 
+# -----------------------------------------------------------------------------
+# APT Mirror Configuration
+# -----------------------------------------------------------------------------
 - name: Determine active APT mirror
   ansible.builtin.set_fact:
     core_active_apt_mirror: >-
@@ -74,6 +78,17 @@
           - "debian.sources"
       register: core_apt_files
 
+    - name: Backup APT source files before modification
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "/etc/apt/{{ item.path | basename }}.bak.{{ ansible_date_time.epoch }}"
+        remote_src: true
+        force: false
+        owner: root
+        group: root
+        mode: '0644'
+      loop: "{{ core_apt_files.files | default([]) }}"
+
     - name: Configure custom APT mirror (Legacy .list format)
       ansible.builtin.replace:
         path: "{{ item.path }}"
@@ -93,7 +108,7 @@
 - name: Update package cache (Debian)
   ansible.builtin.apt:
     update_cache: true
-    cache_valid_time: 3600
+    cache_valid_time: "{{ core_apt_cache_valid_time }}"
   when: ansible_facts['os_family'] == 'Debian'
 
 - name: Update package cache (RedHat)

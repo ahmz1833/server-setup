@@ -9,8 +9,10 @@
     path: "{{ core_ipset_data_dir }}"
     state: directory
     mode: '0755'
+    owner: root
+    group: root
 
-# Create all ipsets
+# Create IPSets
 - name: Create ipsets
   ansible.builtin.command:
     cmd: >-
@@ -24,11 +26,14 @@
 # Populate static entries
 - name: Flush and populate static ipsets
   ansible.builtin.shell: |
+    set -euo pipefail
     ipset flush {{ item.name }}
     {% for entry in item.entries %}
     ipset add {{ item.name }} {{ entry }} -exist
     {% endfor %}
     ipset save {{ item.name }} > {{ core_ipset_data_dir }}/{{ item.name }}.save
+  args:
+    executable: /bin/bash
   loop: "{{ core_ipsets | selectattr('entries', 'defined') | list }}"
   loop_control:
     label: "{{ item.name }}"
@@ -41,7 +46,7 @@
     src: ipset-update.sh.j2
     dest: "{{ core_ipset_data_dir }}/update-{{ item.name }}.sh"
     mode: '0755'
-    user: root
+    owner: root
     group: root
   loop: "{{ core_ipsets | selectattr('url', 'defined') | list }}"
   loop_control:
@@ -55,5 +60,22 @@
     label: "{{ item.name }}"
   changed_when: false
 
-# NOTE: Cron jobs for ipset updates are handled centrally in cron.yml
-# This task does NOT create any cron jobs directly
+# Systemd Persistence (replaces cron @reboot)
+- name: Deploy ipset-restore systemd service
+  ansible.builtin.template:
+    src: ipset-restore.service.j2
+    dest: /etc/systemd/system/ipset-restore.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Restart ipset-restore
+
+- name: Enable ipset-restore service
+  ansible.builtin.systemd:
+    name: ipset-restore
+    enabled: true
+    daemon_reload: true
+
+# NOTE: Cron jobs for periodic ipset updates are handled in cron.yml

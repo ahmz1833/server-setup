@@ -51,11 +51,42 @@
     - core_ssh_ensure_pub_key_user | length > 0
     - core_ssh_ensure_pub_key_user not in core_ssh_allow_users
 
+# Backup SSH Configuration
+- name: Check if sshd_config exists
+  ansible.builtin.stat:
+    path: /etc/ssh/sshd_config
+  register: core_sshd_config_stat
+
+- name: Backup sshd_config before modification
+  ansible.builtin.copy:
+    src: /etc/ssh/sshd_config
+    dest: "/etc/ssh/sshd_config.bak.{{ ansible_date_time.epoch }}"
+    remote_src: true
+    force: false
+    owner: root
+    group: root
+    mode: '0600'
+  when: core_sshd_config_stat.stat.exists
+
+# -----------------------------------------------------------------------------
+# SSH Configuration
+# -----------------------------------------------------------------------------
 - name: Find extra SSH configuration files
   ansible.builtin.find:
     paths: /etc/ssh/sshd_config.d
     patterns: "*.conf"
   register: core_ssh_extra_configs
+
+- name: Backup extra SSH configuration files
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "/etc/ssh/sshd_config.d_{{ item.path | basename }}.bak.{{ ansible_date_time.epoch }}"
+    remote_src: true
+    force: false
+    owner: root
+    group: root
+    mode: '0600'
+  loop: "{{ core_ssh_extra_configs.files }}"
 
 - name: Remove extra SSH configuration files
   ansible.builtin.file:
