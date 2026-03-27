@@ -72,10 +72,15 @@
                 {{ '' }}
               {%- endif -%}
 
-- name: "Resolve target asset metadata: {{ asset_name }}"
+# Split set_fact into two tasks to avoid variable reference timing issues
+- name: "Resolve target version: {{ asset_name }}"
   ansible.builtin.set_fact:
     _asset_target_ver: "{{ asset_version | regex_replace('^(>=|==)', '') }}"
     _asset_op: "{{ '==' if asset_version.startswith('==') else '>=' }}"
+    _asset_stage_locally: "{{ asset_download_locally | default(false) | bool }}"
+
+- name: "Resolve target asset metadata: {{ asset_name }}"
+  ansible.builtin.set_fact:
     _asset_resolved_suffix: >-
       {{
         asset_url
@@ -97,19 +102,16 @@
         (asset_extract_src | default(asset_name))
         | replace('%v', _asset_target_ver)
       }}
-    _asset_cache_path: >-
-      {{
-        (asset_cache_dir | regex_replace('/+$', '')) ~ '/' ~ _asset_resolved_suffix
-      }}
-    _asset_stage_locally: "{{ asset_download_locally | default(false) | bool }}"
     _asset_use_cache: >-
       {{
         (asset_download_locally | default(false) | bool)
         and (asset_cache_enabled | default(true) | bool)
       }}
 
-- name: "Resolve source URL and install decision: {{ asset_name }}"
+- name: "Resolve cache path and URLs: {{ asset_name }}"
   ansible.builtin.set_fact:
+    _asset_cache_path: >-
+      {{ (asset_cache_dir | regex_replace('/+$', '')) ~ '/' ~ _asset_resolved_suffix }}
     _asset_resolved_url: >-
       {{
         ((asset_mirror_base_url | regex_replace('/+$', '')) ~ '/' ~ _asset_resolved_suffix)
@@ -123,6 +125,28 @@
         or (_asset_installed_version | default('0.0.0', true))
         is not ansible.builtin.version(_asset_target_ver, _asset_op)
       }}
+
+# Build proxy environment variables
+- name: "Build proxy environment: {{ asset_name }}"
+  ansible.builtin.set_fact:
+    _asset_proxy_env: >-
+      {%- set env = {} -%}
+      {%- if asset_proxy | default('') | length > 0 -%}
+        {%- set proxy_url = asset_proxy -%}
+        {%- if asset_proxy_username | default('') | length > 0 -%}
+          {%- set proto = proxy_url.split('://')[0] -%}
+          {%- set host = proxy_url.split('://')[1] -%}
+          {%- set auth = asset_proxy_username ~ ':' ~ asset_proxy_password | default('') -%}
+          {%- set proxy_url = proto ~ '://' ~ auth ~ '@' ~ host -%}
+        {%- endif -%}
+        {%- set _ = env.update({
+          'http_proxy': proxy_url,
+          'https_proxy': proxy_url,
+          'HTTP_PROXY': proxy_url,
+          'HTTPS_PROXY': proxy_url
+        }) -%}
+      {%- endif -%}
+      {{ env }}
 
 - name: "Check global cache for {{ asset_name }}"
   ansible.builtin.stat:
@@ -153,6 +177,7 @@
             url: "{{ _asset_resolved_url }}"
             dest: "{{ _asset_cache_path }}"
             mode: '0644'
+          environment: "{{ _asset_proxy_env }}"
           delegate_to: localhost
           become: false
           when:
@@ -189,14 +214,27 @@
               become: "{{ not _asset_stage_locally }}"
               when: _asset_use_cache
 
-            - name: "Download and extract archive: {{ asset_name }}"
+            - name: "Download and extract archive (local staging): {{ asset_name }}"
               ansible.builtin.unarchive:
                 src: "{{ _asset_resolved_url }}"
                 dest: "{{ _asset_tempdir.path }}"
                 remote_src: true
-              delegate_to: "{{ 'localhost' if _asset_stage_locally else inventory_hostname }}"
-              become: "{{ not _asset_stage_locally }}"
-              when: not _asset_use_cache
+              environment: "{{ _asset_proxy_env }}"
+              delegate_to: localhost
+              become: false
+              when:
+                - not _asset_use_cache
+                - _asset_stage_locally
+
+            - name: "Download and extract archive (remote): {{ asset_name }}"
+              ansible.builtin.unarchive:
+                src: "{{ _asset_resolved_url }}"
+                dest: "{{ _asset_tempdir.path }}"
+                remote_src: true
+              environment: "{{ _asset_proxy_env }}"
+              when:
+                - not _asset_use_cache
+                - not _asset_stage_locally
 
         - name: "Handle raw payload for {{ asset_name }}"
           when: not (asset_extract | default(true) | bool)
@@ -210,14 +248,27 @@
               become: "{{ not _asset_stage_locally }}"
               when: _asset_use_cache
 
-            - name: "Download raw asset: {{ asset_name }}"
+            - name: "Download raw asset (local staging): {{ asset_name }}"
               ansible.builtin.get_url:
                 url: "{{ _asset_resolved_url }}"
                 dest: "{{ _asset_tempdir.path }}/{{ _asset_resolved_extract_src }}"
                 mode: '0644'
-              delegate_to: "{{ 'localhost' if _asset_stage_locally else inventory_hostname }}"
-              become: "{{ not _asset_stage_locally }}"
-              when: not _asset_use_cache
+              environment: "{{ _asset_proxy_env }}"
+              delegate_to: localhost
+              become: false
+              when:
+                - not _asset_use_cache
+                - _asset_stage_locally
+
+            - name: "Download raw asset (remote): {{ asset_name }}"
+              ansible.builtin.get_url:
+                url: "{{ _asset_resolved_url }}"
+                dest: "{{ _asset_tempdir.path }}/{{ _asset_resolved_extract_src }}"
+                mode: '0644'
+              environment: "{{ _asset_proxy_env }}"
+              when:
+                - not _asset_use_cache
+                - not _asset_stage_locally
 
     - name: "Stop service before update: {{ asset_name }}"
       ansible.builtin.systemd:

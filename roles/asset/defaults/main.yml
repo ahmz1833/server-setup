@@ -30,3 +30,14 @@ asset_mirror_base_url: ""
 asset_cache_enabled: true
 asset_cache_dir: "{{ lookup('env', 'HOME') }}/.cache/ahmz/server_setup/assets"
 asset_cache_force_refresh: false
+
+# Proxy Configuration
+# Supports HTTP/HTTPS/SOCKS5 proxies for downloading assets
+# Examples:
+#   asset_proxy: "http://proxy.example.com:8080"
+#   asset_proxy: "socks5://127.0.0.1:1080"
+# When asset_download_locally is true, proxy is used on localhost
+# When asset_download_locally is false, proxy is used on target host
+asset_proxy: ""
+asset_proxy_username: ""
+asset_proxy_password: ""
