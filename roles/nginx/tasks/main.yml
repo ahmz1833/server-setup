@@ -17,6 +17,7 @@
 - name: Configure real IP and trusted proxies
   ansible.builtin.include_tasks: realip.yml
   tags: [nginx, nginx-realip, nginx-config]
+  when: nginx_managed
 
 - name: Configure Metrics
   ansible.builtin.import_tasks: metrics.yml

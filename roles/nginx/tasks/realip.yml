@@ -71,7 +71,7 @@
     url: "{{ item }}"
     return_content: true
     timeout: 30
-  register: nginx_url_contents
+  register: nginx_url_fetch_results
   loop: "{{ nginx_url_refs }}"
   when: nginx_url_refs | length > 0
   failed_when: false
@@ -83,9 +83,7 @@
   ansible.builtin.set_fact:
     nginx_resolved_proxies: >-
       {%- set result = nginx_resolved_proxies -%}
-      {%- set url_results = (hostvars['localhost']['nginx_url_contents']['results']
-          if 'nginx_url_contents' in hostvars['localhost'] else nginx_url_contents.results) | default([]) -%}
-      {%- for url_result in url_results -%}
+      {%- for url_result in nginx_url_fetch_results.results | default([]) -%}
         {%- if url_result.content is defined -%}
           {%- for line in url_result.content.split('\n') -%}
             {%- set trimmed = line | trim -%}

@@ -16,6 +16,13 @@ nginx_web_user: "{{ 'nginx' if ansible_facts['os_family'] | default('Debian') ==
 nginx_web_group: "{{ nginx_web_user }}"
 
 # -----------------------------------------------------------------------------
+# Backup Configuration
+# -----------------------------------------------------------------------------
+# Enable backup of nginx.conf and site configs before modification
+nginx_backup_enabled: true
+nginx_backup_dir: "/etc/nginx/backups"
+
+# -----------------------------------------------------------------------------
 # Global Nginx Tuning
 # -----------------------------------------------------------------------------
 # Maximum number of simultaneous connections per worker process
@@ -236,7 +243,7 @@ nginx_waf_global_settings:
   SecRequestBodyNoFilesLimit: "131072"
   SecResponseBodyAccess: "On"
   SecResponseBodyLimit: "524288"
-# Tip: For false positives, it's better to use site.waf_extra_rules with SecRuleRemoveById 
+# Tip: For false positives, it's better to use site.waf_extra_rules with SecRuleRemoveById
 # overriding specific rules per app, rather than disabling WAF globally.
 
 # -----------------------------------------------------------------------------
@@ -251,8 +258,9 @@ nginx_exporter_enabled: false
 # Exporter version to install
 nginx_exporter_version: "1.4.0"
 
-# Port for exporter metrics endpoint
-nginx_exporter_port: 9113
+# Listen address for exporter metrics endpoint
+# Use "127.0.0.1:9113" to restrict to localhost only
+nginx_exporter_listen_address: "127.0.0.1:9113"
 
 # Internal port for nginx stub_status (localhost only)
 nginx_dummy_metric_port: 29182

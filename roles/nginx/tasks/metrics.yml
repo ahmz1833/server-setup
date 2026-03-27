@@ -33,7 +33,9 @@
     src: nginx_exporter.service.j2
     dest: /etc/systemd/system/nginx_exporter.service
     mode: '0644'
-  notify: Restart nginx_exporter
+  notify:
+    - "systemd daemon-reload"
+    - Restart nginx_exporter
 
 - name: Enable and start nginx_exporter
   ansible.builtin.systemd:
