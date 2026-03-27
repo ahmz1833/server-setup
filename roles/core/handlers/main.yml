@@ -22,3 +22,12 @@
   ansible.builtin.systemd:
     name: chronyd
     state: restarted
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart ipset-restore
+  ansible.builtin.systemd:
+    name: ipset-restore
+    state: restarted

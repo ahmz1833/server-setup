@@ -4,7 +4,7 @@
     core_cron_all_jobs: "{{ core_cron_jobs | default([]) }}"
 
 # -----------------------------------------------------------------------------
-# Auto-generate ipset update crons
+# Auto-generate ipset update crons (periodic updates only, NOT @reboot)
 # -----------------------------------------------------------------------------
 - name: Add ipset update cron jobs
   ansible.builtin.set_fact:
@@ -23,25 +23,18 @@
     label: "{{ item.name }}"
   when: core_cron_auto_ipset | default(true)
 
-- name: Add ipset restore cron job
-  ansible.builtin.set_fact:
-    core_cron_all_jobs: >-
-      {{ core_cron_all_jobs + [{
-        'name': 'ipset-restore',
-        'job': 'for f in ' ~ core_ipset_data_dir ~ '/*.save; do [ -f "$f" ] && ipset restore -exist < "$f"; done',
-        'special_time': 'reboot'
-      }] }}
-  when:
-    - core_manage_ipset | default(true)
-    - core_ipsets | length > 0
+# NOTE: ipset restore on boot is now handled by systemd (ipset-restore.service)
+# The @reboot cron job has been removed in favor of proper systemd integration
 
 # -----------------------------------------------------------------------------
 # Exclusive mode: Find and remove stale cron jobs
 # -----------------------------------------------------------------------------
 - name: Get existing cron jobs with our prefix
   ansible.builtin.shell: |
-    set -euo pipefail
+    set -o pipefail
     crontab -l 2>/dev/null | grep -E '^#.*{{ core_cron_prefix }}' | sed 's/^# //' || true
+  args:
+    executable: /bin/bash
   register: core_cron_existing
   changed_when: false
   when: core_cron_exclusive | default(true)

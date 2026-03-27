@@ -1,0 +1,17 @@
+# Managed by Ansible - DO NOT EDIT
+[Unit]
+Description=Restore ipset sets from saved files
+DefaultDependencies=no
+Before=network-pre.target
+Before=netfilter-persistent.service iptables.service ip6tables.service firewalld.service
+Wants=network-pre.target
+After=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'for f in {{ core_ipset_data_dir }}/*.save; do [ -f "$$f" ] && /usr/sbin/ipset restore -exist < "$$f"; done; exit 0'
+ExecStop=/bin/bash -c 'for f in {{ core_ipset_data_dir }}/*.save; do name=$$(basename "$$f" .save); /usr/sbin/ipset save "$$name" > "$$f" 2>/dev/null || true; done; exit 0'
+
+[Install]
+WantedBy=multi-user.target
