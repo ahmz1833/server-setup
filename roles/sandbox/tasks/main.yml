@@ -1,0 +1,82 @@
+---
+- name: Create the single shared sandbox user
+  ansible.builtin.user:
+    name: "{{ sandbox_shared_user }}"
+    state: present
+    create_home: true
+    shell: /bin/bash
+    password_lock: true
+
+- name: Create wrapper script for virtual users
+  ansible.builtin.template:
+    src: sandbox-wrapper.sh.j2
+    dest: /usr/local/bin/sandbox-wrapper.sh
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Configure sudoers for shared sandbox user
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ sandbox_shared_user }}"
+    content: |
+      Defaults:{{ sandbox_shared_user }} env_keep += "SSH_ORIGINAL_COMMAND"
+      {{ sandbox_shared_user }} ALL=(root) NOPASSWD: /usr/local/bin/sandbox-wrapper.sh
+    mode: '0440'
+    owner: root
+    group: root
+    validate: 'visudo -cf %s'
+
+- name: Ensure .ssh directory exists for shared user
+  ansible.builtin.file:
+    path: "/home/{{ sandbox_shared_user }}/.ssh"
+    state: directory
+    mode: '0700'
+    owner: "{{ sandbox_shared_user }}"
+    group: "{{ sandbox_shared_user }}"
+
+- name: Map virtual users via authorized_keys
+  ansible.builtin.template:
+    src: authorized_keys.j2
+    dest: "/home/{{ sandbox_shared_user }}/.ssh/authorized_keys"
+    mode: '0600'
+    owner: "{{ sandbox_shared_user }}"
+    group: "{{ sandbox_shared_user }}"
+
+- name: Ensure sandbox containers are running
+  community.docker.docker_container:
+    name: "sandbox-{{ item.name }}"
+    image: "{{ item.image | default('ubuntu:24.04') }}"
+    state: started
+    restart_policy: always
+    command: sleep infinity
+    ports: "{{ item.ports | default(omit) }}"
+    env: "{{ item.env | default(omit) }}"
+  loop: "{{ sandbox_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure sshd_config.d directory exists
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Ensure sshd_config.d is included in main config
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^\s*#?\s*Include\s+/etc/ssh/sshd_config\.d/\*\.conf'
+    line: 'Include /etc/ssh/sshd_config.d/*.conf'
+    insertbefore: BOF
+  notify: Restart sshd
+
+- name: Configure SSH rules and port for sandbox
+  ansible.builtin.template:
+    src: sandbox.conf.j2
+    dest: /etc/ssh/sshd_config.d/sandbox.conf
+    mode: '0644'
+    owner: root
+    group: root
+    validate: sshd -t -f %s
+  notify: Restart sshd

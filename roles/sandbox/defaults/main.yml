@@ -1,0 +1,11 @@
+---
+sandbox_ssh_port: 2222
+sandbox_shared_user: "sandbox"
+
+# List of virtual users mapped to Docker containers
+# sandbox_users:
+#   - name: "guest1"
+#     image: "ubuntu:24.04"
+#     ssh_keys:
+#       - "ssh-rsa AAAAB3..."
+sandbox_users: []
