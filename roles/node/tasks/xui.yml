@@ -46,7 +46,7 @@
   failed_when: false
 
 # -----------------------------------------------------------------------------
-# X-UI Settings Management (with change detection)
+# X-UI Settings Management
 # -----------------------------------------------------------------------------
 - name: Get current X-UI settings
   ansible.builtin.command: /usr/local/x-ui/x-ui setting -show
@@ -59,6 +59,8 @@
     _node_xui_current_port: "{{ _node_xui_current_settings.stdout | regex_search('port:\\s*(\\d+)', '\\1') | first | default('') }}"
     _node_xui_current_path: "{{ _node_xui_current_settings.stdout | regex_search('webBasePath:\\s*(\\S+)', '\\1') | first | default('') }}"
     _node_xui_current_user: "{{ _node_xui_current_settings.stdout | regex_search('username:\\s*(\\S+)', '\\1') | first | default('') }}"
+    _node_xui_current_cert: "{{ _node_xui_current_settings.stdout | regex_search('webCertFile:\\s*(\\S*)', '\\1') | first | default('') }}"
+    _node_xui_current_key: "{{ _node_xui_current_settings.stdout | regex_search('webKeyFile:\\s*(\\S*)', '\\1') | first | default('') }}"
 
 - name: Determine if X-UI settings need update
   ansible.builtin.set_fact:
@@ -67,6 +69,11 @@
         (_node_xui_current_port | string) != (node_xui_port | string)
         or _node_xui_current_path != node_xui_web_base_path
         or _node_xui_current_user != node_xui_username
+      }}
+    _node_xui_certs_changed: >-
+      {{
+        _node_xui_current_cert != node_xui_cert_path
+        or _node_xui_current_key != node_xui_key_path
       }}
 
 - name: Apply X-UI Panel settings
@@ -80,16 +87,17 @@
   notify: Restart x-ui
   no_log: true
 
-- name: Apply X-UI SSL Certificates (if defined)
+- name: Apply X-UI SSL Certificates
   ansible.builtin.command: >
     /usr/local/x-ui/x-ui cert
     -webCert "{{ node_xui_cert_path }}"
     -webCertKey "{{ node_xui_key_path }}"
-  changed_when: false
+  changed_when: true
   notify: Restart x-ui
   when:
     - node_xui_cert_path | length > 0
     - node_xui_key_path | length > 0
+    - _node_xui_certs_changed
 
 - name: Link x-ui systemd service
   ansible.builtin.file:
