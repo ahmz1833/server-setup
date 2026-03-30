@@ -19,6 +19,9 @@ core_nameservers: []
 # Managed exclusively inside the role-managed section in /etc/hosts
 core_hosts_list: []
 
+# -----------------------------------------------------------------------------
+# Package Configuration
+# -----------------------------------------------------------------------------
 # APT mirror (empty = use default, or set explicitly)
 # Auto-selects ArvanCloud mirror for Iran
 core_apt_mirror: ""
