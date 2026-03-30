@@ -3,6 +3,6 @@
 
 {% for user in sandbox_users %}
 {% for key in user.ssh_keys %}
-command="sudo /usr/local/bin/sandbox-wrapper.sh {{ user.name }}",no-port-forwarding,no-X11-forwarding,no-agent-forwarding {{ key }}
+command="sudo /usr/local/bin/sandbox-login.sh {{ user.name }} {{ user.shell | default('/bin/bash') }}",no-port-forwarding,no-X11-forwarding,no-agent-forwarding {{ key }}
 {% endfor %}
 {% endfor %}

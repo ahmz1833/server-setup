@@ -1,1 +1,22 @@
 ---
+galaxy_info:
+  role_name: sandbox
+  author: AHMZ
+  description: >-
+    Provides isolated, container-backed terminal environments for users via SSH,
+    mapping specific SSH keys to dedicated Docker containers without granting
+    host-level access.
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions: [focal, jammy, noble]
+    - name: Debian
+      versions: [bullseye, bookworm]
+  galaxy_tags:
+    - security
+    - isolation
+    - docker
+    - ssh
+
+dependencies: []
