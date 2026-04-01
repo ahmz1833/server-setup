@@ -153,6 +153,7 @@ node_starship_version: '1.24.2'
 node_bootstrap_script_url: "{{ node_internet_restricted | default(false) |
   ternary('https://s3.ahmz.ir/dots/bootstrap.sh',
   'https://raw.githubusercontent.com/ahmz1833/dots/main/bootstrap.sh') }}"
+node_bootstrap_extra_args: ""
 
 # lazydocker is a brilliant terminal UI that lets you view container logs,
 # restart them, and check their resource usage instantly.
@@ -209,6 +210,35 @@ node_xui_key_path: ""
 # Examples: examples/docker.yml
 # -----------------------------------------------------------------------------
 node_docker_enabled: true
+node_docker_min_version: "29.2.0"
+node_docker_version: "29.3.1"
+node_docker_package_dir: "/usr/local/lib/docker"
+node_docker_cli_plugin_dir: "/usr/local/libexec/docker/cli-plugins"
+
+########
+node_docker_asset_arch_map:
+  x86_64: "x86_64"
+  amd64: "x86_64"
+  aarch64: "aarch64"
+  arm64: "aarch64"
+node_docker_asset_arch: "{{ node_docker_asset_arch_map.get(ansible_architecture, ansible_architecture) }}"
+node_docker_plugin_arch_map:
+  x86_64: "amd64"
+  amd64: "amd64"
+  aarch64: "arm64"
+  arm64: "arm64"
+node_docker_plugin_arch: "{{ node_docker_plugin_arch_map.get(ansible_architecture, ansible_architecture) }}"
+######
+
+node_docker_binaries:
+  - docker
+  - dockerd
+  - containerd
+  - containerd-shim-runc-v2
+  - ctr
+  - docker-init
+  - docker-proxy
+  - runc
 
 # Network Configuration
 node_docker_bip: "172.29.0.1/16"
@@ -232,7 +262,9 @@ node_docker_experimental: false
 node_docker_metrics_enabled: true
 node_docker_metrics_addr: "127.0.0.1:9323"
 
-# Installs standalone docker-compose
+# Docker CLI plugins
+node_docker_buildx_install: true
+node_docker_buildx_version: "0.32.1"
 node_docker_compose_install: true
 node_docker_compose_version: "5.1.1"
 

@@ -16,7 +16,7 @@
     asset_extract: true
     asset_extract_src: "node_exporter-%v.linux-amd64/node_exporter"
     asset_version_cmd: "--version"
-    asset_version_regex: 'version\s+([0-9.]+)'
+    asset_version_regex: 'version\s+v?([0-9.]+)'
     asset_service_stop: "node_exporter"
     asset_download_locally: "{{ node_download_locally | default(false) }}"
     asset_register_path_var: "node_exporter_bin_path"

@@ -9,7 +9,7 @@
     asset_extract: true
     asset_extract_src: "gost"
     asset_version_cmd: "-V"
-    asset_version_regex: 'gost\s+([0-9.]+)'
+    asset_version_regex: 'gost\s+v?([0-9.]+)'
     asset_service_stop: "gost"
     asset_download_locally: "{{ node_download_locally | default(false) }}"
     asset_register_path_var: "node_gost_bin_path"
