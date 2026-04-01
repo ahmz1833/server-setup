@@ -22,9 +22,44 @@ core_hosts_list: []
 # -----------------------------------------------------------------------------
 # Package Configuration
 # -----------------------------------------------------------------------------
-# APT mirror (empty = use default, or set explicitly)
-# Auto-selects ArvanCloud mirror for Iran
-core_apt_mirror: ""
+# APT Mirrors Configuration
+core_set_apt_mirrors: "{{ core_is_iran }}"
+
+core_base_mirror_ubuntu: "https://ir.ubuntu.sindad.cloud"
+core_base_mirror_debian: "https://mirrors.pardisco.co/debian"
+
+# yamllint disable rule:colons
+core_apt_mirrors:
+  # Ubuntu
+  resolute: "{{ core_base_mirror_ubuntu }}"  # 26.04 LTS
+  questing: "{{ core_base_mirror_ubuntu }}"  # 25.10
+  plucky  : "{{ core_base_mirror_ubuntu }}"  # 25.04
+  oracular: "{{ core_base_mirror_ubuntu }}"  # 24.10
+  noble   : "{{ core_base_mirror_ubuntu }}"  # 24.04 LTS
+  mantic  : "{{ core_base_mirror_ubuntu }}"  # 23.10
+  lunar   : "{{ core_base_mirror_ubuntu }}"  # 23.04
+  kinetic : "{{ core_base_mirror_ubuntu }}"  # 22.10
+  jammy   : "{{ core_base_mirror_ubuntu }}"  # 22.04 LTS
+  impish  : "{{ core_base_mirror_ubuntu }}"  # 21.10
+  hirsute : "{{ core_base_mirror_ubuntu }}"  # 21.04
+  groovy  : "{{ core_base_mirror_ubuntu }}"  # 20.10
+  focal   : "{{ core_base_mirror_ubuntu }}"  # 20.04 LTS
+  eoan    : "{{ core_base_mirror_ubuntu }}"  # 19.10
+  disco   : "{{ core_base_mirror_ubuntu }}"  # 19.04
+  cosmic  : "{{ core_base_mirror_ubuntu }}"  # 18.10
+  bionic  : "{{ core_base_mirror_ubuntu }}"  # 18.04 LTS
+  artful  : "{{ core_base_mirror_ubuntu }}"  # 17.10
+  zesty   : "{{ core_base_mirror_ubuntu }}"  # 17.04
+  yakkety : "{{ core_base_mirror_ubuntu }}"  # 16.10
+  xenial  : "{{ core_base_mirror_ubuntu }}"  # 16.04 LTS
+  # Debian
+  bullseye:           "{{ core_base_mirror_debian }}"
+  bullseye-security:  "{{ core_base_mirror_debian }}-security"
+  bookworm:           "{{ core_base_mirror_debian }}"
+  bookworm-security:  "{{ core_base_mirror_debian }}-security"
+  trixie:             "{{ core_base_mirror_debian }}"
+  trixie-security:    "{{ core_base_mirror_debian }}-security"
+# yamllint enable rule:colons
 
 # APT cache configuration
 # cache_valid_time: Skip apt-get update if cache is newer than this (seconds)
@@ -46,6 +81,7 @@ core_packages:
   - vim
   - iotop
   - iftop
+  - rsync
   - tzdata
 
 # Additional packages (role consumer can extend)
@@ -103,7 +139,8 @@ core_manage_ssh: true
 core_ssh_port: >-
   {{
     ansible_facts['port'] | default(ansible_facts['ssh_port'] | default(
-      lookup('pipe', 'ssh -G ' ~ inventory_hostname ~ ' | grep "^port " | cut -d" " -f2', errors='ignore') | default('22', true),
+      lookup('pipe', 'ssh -G ' ~ inventory_hostname ~ ' | grep "^port " | cut -d" " -f2', errors='ignore')
+      | default('22', true),
       true
     )) | int
   }}
