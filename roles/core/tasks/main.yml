@@ -1,12 +1,11 @@
 ---
-- name: Gather facts if they are missing
-  ansible.builtin.setup:
-  when: ansible_facts is not defined
-  tags: always
-
 - name: Core Setup - System Configuration
   ansible.builtin.import_tasks: system.yml
   tags: [core, core-system]
+
+- name: Core Setup - Repository Configuration and Package Installation
+  ansible.builtin.import_tasks: packages.yml
+  tags: [core, core-system, core-packages]
 
 - name: Core Setup - NTP Configuration
   ansible.builtin.import_tasks: ntp.yml

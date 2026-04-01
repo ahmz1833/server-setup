@@ -60,7 +60,7 @@
 - name: Backup sshd_config before modification
   ansible.builtin.copy:
     src: /etc/ssh/sshd_config
-    dest: "/etc/ssh/sshd_config.bak.{{ ansible_date_time.epoch }}"
+    dest: "/etc/ssh/sshd_config.bak.{{ ansible_facts['date_time']['epoch'] }}"
     remote_src: true
     force: false
     owner: root
@@ -80,7 +80,7 @@
 - name: Backup extra SSH configuration files
   ansible.builtin.copy:
     src: "{{ item.path }}"
-    dest: "/etc/ssh/sshd_config.d_{{ item.path | basename }}.bak.{{ ansible_date_time.epoch }}"
+    dest: "/etc/ssh/sshd_config.d_{{ item.path | basename }}.bak.{{ ansible_facts['date_time']['epoch'] }}"
     remote_src: true
     force: false
     owner: root
@@ -102,36 +102,81 @@
     line: '# Include /etc/ssh/sshd_config.d/*.conf'
   notify: Restart sshd
 
-- name: Configure SSH parameters
-  ansible.builtin.lineinfile:
-    path: /etc/ssh/sshd_config
-    regexp: "{{ item.regexp }}"
-    line: "{{ item.line }}"
-    validate: sshd -t -f %s
-  loop:
-    - { regexp: '^\s*#?\s*Port\s+', line: 'Port {{ core_ssh_port }}' }
-    - { regexp: '^\s*#?\s*PasswordAuthentication\s+', line: "PasswordAuthentication {{ 'yes' if core_ssh_password_auth else 'no' }}" }
-    - { regexp: '^\s*#?\s*PermitRootLogin\s+', line: "PermitRootLogin {{ 'yes' if core_ssh_permit_root_login else 'no' }}" }
-    - { regexp: '^\s*#?\s*X11Forwarding\s+', line: "X11Forwarding {{ 'yes' if core_ssh_x11_forwarding else 'no' }}" }
-    - { regexp: '^\s*#?\s*AllowTcpForwarding\s+', line: "AllowTcpForwarding {{ 'yes' if core_ssh_port_forwarding else 'no' }}" }
-    - { regexp: '^\s*#?\s*MaxAuthTries\s+', line: "MaxAuthTries {{ core_ssh_max_auth_tries }}" }
-    - { regexp: '^\s*#?\s*LoginGraceTime\s+', line: "LoginGraceTime {{ core_ssh_login_grace_time }}" }
+- name: Comment out unmanaged SSH directives outside Ansible blocks
+  ansible.builtin.command: |
+    {{ ansible_python_interpreter | default('python3') }} -c '
+    import sys, re
+    try:
+        with open("/etc/ssh/sshd_config", "r") as f:
+            lines = f.readlines()
+        out = []
+        in_block = False
+        in_match_section = False
+        changed = False
+        pattern = re.compile(r"^\s*(Port|PasswordAuthentication|PermitRootLogin|X11Forwarding|AllowTcpForwarding|MaxAuthTries|LoginGraceTime|AllowUsers)[\s=]+",
+                              re.IGNORECASE)
+        for line in lines:
+            # Once we reach a Match stanza, preserve all remaining lines unchanged
+            if re.match(r"^\s*Match\b", line):
+                in_match_section = True
+            if in_match_section:
+                out.append(line)
+                continue
+            if line.startswith("# BEGIN ANSIBLE MANAGED"):
+                in_block = True
+            elif line.startswith("# END ANSIBLE MANAGED"):
+                in_block = False
+                out.append(line)
+                continue
+            if not in_block and pattern.match(line):
+                out.append("# " + line)
+                changed = True
+            else:
+                out.append(line)
+        if changed:
+            with open("/etc/ssh/sshd_config", "w") as f:
+                f.writelines(out)
+            sys.exit(2)
+        else:
+            sys.exit(0)
+    except Exception as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+    '
+  register: core_ssh_comment_task
+  changed_when: core_ssh_comment_task.rc == 2
+  failed_when: core_ssh_comment_task.rc not in [0, 2]
   notify: Restart sshd
 
-- name: Configure allowed users
-  ansible.builtin.lineinfile:
-    path: /etc/ssh/sshd_config
-    regexp: '^\s*#?\s*AllowUsers\s+'
-    line: "AllowUsers {{ core_ssh_allow_users | join(' ') }}"
-    validate: sshd -t -f %s
-  when: core_ssh_allow_users | length > 0
+- name: Disable SSH socket activation to allow custom ports
+  ansible.builtin.systemd:
+    name: ssh.socket
+    state: stopped
+    enabled: false
+  failed_when: false
   notify: Restart sshd
+  when: ansible_facts['os_family'] == 'Debian'
 
-- name: Remove AllowUsers if not configured
-  ansible.builtin.lineinfile:
+- name: Ensure standard SSH service is enabled
+  ansible.builtin.systemd:
+    name: "{{ 'ssh' if ansible_facts['os_family'] == 'Debian' else 'sshd' }}"
+    enabled: true
+
+- name: Configure global SSH parameters in dedicated block
+  ansible.builtin.blockinfile:
     path: /etc/ssh/sshd_config
-    regexp: '^\s*AllowUsers\s+'
-    state: absent
+    marker: "# {mark} ANSIBLE MANAGED CORE SSH"
+    insertbefore: BOF
+    block: |
+      Port {{ core_ssh_port }}
+      PasswordAuthentication {{ 'yes' if core_ssh_password_auth else 'no' }}
+      PermitRootLogin {{ 'yes' if core_ssh_permit_root_login else 'no' }}
+      X11Forwarding {{ 'yes' if core_ssh_x11_forwarding else 'no' }}
+      AllowTcpForwarding {{ 'yes' if core_ssh_port_forwarding else 'no' }}
+      MaxAuthTries {{ core_ssh_max_auth_tries }}
+      LoginGraceTime {{ core_ssh_login_grace_time }}
+      {% if core_ssh_allow_users | length > 0 %}
+      AllowUsers {{ core_ssh_allow_users | join(' ') }}
+      {% endif %}
     validate: sshd -t -f %s
-  when: core_ssh_allow_users | length == 0
   notify: Restart sshd
