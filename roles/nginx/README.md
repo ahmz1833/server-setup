@@ -47,6 +47,7 @@ Applied in `tasks/main.yml`:
 | `nginx-install` | Packages (`install.yml`). |
 | `nginx-waf` | WAF install + ModSecurity config (`waf.yml`). |
 | `nginx-config` | Main nginx tuning + real IP (`config.yml`, `realip.yml`). |
+| `nginx-realip` | Real-IP / trusted-proxy config only (`realip.yml`). |
 | `nginx-sites` | Site templates and `sites-enabled` links (`sites.yml`). |
 | `nginx-monitoring` | Exporter + Promtail (`metrics.yml`, `promtail.yml`). |
 | `nginx-promtail` | Promtail only. |
