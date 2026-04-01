@@ -1,160 +1,232 @@
-# Ansible Role: ahmz.server_setup.apps
+# Ansible role: `ahmz.server_setup.apps`
 
-A production-ready Docker container lifecycle manager and orchestrator.
+Declarative **Docker container** lifecycle on the target host using **`community.docker`**: validate definitions, log in to registries, create networks, resolve **`depends_on`** order, deploy with **`docker_container`**, optionally wait on Docker **health checks**, and optionally **prune** containers or networks that are not part of **`apps_list`**.
 
-## Description
+This role is intended as an alternative to ad-hoc `docker compose` for stacks you want fully described in Ansible variables.
 
-The `apps` role is a complete replacement for `docker-compose`. It manages complex, multi-container deployments directly through native Ansible Docker modules. It introduces advanced CI/CD capabilities like **Preserve Mode** (for partial updates), strict state enforcement (Terraform-style pruning), and automated dependency graph resolution.
+---
 
-### Core Capabilities
+## Requirements
 
-* **Dependency Resolution:** Automatically calculates the correct startup order based on `depends_on`.
+| Requirement | Notes |
+|-------------|--------|
+| **Target OS** | Tested with **Debian / Ubuntu** hosts where Docker Engine is available (`meta/main.yml` platforms). |
+| **Ansible** | 2.14+ |
+| **Collection** | **`community.docker`** — declared in role `meta/main.yml`; also listed in the collection `galaxy.yml` dependencies. |
+| **Docker on the target** | Engine API reachable by the modules; Python **`docker`** SDK on the controller/target as required by `community.docker` (often satisfied by installing **`python3-docker`** on the host, e.g. via the **`node`** role in this collection). |
 
-* **Health Gating:** Pauses the deployment pipeline until a container's Docker `healthcheck` reports as `healthy` before starting its dependents.
+---
 
-* **Smart Preserve Mode:** Fetches the running container's state and merges it with your playbook. This allows CI/CD pipelines to update *just* the Docker image tag without needing to know the container's secrets, ports, or volumes.
+## Execution flow
 
-* **Strict Pruning:** Can automatically destroy any containers or networks running on the host that are *not* defined in your Ansible inventory, enforcing pure Infrastructure-as-Code (with regex/label whitelists for safety).
+| Step | Task file | Purpose |
+|------|-----------|---------|
+| 1 | `prepare.yml` | Assert schema (names, duplicates, `depends_on`), create **`{{ apps_base_path }}`** and per-app dirs, **`docker_login`** for **`apps_registries`**. |
+| 2 | `network.yml` | Create **`apps_networks`**; auto-create any **bridge** networks referenced by apps but not explicitly defined. |
+| 3 | `deploy.yml` | Topological sort by **`depends_on`**, inspect existing containers, **`include_tasks: container.yml`** per app. |
+| 4 | `prune.yml` | If **`apps_prune.enabled`**, remove unmanaged containers and/or networks (see below). |
 
-* **Auto-Provisioning:** Automatically creates referenced Docker networks and host-mounted volume directories under `apps_base_path`.
+---
 
-## Available Tags
+## Tags
 
-* `apps`: Runs the entire role.
+| Tag | What runs |
+|-----|-----------|
+| `apps` | All of the above (each `include_tasks` is tagged). |
+| `ci-cd`, `deploy` | Prepare, networks, deploy — **not** prune unless you also match prune conditions. |
+| `apps-prune` | Prune task file is tagged; prune **still runs only when** **`apps_prune.enabled`** is true. |
 
-* `ci-cd`: Validates, authenticates, provisions networks, and deploys containers.
+---
 
-* `deploy`: Alias for `ci-cd`.
+## Global variables
 
-* `apps-prune`: Runs the pruning task to clean up unmanaged resources.
+Defaults are in `defaults/main.yml`. Commonly used:
 
-## Role Variables: Global Configuration
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `apps_list` | `[]` | List of app dicts (see schema below). |
+| `apps_base_path` | `/opt/apps` | Base directory; each app gets `{{ apps_base_path }}/{{ name }}/`. |
+| `apps_preserve_mode` | `false` | When true, omitted keys for an **existing** container are filled from the live container (CI/CD image-only bumps). |
+| `apps_default_restart_policy` | `unless-stopped` | Used when not set on the app. |
+| `apps_default_pull_policy` | `missing` | Maps to `pull`: `always` / `missing` / `never` (or bool for `always`). |
+| `apps_default_log_driver` / `apps_default_log_options` | `json-file`, size/rotation | Applied when not overridden per app. |
+| `apps_management_labels_enabled` | `true` | Adds `apps.ansible.managed=true` and `apps.ansible.name`. |
+| `apps_registries` | `[]` | `registry`, `username`, `password`, optional `reauthorize`. |
+| `apps_networks` | `[]` | Explicit `docker_network` definitions (`name`, `driver`, `internal`, `ipam`, …). |
 
-| Variable | Description | Default | 
- | ----- | ----- | ----- | 
-| `apps_base_path` | Host directory where app data volumes are automatically created. | `/opt/apps` | 
-| `apps_preserve_mode` | Retain omitted fields (ports, envs) from running containers. | `false` | 
-| `apps_management_labels_enabled` | Adds `apps.ansible.managed=true` to all created containers. | `true` | 
-| `apps_registries` | List of dicts (`registry`, `username`, `password`) for private repos. | `[]` | 
-| `apps_networks` | List of explicitly defined Docker networks (auto-created if omitted). | `[]` | 
+### Pruning: `apps_prune`
 
-### Pruning Configuration (`apps_prune`)
+**Dangerous when enabled.** Removes resources **not** named in **`apps_list`** (containers) or not in the managed network set (networks).
 
-WARNING: Enable with caution. Removes containers not defined in `apps_list`.
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enabled` | `false` | Master switch. |
+| `containers` | `true` | Remove unmanaged containers (after filters). |
+| `networks` | `false` | Remove Docker networks not referenced by role + not `bridge`/`host`/`none`. |
+| `whitelist_patterns` | includes `^sandbox-.*$` in defaults | Regex on container **name**; matches are **never** removed. **Prune logic also always prepends** `^sandbox-.*$` so clearing this list in YAML does not drop that safety net. |
+| `whitelist_labels` | `[]` | Skip removal if label **key** exists (string entry) or **key/value** match (`{ key:, value: }`). |
+
+Network pruning uses **`failed_when: false`** on removal (busy networks may fail).
+
+---
+
+## App schema (`apps_list` entries)
+
+### Required
+
+| Key | Description |
+|-----|-------------|
+| `name` | Container name; must match `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`. |
+| `image` | Image reference — **required** for **`started`**. **Optional** for **`stopped`** and **`absent`** (module does not need an image to stop/remove). |
+
+### Common optional keys
+
+| Key | Description |
+|-----|-------------|
+| `state` | `started` (default), `stopped`, or `absent`. |
+| `preserve_mode` | Override global **`apps_preserve_mode`** for this container. |
+| `depends_on` | List of other **`name`** values in **`apps_list`**; those containers start (and become healthy if waited) **before** this one. Cycles are rejected. |
+| `ports` | Same strings as `docker_container` (e.g. `8080:80`, `127.0.0.1:5432:5432`). |
+| `networks` | e.g. `[{ name: frontend }, { name: backend, ipv4_address: 172.25.0.10 }]`. |
+| `volumes` | Bind paths starting with **`./`** are resolved under **`{{ apps_base_path }}/{{ name }}/`** (only the `./` prefix is rewritten). Other forms (`named_volume:/path`, absolute binds) are passed through. |
+| `env` | Dict. With **preserve mode**, merged **on top of** the running container’s env. |
+| `healthcheck` / `healthcheck_wait` / `healthcheck_wait_timeout` | Docker healthcheck dict; wait loop until `healthy` or no health state (`none`), default timeout **300** s, poll every **5** s. |
+| `pull`, `recreate`, `restart`, `restart_policy` | Passed through to **`docker_container`**. |
+| `dir_owner`, `dir_group`, `dir_mode` | Ownership/mode for **`{{ apps_base_path }}/{{ name }}/`**. |
+
+Many other **`docker_container`** options are mapped in `tasks/container.yml`: `command`, `entrypoint`, `user`, `working_dir`, `hostname`, `dns`, `tmpfs`, resources, capabilities, `read_only`, `privileged`, `security_opts`, `log_driver`, `log_options`, `labels`, etc.
+
+### Idempotency (`comparisons`)
+
+The deploy task sets:
+
+- `image: strict`
+- `env: strict`
+- `labels: allow_more_present`
+- `volumes: allow_more_present`
+- `networks: allow_more_present`
+
+### Preserve mode (CI/CD)
+
+When **`apps_preserve_mode`** (or per-app **`preserve_mode`**) is **true** and the container **already exists**, omitted fields are filled from **`docker_container_info`** (ports, networks, env merge, volumes, healthcheck, resources, …). Your playbook can ship only **`name`** + **`image`** (and e.g. **`pull: always`**) while secrets and bindings stay on the host.
+
+---
+
+## Examples
+
+### Minimal single container
+
+```yaml
+apps_list:
+  - name: whoami
+    image: traefik/whoami:v1.10
+    ports:
+      - "8080:80"
+```
+
+### Data directory under `apps_base_path`
+
+Host path: **`/opt/apps/uptime-kuma/data`** → container **`/app/data`**.
+
+```yaml
+apps_base_path: /opt/apps
+apps_list:
+  - name: uptime-kuma
+    image: louislam/uptime-kuma:1
+    ports:
+      - "3001:3001"
+    volumes:
+      - "./data:/app/data"
+    restart_policy: unless-stopped
+```
+
+### Dependency order + health gating
+
+```yaml
+apps_list:
+  - name: db
+    image: postgres:15-alpine
+    restart_policy: unless-stopped
+    env:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: "{{ vault_pg_password }}"
+    volumes:
+      - "./pgdata:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      retries: 5
+
+  - name: api
+    image: ghcr.io/example/api:1.2.0
+    depends_on:
+      - db
+    ports:
+      - "8080:3000"
+    env:
+      DATABASE_URL: "postgres://admin@db:5432/app"
+```
+
+### Preserve mode (image bump only)
+
+```yaml
+apps_preserve_mode: true
+apps_list:
+  - name: api
+    image: "ghcr.io/example/api:{{ release_tag }}"
+    pull: always
+```
+
+### Stop or remove without image
+
+```yaml
+apps_list:
+  - name: old_worker
+    state: stopped
+
+  - name: legacy_app
+    state: absent
+```
+
+### Prune with label protection
 
 ```yaml
 apps_prune:
-  enabled: false
+  enabled: true
   containers: true
   networks: false
-  whitelist_patterns: 
-    - "^sandbox-.*$"
   whitelist_labels:
-    - "com.docker.compose.project" # Keep docker-compose containers
+    - "com.docker.compose.project"
+    - key: "com.example.role"
+      value: "system"
+
+apps_list:
+  - name: prometheus
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
 ```
 
-## Role Variables: Application Schema (`apps_list`)
+More snippets: **`examples/apps.yml`**.
 
-The `apps_list` is a list of dictionaries. Each dictionary represents a container. Almost all parameters map directly to `docker_container` arguments.
+---
 
-### Key Application Properties
-
-| Key | Type | Description | 
- | ----- | ----- | ----- | 
-| `name` | String | **(Required)** Container name. | 
-| `image` | String | **(Required)** Docker image and tag. | 
-| `state` | String | `started`, `stopped`, or `absent`. (Default: `started`) | 
-| `preserve_mode` | Bool | Overrides global `apps_preserve_mode` for this specific container. | 
-| `depends_on` | List | Names of other apps in `apps_list` that must start/be healthy first. | 
-| `ports` | List | Port bindings (e.g., `["8080:80", "127.0.0.1:5432:5432"]`). | 
-| `volumes` | List | Volume bindings. Relative paths (`./data:/app`) map to `apps_base_path/name/data`. | 
-| `env` | Dict | Environment variables. | 
-| `healthcheck` | Dict | Keys: `test`, `interval`, `timeout`, `retries`. | 
-| `healthcheck_wait` | Bool | Pause deployment until container is `healthy`. (Default: `true`) | 
-| `networks` | List | Networks to attach to (e.g., `[{name: frontend}, {name: backend}]`). | 
-
-*(Supports standard Docker features: `user`, `working_dir`, `command`, `memory`, `cpus`, `privileged`, `labels`, `restart_policy`, etc.)*
-
-## Example Playbooks
-
-### 1. Multi-Tier Application with Health Gating
-
-This example ensures Postgres starts, creates the host directories, and waits until Postgres is fully healthy before starting the Node.js API.
+## Playbook usage
 
 ```yaml
-- name: Deploy Production Stack
-  hosts: app_servers
-  vars:
-    apps_base_path: "/opt/production"
-    apps_list:
-      - name: db
-        image: postgres:15-alpine
-        restart_policy: unless-stopped
-        env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: secretpassword
-        volumes:
-          - "./pgdata:/var/lib/postgresql/data" # Maps to /opt/production/db/pgdata
-        healthcheck:
-          test: ["CMD-SHELL", "pg_isready -U admin"]
-          interval: 10s
-          retries: 5
-        
-      - name: api
-        image: myrepo/api:v1.2.0
-        depends_on: [db]
-        ports:
-          - "8080:3000"
-        env:
-          DB_HOST: db
-          DB_USER: admin
+- hosts: app_servers
   roles:
-    - ahmz.server_setup.apps
+    - role: ahmz.server_setup.apps
+      vars:
+        apps_base_path: /opt/production
+        apps_list:
+          - name: web
+            image: nginx:alpine
+            ports:
+              - "80:80"
 ```
 
-### 2. CI/CD Pipeline (Preserve Mode)
-
-If you are running Ansible from a CI/CD pipeline (like GitLab CI or GitHub Actions), you often only want to update the image tag without hardcoding the database passwords or port bindings into the CI repository.
-
-By using `preserve_mode: true`, Ansible fetches the running container's configuration and merges it with your playbook update.
-
-```yaml
-- name: Update API Image
-  hosts: app_servers
-  vars:
-    # Retain all existing env vars, ports, and volumes
-    apps_preserve_mode: true 
-    apps_list:
-      - name: api
-        image: "myrepo/api:{{ target_version }}"
-  roles:
-    - ahmz.server_setup.apps
-```
-
-### 3. Strict Infrastructure Enforcement
-
-Automatically destroys any container that is manually spun up (`docker run ...`) outside of this playbook, protecting against configuration drift.
-
-```yaml
-- name: Enforce State
-  hosts: all
-  vars:
-    apps_prune:
-      enabled: true
-      containers: true
-      whitelist_patterns:
-        - "^temp-.*$" # Protects containers starting with 'temp-'
-    apps_list:
-      - name: monitoring
-        image: prom/prometheus:latest
-  roles:
-    - ahmz.server_setup.apps
-```
-
-## Dependencies
-
-* `community.docker` collection must be installed.
-* Docker Engine and Python `docker` package must be present on target host (handled by the `node` role in this collection).
+---
 
 ## License
 
