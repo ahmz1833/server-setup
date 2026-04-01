@@ -111,10 +111,17 @@
             lines = f.readlines()
         out = []
         in_block = False
+        in_match_section = False
         changed = False
         pattern = re.compile(r"^\s*(Port|PasswordAuthentication|PermitRootLogin|X11Forwarding|AllowTcpForwarding|MaxAuthTries|LoginGraceTime|AllowUsers)[\s=]+",
                               re.IGNORECASE)
         for line in lines:
+            # Once we reach a Match stanza, preserve all remaining lines unchanged
+            if re.match(r"^\s*Match\b", line):
+                in_match_section = True
+            if in_match_section:
+                out.append(line)
+                continue
             if line.startswith("# BEGIN ANSIBLE MANAGED"):
                 in_block = True
             elif line.startswith("# END ANSIBLE MANAGED"):
