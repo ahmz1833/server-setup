@@ -35,7 +35,7 @@ tags:
   - tunnel
 
 repository: https://github.com/ahmz1833/server-setup
-documentation: https://github.com/ahmz1833/server-setup/blob/main/README.md
+documentation: https://github.com/ahmz1833/server-setup/blob/master/README.md
 homepage: https://github.com/ahmz1833/server-setup
 issues: https://github.com/ahmz1833/server-setup/issues
 

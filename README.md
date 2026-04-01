@@ -8,10 +8,10 @@ Roles for **Debian/Ubuntu**-style hosts: base hardening, edge Nginx (optional Mo
 
 ## Requirements
 
-| | |
-|--|--|
+| Requirement | Notes |
+|-------------|--------|
 | **Ansible** | 2.14+ (`ansible-core` compatible) |
-| **Python** | 3.9+ on the controller |
+| **Python**  | 3.9+ on the controller |
 | **Targets** | Roles are written for **systemd**-based Linux; several roles assume **Debian/Ubuntu** packages or paths—see each role README. |
 
 ### Collection dependencies
