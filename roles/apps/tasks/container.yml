@@ -141,7 +141,7 @@
       volumes: >-
         {{
           _resolved_volumes
-          if _resolved_volumes
+          if _apps_app.volumes is defined
           else (_existing.volumes if (_preserve and _has_existing and _existing.volumes | length > 0) else omit)
         }}
       tmpfs: >-
