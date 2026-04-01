@@ -1,17 +1,22 @@
 ---
+collections:
+  - community.general
+
 galaxy_info:
   role_name: asset
   author: AHMZ
   description: >-
-    Universal utility role to check, download, and install/update
-    remote assets including standalone binaries, single files, or extracted directories.
+    Universal utility role to check, download, and install or update remote assets:
+    standalone binaries, single files, or extracted package directories. Supports
+    controller-side cache, local staging for air-gapped targets, mirrors, and proxies.
+    Optional systemd stop before update uses the systemd module.
   license: MIT
   min_ansible_version: "2.14"
   platforms:
     - name: Ubuntu
       versions: [focal, jammy, noble]
     - name: Debian
-      versions: [bullseye, bookworm]
+      versions: [bullseye, bookworm, trixie]
     - name: EL
       versions: ["8", "9"]
   galaxy_tags:
