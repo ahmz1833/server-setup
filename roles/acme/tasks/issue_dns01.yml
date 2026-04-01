@@ -50,7 +50,10 @@
 
           {% endfor %}
 
-          Verify propagation: dig TXT {{ (acme_challenge.challenge_data.keys() | list | first) | regex_replace('^', '_acme-challenge.') }}
+          Verify propagation (one per record):
+          {% for k, v in acme_challenge.challenge_data.items() %}
+          dig TXT {{ v['dns-01'].record }}
+          {% endfor %}
 
           Press ENTER when all records have propagated globally.
       when:
