@@ -1,102 +1,178 @@
-# Ansible Role: ahmz.server_setup.acme
+# Ansible role: `ahmz.server_setup.acme`
 
-A highly secure, controller-centric Let's Encrypt / ACME certificate issuance and renewal engine.
-
-## Description
-
-The `acme` role automates the generation and renewal of SSL/TLS certificates. Unlike traditional setups that install `certbot` on the target server, this role performs all cryptographic operations (Account Registration, Key Generation, CSR Generation, ACME API handshakes) **locally on the Ansible control node**. It then securely pushes the finalized certificates to the remote server.
-
-### Core Capabilities
-* **Zero Remote Dependencies:** Does not require `certbot`, `acme.sh`, or any ACME client on the target servers.
-* **Interactive DNS-01 Challenges:** Automatically pauses the playbook, displays the required `_acme-challenge` TXT records, and waits for your confirmation to proceed.
-* **Smart HTTP-01 Challenges:** 1. Detects if an existing webroot is accessible from the internet. If so, it uses it with zero downtime.
-  2. If port 80 is blocked/used by another service, it prompts to safely suspend the service, spins up a native Python 3 web server to handle the ACME challenge, and restores the original service afterward.
-* **Mathematical Idempotency:** Parses the remote X.509 certificate to check its exact expiration date. Only triggers a renewal if the certificate expires within the configured threshold (default: 30 days).
+Let’s Encrypt (ACME v2) certificate issuance and renewal with **cryptography on the Ansible controller**. The managed host only receives the final key and full chain; it does **not** need `certbot`, `acme.sh`, or similar.
 
 ---
 
-## ⚠️ Important Execution Requirement
+## How it works
 
-Because this role utilizes `ansible.builtin.pause` to prompt for DNS record creation or Port 80 conflict resolution, **it must be run interactively in a TTY/terminal by a human**. It is currently not designed for unattended CI/CD pipelines unless the HTTP-01 webroot path is perfectly configured and accessible beforehand.
+1. **Controller** (tasks delegated to `localhost`): create or reuse an account key, register the ACME account, generate per-certificate keys and CSRs, talk to the CA, complete challenges.
+2. **Target host**: optional webroot writes or temporary standalone HTTP server for HTTP-01; receive `privkey.pem` and `fullchain.pem` via `copy`.
+3. **Renewal**: read the **existing** certificate on the target with `community.crypto.x509_certificate_info`; issue only if it is missing or expires within `acme_renew_days`.
+4. **After deploy**: notify **`reload certificates`** → custom command and/or `ansible.builtin.service` reload (not hard-coded to systemd only).
 
 ---
 
-## Role Variables: Global Configuration
+## Requirements
+
+| Requirement | Notes |
+|-------------|--------|
+| **Ansible** | 2.14+ (see `meta/main.yml`). |
+| **`community.crypto`** | Declared in role `meta/main.yml`; install on the controller, e.g. `ansible-galaxy collection install community.crypto`. |
+| **Controller Python** | OpenSSL-backed crypto as required by `community.crypto` (typically `cryptography` + system OpenSSL). |
+| **Target** | Unix-like host with `become` for writing cert paths and (for HTTP-01) webroot or port 80. **Windows targets are not supported** (bash paths, `python3 -m http.server`, etc.). |
+| **Facts** | `gather_facts` should be enabled so `ansible_facts['date_time']` and handler conditions (`service_mgr`) behave correctly. |
+
+---
+
+## Global variables
 
 | Variable | Description | Default |
-|---|---|---|
-| `acme_directory_url` | The ACME API endpoint. | `https://acme-v02.api.letsencrypt.org/directory` |
-| `acme_account_email` | Email used for Let's Encrypt registration/notifications. | `admin@example.com` |
-| `acme_local_workspace` | Directory on the **Ansible Controller** to store keys. | `/tmp/ansible_acme_workspace` |
-| `acme_renew_days` | Number of days before expiration to trigger a renewal. | `30` |
-| `acme_default_cert_dir`| Default remote directory to push deployed certificates to. | `/etc/ssl/certs` |
-| `acme_webroot_path` | Target webroot for HTTP-01 zero-downtime challenges. | `/var/www/acme` |
-| `acme_reload_service` | systemd service to reload after a successful deployment. | `nginx` |
-| `acme_reload_command` | Custom shell command to run on reload (overrides service). | `""` |
+|----------|-------------|---------|
+| `acme_directory_url` | ACME directory (production or staging). | `https://acme-v02.api.letsencrypt.org/directory` |
+| `acme_account_email` | Account contact (`mailto:`) for the CA. | `admin@example.com` |
+| `acme_local_workspace` | Directory on the **controller** for account key, CSRs, and issued files (per CN under this path). | `/tmp/ansible_acme_workspace` |
+| `acme_noninteractive` | If `true`: no `pause` prompts; DNS-01 **fails** immediately; HTTP-01 **fails** if port 80 is busy and webroot validation did not succeed. For CI / `-e` runs. | `false` |
+| `acme_renew_days` | Renew if the certificate is not valid this many days ahead. | `30` |
+| `acme_default_cert_dir` | Default parent for remote cert material (unless `cert_dir` / explicit paths override). | `/etc/ssl/certs` |
+| `acme_webroot_path` | Webroot used for HTTP-01 when the role can place challenge files. | `/var/www/acme` |
+| `acme_webroot_owner` | Owner for webroot dirs/files (optional). | `www-data` (via `default` in tasks) |
+| `acme_webroot_group` | Group for webroot dirs/files (optional). | `www-data` |
+| `acme_webroot_test_timeout` | Seconds for the HTTP check from the controller to `http://<CN>/.well-known/...`. | `5` |
+| `acme_reload_service` | Service name passed to `ansible.builtin.service` with `state: reloaded` after deploy. Set to `""` to skip. | `nginx` |
+| `acme_reload_command` | If non-empty, run this command with `become` instead of reloading `acme_reload_service`. | `""` |
 
-## Role Variables: Certificates (`acme_certificates`)
+Staging example:
 
-The `acme_certificates` variable is a list of dictionaries. Each dictionary represents a unique certificate request.
-
-| Key | Type | Description |
-|---|---|---|
-| `domains` | List | **(Required)** List of domains. The first item becomes the Common Name (CN), the rest are Subject Alternative Names (SANs). |
-| `challenge` | String | Challenge type: `dns-01` or `http-01`. (Default: `dns-01`) |
-| `cert_dir` | String | Base directory for the certificate on the remote host. (Default: `{{ acme_default_cert_dir }}/{{ CN }}`) |
-| `fullchain_path` | String | Exact remote path for `fullchain.pem`. (Default: `{{ cert_dir }}/fullchain.pem`) |
-| `privkey_path` | String | Exact remote path for `privkey.pem`. (Default: `{{ cert_dir }}/privkey.pem`) |
-| `renew_days` | Integer | Override the global `acme_renew_days` for this specific certificate. |
+```yaml
+acme_directory_url: "https://acme-staging-v02.api.letsencrypt.org/directory"
+```
 
 ---
 
-## Example Playbooks
+## `acme_certificates` (list)
 
-### 1. Standard DNS-01 Challenge (Wildcard Support)
-`dns-01` is required if you want to issue wildcard certificates (`*.example.com`). When run, Ansible will pause and display the required TXT records.
+Each item describes one certificate.
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `domains` | yes | First element = CN; rest = SANs. Wildcards require **dns-01**. |
+| `challenge` | no | `dns-01` (default) or `http-01`. |
+| `cert_dir` | no | Remote directory base (default: `acme_default_cert_dir/<CN>`). |
+| `fullchain_path` | no | Remote full chain path (default: `<cert_dir>/fullchain.pem`). |
+| `privkey_path` | no | Remote private key path (default: `<cert_dir>/privkey.pem`). |
+| `renew_days` | no | Override `acme_renew_days` for this cert only. |
+
+---
+
+## Challenge modes
+
+### DNS-01
+
+- Required for **wildcard** names.
+- The role **does not** create DNS records. It **pauses** and prints TXT record names/values; you create them at your DNS provider, then continue.
+- With `acme_noninteractive: true`, the role **stops** with an error (use HTTP-01, interactive mode, or external DNS automation outside this role).
+
+### HTTP-01
+
+1. **Webroot path** (preferred): creates `.well-known/acme-challenge` under `acme_webroot_path`, probes `http://<first-domain>/.well-known/...` **from the controller**. If that returns the test token, challenges are served via the existing web server (no port 80 binding on the host by the role for validation).
+2. **Standalone fallback**: temporary files under `/tmp/acme_standalone` and `python3 -m http.server` on **port 80** (needs **root** / capabilities on the target). If something already listens on 80, the role either **prompts** (interactive) or **fails** (`acme_noninteractive: true`).
+
+**Webroot check:** The hostname in the URL is the certificate **CN** (`domains[0]`). That name must **resolve and reach** the target from the machine running the `uri` task (usually the controller).
+
+**Port 80 “auto” mode:** The role uses `ps` **comm** names with `ansible.builtin.service`. The process name is not always the same as the init unit name; if stop/restore fails, prefer **manual** free-port 80 or fix webroot reachability.
+
+---
+
+## Interactive vs non-interactive
+
+| Scenario | Suggestion |
+|----------|------------|
+| Laptop / shell with TTY | `acme_noninteractive: false` (default). |
+| CI, `cron`, AWX without survey | `acme_noninteractive: true`, **http-01** with a **working webroot**, free port 80 if standalone is possible, or skip this role and use another ACME path. |
+| DNS-01 in CI | Not supported inside this role without human or external DNS API. |
+
+---
+
+## Handlers
+
+- **`reload certificates`**: runs `acme_reload_command` if set; otherwise `service: name={{ acme_reload_service }} state=reloaded` when `acme_reload_service` is non-empty.
+- **`systemd daemon-reload`**: runs only when `ansible_facts.service_mgr == 'systemd'` (safe on non-systemd targets).
+
+---
+
+## Example: DNS-01 (wildcard)
 
 ```yaml
-- name: Issue Certificates
-  hosts: webservers
+- hosts: webservers
+  become: true
   vars:
-    acme_account_email: "security@mycompany.com"
+    acme_account_email: security@example.com
     acme_certificates:
       - domains:
-          - "example.com"
+          - example.com
           - "*.example.com"
-        challenge: "dns-01"
+        challenge: dns-01
   roles:
-    - ahmz.server_setup.acme
+    - role: ahmz.server_setup.acme
 ```
-*Resulting files on target:*
-* `/etc/ssl/certs/example.com/fullchain.pem`
-* `/etc/ssl/certs/example.com/privkey.pem`
 
-### 2. HTTP-01 Challenge with Custom Paths & Custom Reload
-Uses `http-01` (no wildcards allowed). Instead of reloading `nginx`, it runs a custom bash script after the keys are pushed.
+Default remote layout: `fullchain.pem` and `privkey.pem` under `/etc/ssl/certs/example.com/` (unless you set `cert_dir` / explicit paths).
+
+---
+
+## Example: HTTP-01 + custom paths + custom reload
 
 ```yaml
-- name: Issue Certificates
-  hosts: webservers
+- hosts: webservers
+  become: true
   vars:
-    acme_account_email: "admin@mycompany.com"
-    acme_reload_command: "/usr/local/bin/restart-custom-app.sh"
+    acme_account_email: admin@example.com
+    acme_reload_command: /usr/local/bin/reload-app-certs.sh
     acme_certificates:
       - domains:
-          - "app.example.com"
-        challenge: "http-01"
-        fullchain_path: "/opt/myapp/ssl/cert.pem"
-        privkey_path: "/opt/myapp/ssl/key.pem"
+          - app.example.com
+        challenge: http-01
+        fullchain_path: /opt/myapp/ssl/cert.pem
+        privkey_path: /opt/myapp/ssl/key.pem
         renew_days: 15
   roles:
-    - ahmz.server_setup.acme
+    - role: ahmz.server_setup.acme
 ```
 
-## Handlers Integration
-If you rely on the default `acme_reload_service: "nginx"`, this role will automatically trigger a systemd reload whenever a certificate is newly issued or renewed, ensuring the web server picks up the fresh certificates immediately without dropping active connections.
+---
 
-## Dependencies
-* `community.crypto` collection must be installed on the Ansible controller.
-* `cryptography` Python library must be installed on the Ansible controller.
+## Example: Controller == target (`localhost`)
+
+Use a normal play with `hosts: localhost`, `connection: local`, and `become: true` so the same machine can write `/etc/...` and run webroot/standalone steps. Ensure the HTTP-01 probe can reach `http://<CN>/...` (DNS/hosts as needed).
+
+```yaml
+- hosts: localhost
+  connection: local
+  become: true
+  vars:
+    acme_noninteractive: true
+    acme_reload_service: nginx
+    acme_webroot_path: /var/www/acme
+    acme_certificates:
+      - domains: [example.com]
+        challenge: http-01
+  roles:
+    - role: ahmz.server_setup.acme
+```
+
+---
+
+## Limitations (by design)
+
+- No **ACME client** on the target; no **DNS provider API** inside the role.
+- **DNS-01** needs human or external automation for TXT records.
+- **HTTP-01 standalone** needs **Python 3**, **`/bin/bash`**, and privileges for **port 80**.
+- **Wildcard** certificates require **dns-01**.
+- Empty **`acme_certificates`** runs account/workspace setup only and issues **no** certs.
+
+---
 
 ## License
+
 MIT
