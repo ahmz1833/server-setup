@@ -261,7 +261,7 @@
       always:
         - name: Stop temporary Python web server
           ansible.builtin.command: "kill -9 {{ acme_standalone_pid.stdout }}"
-          when: acme_standalone_pid.stdout is defined and acme_standalone_pid.stdout | length > 0
+          when: acme_standalone_pid is defined and acme_standalone_pid.stdout is defined and acme_standalone_pid.stdout | length > 0
           changed_when: true
           failed_when: false
           become: true
