@@ -1,6 +1,11 @@
 ---
+- name: Validate sandbox configuration
+  ansible.builtin.import_tasks: validate.yml
+  tags: [sandbox, sandbox-prune]
+  when: sandbox_managed | bool
+
 - name: Prune unmanaged sandbox containers (Exclusive mode)
-  when: sandbox_managed
+  when: sandbox_managed | bool
   tags: [sandbox, sandbox-prune]
   block:
     - name: Gather docker host information
@@ -32,11 +37,11 @@
     - name: Remove/Stop unmanaged sandbox containers
       community.docker.docker_container:
         name: "{{ item }}"
-        state: "{{ (sandbox_prune | default(false)) | ternary('absent', 'stopped') }}"
+        state: "{{ (sandbox_prune | default(false) | bool) | ternary('absent', 'stopped') }}"
       loop: "{{ _sandbox_current_instances | difference(_sandbox_expected_instances) }}"
 
 - name: Provision sandbox users
-  when: sandbox_managed
+  when: sandbox_managed | bool
   tags: [sandbox]
   block:
     - name: Create the shared sandbox user

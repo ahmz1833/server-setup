@@ -11,9 +11,10 @@ sandbox_prune: false
 # The shared host user that accepts incoming SSH connections
 sandbox_shared_user: "sandbox"
 
-# List of virtual users mapped to Docker containers
-# By default, a home directory is mapped: /home/sandbox/<name> -> /home/<name>
-# and the container runs under the host's sandbox UID:GID.
+# List of virtual users mapped to Docker containers (logical names, not Linux logins).
+# Container name: sandbox-<name>. Default image if omitted: ubuntu:24.04.
+# Default bind: /home/<sandbox_shared_user>/<name> -> container /home/<name>
+# Host user for SSH is always sandbox_shared_user (e.g. ssh -p PORT sandbox@host).
 # Example:
 # sandbox_users:
 #   - name: "guest1"
