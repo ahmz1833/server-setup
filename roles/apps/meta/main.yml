@@ -1,11 +1,16 @@
 ---
+collections:
+  - community.docker
+
 galaxy_info:
   role_name: apps
   author: ahmz
   description: >-
-    Docker container lifecycle manager — creates directories, ensures
-    networks, reconciles container state, and prunes unmanaged containers
-    with configurable whitelist.
+    Declarative Docker container lifecycle for Debian/Ubuntu hosts using
+    community.docker: dependency-ordered deploys, optional health gating,
+    preserve-mode merges for CI/CD, automatic networks and host bind paths,
+    registry login, and optional pruning of unmanaged containers/networks.
+  license: MIT
   min_ansible_version: "2.14"
   platforms:
     - name: Ubuntu
@@ -17,10 +22,12 @@ galaxy_info:
       versions:
         - bullseye
         - bookworm
+        - trixie
   galaxy_tags:
     - docker
     - containers
     - deployment
     - apps
+    - devops
 
 dependencies: []
