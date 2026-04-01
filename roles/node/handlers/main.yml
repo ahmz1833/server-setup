@@ -34,3 +34,9 @@
     name: docker
     state: restarted
   when: node_docker_enabled
+
+- name: Restart containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+  when: node_docker_enabled

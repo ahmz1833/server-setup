@@ -1,7 +1,4 @@
 ---
-# -----------------------------------------------------------------------------
-# Docker Version Detection
-# -----------------------------------------------------------------------------
 - name: Check if Docker is installed
   ansible.builtin.command: which docker
   register: node_docker_check
@@ -33,72 +30,158 @@
       {{
         not node_docker_installed
         or (node_docker_min_version is defined
+            and (node_docker_min_version | length > 0)
             and node_docker_current_version is version(node_docker_min_version, '<'))
       }}
 
-- name: Install Docker
+- name: Install or update Docker from managed assets
   when: node_docker_needs_install
   block:
-    - name: Download Docker install script
-      ansible.builtin.get_url:
-        url: https://get.docker.com
-        dest: /tmp/get-docker.sh
-        mode: '0755'
-        force: true
+    - name: Refuse glibc-linked static Docker on Alpine/musl
+      ansible.builtin.fail:
+        msg: >-
+          This role installs Docker from download.docker.com static tarballs
+          (glibc-linked). They do not run on Alpine/musl as-is. Use distro
+          packages (e.g. apk add docker), another install method, or set
+          node_docker_enabled to false.
+      when: ansible_facts.get('os_family') == 'Alpine'
 
-    - name: Execute Docker install script
-      ansible.builtin.command:
-        cmd: /tmp/get-docker.sh
-      register: node_docker_install_result
-      changed_when: true
+    - name: Stop Docker services before cleanup
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      failed_when: false
+      loop:
+        - docker.service
+        - docker.socket
+        - containerd.service
+        - snap.docker.dockerd.service
 
-    - name: Clean up Docker install script
-      ansible.builtin.file:
-        path: /tmp/get-docker.sh
+    - name: Remove Docker snap package
+      ansible.builtin.command: snap remove docker
+      failed_when: false
+      changed_when: false
+
+    - name: Remove Docker packages from OS package manager
+      ansible.builtin.package:
+        name:
+          - docker
+          - docker.io
+          - docker-engine
+          - moby-engine
+          - docker-ce
+          - docker-ce-cli
+          - docker-ce-rootless-extras
+          - docker-buildx-plugin
+          - docker-compose
+          - docker-compose-plugin
+          - containerd
+          - containerd.io
+          - runc
         state: absent
+      failed_when: false
 
-    - name: Remove Docker APT repository source (use system repos)
+    - name: Remove Docker repository and key artifacts
       ansible.builtin.file:
-        path: /etc/apt/sources.list.d/docker.list
+        path: "{{ item }}"
         state: absent
+      loop:
+        - /etc/apt/sources.list.d/docker.list
+        - /etc/apt/sources.list.d/docker-ce.list
+        - /etc/apt/keyrings/docker.asc
+        - /etc/apt/keyrings/docker.gpg
+        - /usr/share/keyrings/docker-archive-keyring.gpg
+        - /etc/yum.repos.d/docker-ce.repo
+        - /usr/libexec/docker/cli-plugins/docker-buildx
+        - /usr/libexec/docker/cli-plugins/docker-compose
+        - /usr/local/bin/docker-buildx
+        - /usr/local/bin/docker-compose
+        - /usr/local/bin/.docker-compose_ansible_version
+        - /usr/local/bin/.docker-buildx_ansible_version
+        - "{{ node_docker_package_dir }}"
 
-# -----------------------------------------------------------------------------
-# Docker Compose Plugin
-# -----------------------------------------------------------------------------
-- name: Check if Docker Compose plugin is installed
-  ansible.builtin.command: docker compose version --short
-  register: node_docker_compose_plugin_check
-  failed_when: false
-  changed_when: false
+    - name: Install Docker engine package via remote_asset role
+      ansible.builtin.include_role:
+        name: ahmz.server_setup.asset
+      vars:
+        asset_name: "docker"
+        asset_type: "package"
+        asset_version: "{{ node_docker_version }}"
+        asset_url: "download.docker.com/linux/static/stable/{{ node_docker_asset_arch }}/docker-%v.tgz"
+        asset_dest: "{{ node_docker_package_dir }}"
+        asset_extract: true
+        asset_extract_src: "docker/"
+        asset_service_stop: "docker"
+        asset_download_locally: "{{ node_download_locally | default(false) }}"
 
-- name: Install Docker Compose plugin
-  ansible.builtin.apt:
-    name: docker-compose-plugin
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
-  when: node_docker_compose_plugin_check.rc != 0
+- name: Link Docker engine binaries into /usr/local/bin
+  ansible.builtin.file:
+    src: "{{ node_docker_package_dir }}/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+    force: true
+  loop: "{{ node_docker_binaries }}"
+  when: node_docker_needs_install
 
-# -----------------------------------------------------------------------------
-# Docker Compose Standalone (optional)
-# -----------------------------------------------------------------------------
-- name: Install/Update Docker Compose standalone via remote_asset role
+- name: Ensure Docker CLI plugin directory exists
+  ansible.builtin.file:
+    path: "{{ node_docker_cli_plugin_dir }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Install Docker Buildx plugin via remote_asset role
+  ansible.builtin.include_role:
+    name: ahmz.server_setup.asset
+  vars:
+    asset_name: "docker-buildx"
+    asset_version: "{{ node_docker_buildx_version }}"
+    asset_url: "github.com/docker/buildx/releases/download/v%v/buildx-v%v.linux-{{ node_docker_buildx_arch }}"
+    asset_dest: "{{ node_docker_cli_plugin_dir }}/docker-buildx"
+    asset_extract: false
+    asset_version_cmd: "version"
+    asset_version_regex: 'v?([0-9]+\.[0-9]+\.[0-9]+)'
+    asset_download_locally: "{{ node_download_locally | default(false) }}"
+    asset_register_path_var: "node_docker_buildx_plugin_path"
+  when: node_docker_buildx_install
+
+- name: Link Docker Buildx CLI shim
+  ansible.builtin.file:
+    src: "{{ node_docker_cli_plugin_dir }}/docker-buildx"
+    dest: /usr/local/bin/docker-buildx
+    state: link
+    force: true
+  when: node_docker_buildx_install
+
+- name: Install Docker Compose plugin via remote_asset role
   ansible.builtin.include_role:
     name: ahmz.server_setup.asset
   vars:
     asset_name: "docker-compose"
     asset_version: "{{ node_docker_compose_version }}"
-    asset_url: "github.com/docker/compose/releases/download/v%v/docker-compose-linux-x86_64"
+    asset_url: "github.com/docker/compose/releases/download/v%v/docker-compose-linux-{{ node_docker_compose_arch }}"
+    asset_dest: "{{ node_docker_cli_plugin_dir }}/docker-compose"
     asset_extract: false
     asset_version_cmd: "version --short"
     asset_version_regex: 'v?([0-9]+\.[0-9]+\.[0-9]+)'
     asset_download_locally: "{{ node_download_locally | default(false) }}"
-    asset_register_path_var: "node_docker_compose_bin_path"
+    asset_register_path_var: "node_docker_compose_plugin_path"
   when: node_docker_compose_install
 
-# -----------------------------------------------------------------------------
-# Docker Configuration
-# -----------------------------------------------------------------------------
+- name: Link Docker Compose CLI shim
+  ansible.builtin.file:
+    src: "{{ node_docker_cli_plugin_dir }}/docker-compose"
+    dest: /usr/local/bin/docker-compose
+    state: link
+    force: true
+  when: node_docker_compose_install
+
+- name: Ensure docker group exists
+  ansible.builtin.group:
+    name: docker
+    state: present
+
 - name: Add user to docker group
   ansible.builtin.user:
     name: "{{ node_primary_user }}"
@@ -114,6 +197,32 @@
     owner: root
     group: root
 
+- name: Configure containerd systemd service
+  ansible.builtin.template:
+    src: containerd.service.j2
+    dest: /etc/systemd/system/containerd.service
+    mode: '0644'
+    owner: root
+    group: root
+  notify:
+    - "systemd daemon-reload"
+    - Restart containerd
+    - Restart docker
+  when: node_docker_needs_install
+
+- name: Configure Docker systemd service
+  ansible.builtin.template:
+    src: docker.service.j2
+    dest: /etc/systemd/system/docker.service
+    mode: '0644'
+    owner: root
+    group: root
+  notify:
+    - "systemd daemon-reload"
+    - Restart containerd
+    - Restart docker
+  when: node_docker_needs_install
+
 - name: Configure Docker daemon
   ansible.builtin.template:
     src: daemon.json.j2
@@ -122,6 +231,13 @@
     owner: root
     group: root
   notify: Restart docker
+
+- name: Manage containerd service state
+  ansible.builtin.systemd:
+    name: containerd
+    state: "{{ node_docker_enabled | ternary('started', 'stopped') }}"
+    enabled: "{{ node_docker_enabled }}"
+    daemon_reload: true
 
 - name: Manage Docker service state
   ansible.builtin.systemd:
