@@ -147,8 +147,19 @@
       loop_control:
         label: "{{ item.name }}"
       register: _sandbox_init_result
-      changed_when: _sandbox_init_result.rc == 10
-      failed_when: _sandbox_init_result.rc not in [0, 10]
+      changed_when: >
+        (_sandbox_init_result.results
+        | map(attribute='rc')
+        | select('equalto', 10)
+        | list
+        | length) > 0
+      failed_when: >
+        (_sandbox_init_result.results
+        | map(attribute='rc')
+        | reject('equalto', 0)
+        | reject('equalto', 10)
+        | list
+        | length) > 0
 
     - name: Cleanup temporary init-sandbox script
       ansible.builtin.file:
