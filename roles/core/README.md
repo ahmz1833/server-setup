@@ -137,6 +137,7 @@ If `core_manage_nameservers` is true, the role may **remove a symlink** and writ
     core_firewall_rules:
       - { port: 80, comment: "HTTP" }
       - { port: 443, comment: "HTTPS" }
+      - { port: "8080:8090", comment: "App range" }
 
     core_ipsets:
       - name: office-nets

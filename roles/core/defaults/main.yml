@@ -241,6 +241,7 @@ core_firewall_allow_ping: true
 # core_firewall_rules:
 #   - { port: 80, comment: "HTTP" }
 #   - { port: 443, comment: "HTTPS" }
+#   - { port: "8080:8090", comment: "App range" }
 #   - { port: 9100, src: "10.0.0.0/8", comment: "Metrics" }
 #   - { port: 8080, ipset: "trusted-nets", comment: "From trusted" }
 #   - { port: 3000, v4_only: true, comment: "IPv4 only" }
