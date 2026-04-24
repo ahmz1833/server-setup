@@ -372,6 +372,14 @@
                 group: root
                 remote_src: true
 
+            - name: "Normalize package destination permissions after extraction: {{ asset_name }}"
+              ansible.builtin.file:
+                path: "{{ _asset_dest }}"
+                state: directory
+                mode: '0755'
+                owner: root
+                group: root
+
             - name: "Normalize package ownership after extraction: {{ asset_name }}"
               ansible.builtin.file:
                 path: "{{ _asset_dest }}"
