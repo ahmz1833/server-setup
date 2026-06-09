@@ -256,7 +256,7 @@ nginx_exporter_install: true
 nginx_exporter_enabled: false
 
 # Exporter version to install
-nginx_exporter_version: "1.4.0"
+nginx_exporter_version: "1.5.1"
 
 # Listen address for exporter metrics endpoint
 # Use "127.0.0.1:9113" to restrict to localhost only
@@ -274,8 +274,11 @@ nginx_promtail_install: false
 # Enable and start Promtail service
 nginx_promtail_enabled: false
 
-# Promtail version to install
-nginx_promtail_version: "3.4.2"
+# Promtail version to install.
+# NOTE: Grafana deprecated Promtail and removed its release binaries starting
+# Loki v3.7.0, so 3.6.x (last: 3.6.11) is the final line that ships
+# promtail-linux-amd64.zip. Migration to Grafana Alloy is recommended.
+nginx_promtail_version: "3.6.11"
 
 # Promtail HTTP server port (for /ready, /metrics endpoints)
 nginx_promtail_port: 9080

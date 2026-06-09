@@ -131,7 +131,7 @@ node_arch_lazydocker: "{{ node_arch_lazydocker_map.get(ansible_facts['architectu
 # -----------------------------------------------------------------------------
 node_singbox_install: '{{ node_internet_restricted }}'
 node_singbox_enabled: false
-node_singbox_version: "1.13.3"
+node_singbox_version: "1.13.13"
 # sing-box release tarball: auto uses -musl on Alpine; glibc | musl to force
 node_singbox_libc: auto
 
@@ -265,12 +265,12 @@ node_tools_packages:
 # Downloads and executes bootstrap script for shell environment setup
 # (zsh, dotfiles, etc.)
 node_bootstrap_enabled: true
-node_fzf_version: '0.70.0'
+node_fzf_version: '0.73.1'
 node_eza_version: '0.23.4'
 node_zoxide_version: '0.9.9'
-node_starship_version: '1.24.2'
+node_starship_version: '1.25.1'
 node_wgcf_install: false
-node_wgcf_version: '2.2.30'
+node_wgcf_version: '2.2.31'
 node_bootstrap_script_url: "{{ node_internet_restricted | default(false) |
   ternary('https://s3.ahmz.ir/dots/bootstrap.sh',
   'https://raw.githubusercontent.com/ahmz1833/dots/main/bootstrap.sh') }}"
@@ -279,7 +279,7 @@ node_bootstrap_extra_args: ""
 # lazydocker is a brilliant terminal UI that lets you view container logs,
 # restart them, and check their resource usage instantly.
 node_lazydocker_install: "{{ node_docker_enabled }}"
-node_lazydocker_version: '0.25.0'
+node_lazydocker_version: '0.25.2'
 
 # -----------------------------------------------------------------------------
 # GOST TUNNEL
@@ -373,7 +373,7 @@ node_xui_distro: "{{ node_xui_distro_map.get(ansible_facts['os_family'], node_xu
 # -----------------------------------------------------------------------------
 node_docker_enabled: true
 node_docker_min_version: "29.2.0"
-node_docker_version: "29.3.1"
+node_docker_version: "29.5.3"
 node_docker_package_dir: "/usr/local/lib/docker"
 node_docker_cli_plugin_dir: "/usr/local/libexec/docker/cli-plugins"
 
@@ -411,16 +411,16 @@ node_docker_metrics_addr: "127.0.0.1:9323"
 
 # Docker CLI plugins
 node_docker_buildx_install: true
-node_docker_buildx_version: "0.32.1"
+node_docker_buildx_version: "0.34.1"
 node_docker_compose_install: true
-node_docker_compose_version: "5.1.1"
+node_docker_compose_version: "5.1.4"
 
 # -----------------------------------------------------------------------------
 # PROMETHEUS NODE EXPORTER
 # -----------------------------------------------------------------------------
 node_exporter_install: true
 node_exporter_enabled: false
-node_exporter_version: "1.10.2"
+node_exporter_version: "1.11.1"
 node_exporter_listen_address: "127.0.0.1:9100"
 
 # Collector Configuration
