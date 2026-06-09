@@ -1,4 +1,14 @@
 ---
+- name: Validate X-UI database configuration
+  ansible.builtin.assert:
+    that:
+      - node_xui_db_type | lower in ['sqlite', 'postgres', 'postgresql', 'pg']
+      - (node_xui_db_type | lower == 'sqlite') or (node_xui_db_dsn | length > 0)
+    fail_msg: >-
+      node_xui_db_type='{{ node_xui_db_type }}' requires node_xui_db_dsn to be set to a
+      PostgreSQL DSN (e.g. postgres://user:pass@host:5432/db?sslmode=disable).
+    quiet: true
+
 - name: Install x-ui package via remote_asset role
   ansible.builtin.include_role:
     name: ahmz1833.server_setup.asset
@@ -40,6 +50,42 @@
     src: /usr/local/x-ui/x-ui.sh
     dest: /usr/bin/x-ui
     state: link
+
+# -----------------------------------------------------------------------------
+# X-UI Environment File (systemd EnvironmentFile + CLI)
+#
+# The release ships per-distro unit files whose EnvironmentFile path differs
+# (see node_xui_distro_map). Both the running panel AND the `x-ui` CLI read this
+# file, so it must be written BEFORE any migrate/setting call for those to
+# target the right DB backend.
+# -----------------------------------------------------------------------------
+- name: Build X-UI environment variable set
+  ansible.builtin.set_fact:
+    _node_xui_env_all: >-
+      {{
+        node_xui_env
+        | combine({'XUI_DB_TYPE': node_xui_db_type} if node_xui_db_type | lower != 'sqlite' else {})
+        | combine({'XUI_DB_DSN': node_xui_db_dsn} if node_xui_db_dsn | length > 0 else {})
+        | combine({'XUI_SKIP_HSTS': 'true'} if node_xui_skip_hsts | bool else {})
+      }}
+
+- name: Configure X-UI environment file
+  ansible.builtin.template:
+    src: x-ui.env.j2
+    dest: "{{ node_xui_distro.env_file }}"
+    mode: '0600'
+    owner: root
+    group: root
+  notify: Restart x-ui
+  no_log: true
+  when: _node_xui_env_all | length > 0
+
+- name: Remove X-UI environment file when no overrides are set
+  ansible.builtin.file:
+    path: "{{ node_xui_distro.env_file }}"
+    state: absent
+  notify: Restart x-ui
+  when: _node_xui_env_all | length == 0
 
 - name: Run X-UI database migrations
   ansible.builtin.command: "/usr/local/x-ui/x-ui migrate"
@@ -101,11 +147,29 @@
     - node_xui_key_path | length > 0
     - _node_xui_certs_changed
 
+- name: Retrieve X-UI panel API token
+  ansible.builtin.command: /usr/local/x-ui/x-ui setting -getApiToken
+  register: _node_xui_api_token_raw
+  changed_when: false
+  failed_when: false
+  no_log: true
+  when: node_xui_get_api_token | bool
+
+- name: Register X-UI API token fact
+  ansible.builtin.set_fact:
+    node_xui_api_token: >-
+      {{ _node_xui_api_token_raw.stdout | regex_search('apiToken:\\s*(\\S+)', '\\1') | default([], true) | first | default('') }}
+  no_log: true
+  when: node_xui_get_api_token | bool
+
+# The release tarball ships per-distro unit files (x-ui.service.debian/.rhel/.arch),
+# not a plain x-ui.service; node_xui_distro.service_file selects one by OS family.
 - name: Link x-ui systemd service
   ansible.builtin.file:
-    src: /usr/local/x-ui/x-ui.service
+    src: "{{ node_xui_distro.service_file }}"
     dest: /etc/systemd/system/x-ui.service
     state: link
+    force: true
   notify:
     - "systemd daemon-reload"
     - Restart x-ui

@@ -145,7 +145,7 @@ node_singbox_tun_interface: "tun-sb"
 node_singbox_tun_stack: "system"              # system, gvisor, mixed
 node_singbox_tun_mtu: 1500
 node_singbox_tun_auto_route: true
-node_singbox_tun_auto_redirect: true
+node_singbox_tun_auto_redirect: "{{ node_singbox_tun_auto_route }}"
 node_singbox_tun_strict_route: true
 node_singbox_tun_inet4_address: "172.19.0.1/30"
 node_singbox_tun_inet6_address: "fdfe:dcba:9876::1/126"
@@ -312,7 +312,7 @@ node_gost_config: {}
 node_xui_install: false
 node_xui_enabled: false
 node_xui_repo: "MHSanaei/3x-ui"
-node_xui_version: "2.8.11"
+node_xui_version: "3.3.0"
 
 # Panel Configuration (Ansible acts as the Source of Truth)
 node_xui_port: 2053
@@ -324,6 +324,46 @@ node_xui_password: "admin"
 # (Leave empty if putting behind NGINX)
 node_xui_cert_path: ""
 node_xui_key_path: ""
+
+# --- Database backend (3x-ui v3.0+) ---
+# "sqlite" (default) keeps the local /etc/x-ui/x-ui.db file.
+# "postgres" stores all panel data in PostgreSQL (node_xui_db_dsn required).
+# Applied via the systemd EnvironmentFile, which the `x-ui` CLI also reads, so
+# migrations and setting changes target the same backend as the running panel.
+# NOTE: switching backends does not copy existing data. To move SQLite data into
+# PostgreSQL once, run manually: `x-ui migrate-db --dsn "<dsn>"`.
+node_xui_db_type: "sqlite"
+node_xui_db_dsn: "" # e.g. "postgres://xui:secret@127.0.0.1:5432/xui?sslmode=disable"
+
+# Skip the HSTS response header (3x-ui v3.0+). Useful when the panel sits behind
+# a TLS-terminating reverse proxy (NGINX) and is reached over plain HTTP locally.
+node_xui_skip_hsts: false
+
+# Extra environment variables for the x-ui service AND CLI (written to the
+# EnvironmentFile). Use for advanced knobs such as XUI_DB_FOLDER, XUI_LOG_FOLDER,
+# XUI_LOG_LEVEL, XUI_DEBUG, XUI_BIN_FOLDER.
+# Example:
+#   node_xui_env:
+#     XUI_LOG_LEVEL: "warning"
+node_xui_env: {}
+
+# Register the panel API token (3x-ui v3.0+) as the `node_xui_api_token` fact.
+node_xui_get_api_token: false
+
+# Per-distro X-UI paths, merged into one entry per OS family and selected by
+# ansible_facts.os_family (default: Debian). The release ships
+# x-ui.service.{debian,rhel,arch}, each with a different EnvironmentFile path.
+node_xui_distro_map:
+  Debian:
+    env_file: /etc/default/x-ui
+    service_file: /usr/local/x-ui/x-ui.service.debian
+  RedHat:
+    env_file: /etc/sysconfig/x-ui
+    service_file: /usr/local/x-ui/x-ui.service.rhel
+  Archlinux:
+    env_file: /etc/conf.d/x-ui
+    service_file: /usr/local/x-ui/x-ui.service.arch
+node_xui_distro: "{{ node_xui_distro_map.get(ansible_facts['os_family'], node_xui_distro_map['Debian']) }}"
 
 # -----------------------------------------------------------------------------
 # DOCKER
