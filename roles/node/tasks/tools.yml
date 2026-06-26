@@ -33,6 +33,33 @@
     asset_download_locally: "{{ node_download_locally | default(false) }}"
   when: node_bootstrap_enabled and node_yazi_version is defined and (node_yazi_version | length > 0)
 
+- name: Install gitui via remote_asset role
+  ansible.builtin.include_role:
+    name: ahmz1833.server_setup.asset
+  vars:
+    asset_name: "gitui"
+    asset_version: "{{ node_gitui_version }}"
+    asset_url: "github.com/gitui-org/gitui/releases/download/v%v/gitui-linux-{{ node_arch_gitui_linux }}.tar.gz"
+    asset_extract: true
+    asset_extract_src: "gitui"
+    asset_version_cmd: "--version"
+    asset_version_regex: '([0-9.]+)'
+    asset_download_locally: "{{ node_download_locally | default(false) }}"
+  when: node_bootstrap_enabled and node_gitui_version is defined and (node_gitui_version | length > 0)
+
+- name: Install lazyjournal via remote_asset role
+  ansible.builtin.include_role:
+    name: ahmz1833.server_setup.asset
+  vars:
+    asset_name: "lazyjournal"
+    asset_version: "{{ node_lazyjournal_version }}"
+    asset_url: "github.com/Lifailon/lazyjournal/releases/download/%v/lazyjournal-%v-linux-{{ node_arch_lazyjournal_linux }}"
+    asset_extract: false
+    asset_version_cmd: "--version"
+    asset_version_regex: '([0-9.]+)'
+    asset_download_locally: "{{ node_download_locally | default(false) }}"
+  when: node_bootstrap_enabled and node_lazyjournal_version is defined and (node_lazyjournal_version | length > 0)
+
 - name: Install eza via remote_asset role
   ansible.builtin.include_role:
     name: ahmz1833.server_setup.asset

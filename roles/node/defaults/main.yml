@@ -130,6 +130,23 @@ node_arch_yazi_linux_map:
   riscv64: riscv64gc-unknown-linux-gnu
 node_arch_yazi_linux: "{{ node_arch_yazi_linux_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
 
+node_arch_gitui_linux_map:
+  x86_64: x86_64
+  amd64: x86_64
+  aarch64: aarch64
+  arm64: aarch64
+  armv7l: armv7
+  armv6l: arm
+  armv5l: arm
+node_arch_gitui_linux: "{{ node_arch_gitui_linux_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
+
+node_arch_lazyjournal_linux_map:
+  x86_64: amd64
+  amd64: amd64
+  aarch64: arm64
+  arm64: arm64
+node_arch_lazyjournal_linux: "{{ node_arch_lazyjournal_linux_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
+
 # -----------------------------------------------------------------------------
 # SING-BOX CONFIGURATION
 #
@@ -280,6 +297,8 @@ node_bootstrap_enabled: true
 node_fzf_version: '0.73.1'
 node_eza_version: '0.23.4'
 node_yazi_version: '26.5.6'
+node_gitui_version: '0.28.1'
+node_lazyjournal_version: '0.8.6'
 node_zoxide_version: '0.9.9'
 node_starship_version: '1.25.1'
 node_wgcf_install: false
