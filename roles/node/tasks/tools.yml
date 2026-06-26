@@ -19,6 +19,20 @@
     asset_download_locally: "{{ node_download_locally | default(false) }}"
   when: node_bootstrap_enabled and node_fzf_version is defined and (node_fzf_version | length > 0)
 
+- name: Install yazi via remote_asset role
+  ansible.builtin.include_role:
+    name: ahmz1833.server_setup.asset
+  vars:
+    asset_name: "yazi"
+    asset_version: "{{ node_yazi_version }}"
+    asset_url: "github.com/sxyazi/yazi/releases/download/v%v/yazi-{{ node_arch_yazi_linux }}.zip"
+    asset_extract: true
+    asset_extract_src: "yazi-{{ node_arch_yazi_linux }}/yazi"
+    asset_version_cmd: "--version"
+    asset_version_regex: '([0-9.]+)'
+    asset_download_locally: "{{ node_download_locally | default(false) }}"
+  when: node_bootstrap_enabled and node_yazi_version is defined and (node_yazi_version | length > 0)
+
 - name: Install eza via remote_asset role
   ansible.builtin.include_role:
     name: ahmz1833.server_setup.asset

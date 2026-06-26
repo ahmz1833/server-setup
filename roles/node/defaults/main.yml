@@ -120,6 +120,16 @@ node_arch_lazydocker_map:
   i686: x86
 node_arch_lazydocker: "{{ node_arch_lazydocker_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
 
+node_arch_yazi_linux_map:
+  x86_64: x86_64-unknown-linux-gnu
+  amd64: x86_64-unknown-linux-gnu
+  aarch64: aarch64-unknown-linux-gnu
+  arm64: aarch64-unknown-linux-gnu
+  i386: i686-unknown-linux-gnu
+  i686: i686-unknown-linux-gnu
+  riscv64: riscv64gc-unknown-linux-gnu
+node_arch_yazi_linux: "{{ node_arch_yazi_linux_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
+
 # -----------------------------------------------------------------------------
 # SING-BOX CONFIGURATION
 #
@@ -255,6 +265,8 @@ node_tools_packages:
   - iotop
   - iftop
   - ncdu
+  - du-dust
+  - duf
   - nmap
   - mtr
   - iperf3
@@ -267,6 +279,7 @@ node_tools_packages:
 node_bootstrap_enabled: true
 node_fzf_version: '0.73.1'
 node_eza_version: '0.23.4'
+node_yazi_version: '26.5.6'
 node_zoxide_version: '0.9.9'
 node_starship_version: '1.25.1'
 node_wgcf_install: false
