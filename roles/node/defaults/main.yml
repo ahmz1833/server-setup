@@ -72,6 +72,18 @@ node_docker_compose_arch_map:
   riscv64: riscv64
 node_docker_compose_arch: "{{ node_docker_compose_arch_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
 
+# dust (du-dust): Rust triple in tarball name
+node_arch_dust_triple_map:
+  x86_64: x86_64-unknown-linux-musl
+  amd64: x86_64-unknown-linux-musl
+  aarch64: aarch64-unknown-linux-musl
+  arm64: aarch64-unknown-linux-musl
+  armv7l: arm-unknown-linux-musleabi
+  armv6l: arm-unknown-linux-musleabi
+  i386: i686-unknown-linux-musl
+  i686: i686-unknown-linux-musl
+node_arch_dust_triple: "{{ node_arch_dust_triple_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
+
 # eza: Rust triple in tarball name (aarch64 builds are gnu-only in many releases)
 node_arch_eza_triple_map:
   x86_64: x86_64-unknown-linux-musl
@@ -282,7 +294,6 @@ node_tools_packages:
   - iotop
   - iftop
   - ncdu
-  - du-dust
   - duf
   - nmap
   - mtr
@@ -294,6 +305,7 @@ node_tools_packages:
 # Downloads and executes bootstrap script for shell environment setup
 # (zsh, dotfiles, etc.)
 node_bootstrap_enabled: true
+node_dust_version: '1.2.4'
 node_fzf_version: '0.73.1'
 node_eza_version: '0.23.4'
 node_yazi_version: '26.5.6'
