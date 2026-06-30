@@ -263,7 +263,7 @@
   when:
     - _apps_app.state | default('started') == 'started'
     - _apps_app.healthcheck_wait | default(true) | bool
-    - _apps_app.healthcheck is defined or (_preserve and _has_existing and _existing.healthcheck)
+    - _apps_app.healthcheck is defined or (_preserve and _has_existing and (_existing.healthcheck is not none))
   vars:
     _preserve: "{{ _apps_app.preserve_mode | default(apps_preserve_mode) | bool }}"
     _existing: "{{ _apps_existing_config.get(_apps_app.name, {}) }}"
