@@ -27,3 +27,8 @@
   ansible.builtin.import_tasks: exporter.yml
   tags: [node, node-exporter]
   when: node_exporter_install
+
+- name: Node Services - Gitlab Runner Installation
+  ansible.builtin.import_tasks: gitlab-runner.yml
+  tags: [node, node-gitlab-runner]
+  when: node_gitlab_runner_install

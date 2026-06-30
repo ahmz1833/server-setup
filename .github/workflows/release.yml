@@ -1,4 +1,4 @@
-name: Publish to Ansible Galaxy
+name: Publish to Ansible Galaxy and GHCR
 
 on:
   push:
@@ -57,3 +57,43 @@ jobs:
           artifact="$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
           test -n "$artifact"
           ansible-galaxy collection publish "$artifact" --token "$GALAXY_API_TOKEN"
+
+  build-push-docker:
+    name: Build and publish server-setup image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/server-setup
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -460,6 +460,12 @@ node_docker_compose_install: true
 node_docker_compose_version: "5.1.4"
 
 # -----------------------------------------------------------------------------
+# GITLAB RUNNER
+# -----------------------------------------------------------------------------
+node_gitlab_runner_install: false
+node_gitlab_runner_version: "17.0.0"
+
+# -----------------------------------------------------------------------------
 # PROMETHEUS NODE EXPORTER
 # -----------------------------------------------------------------------------
 node_exporter_install: true

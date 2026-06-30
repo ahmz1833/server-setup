@@ -1,0 +1,13 @@
+---
+- name: Install gitlab-runner via remote_asset role
+  ansible.builtin.include_role:
+    name: ahmz1833.server_setup.asset
+  vars:
+    asset_name: gitlab-runner
+    asset_type: binary
+    asset_url: "gitlab-runner-downloads.s3.amazonaws.com/v%v/binaries/gitlab-runner-linux-{{ node_arch_go_platform_suffix }}"
+    asset_dest: /usr/local/bin/gitlab-runner
+    asset_extract: false
+    asset_version_cmd: "--version"
+    asset_version_regex: 'Version:\s+([0-9.]+)'
+    asset_version: "{{ node_gitlab_runner_version }}"
