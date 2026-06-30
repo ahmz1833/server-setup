@@ -43,12 +43,12 @@
       {%- for result in _apps_existing_raw.results | default([]) -%}
         {%- if result.exists | default(false) and result.container is defined -%}
           {%- set c = result.container -%}
-          {%- set hc = c.HostConfig | default({}) -%}
-          {%- set cfg = c.Config | default({}) -%}
-          {%- set ns = c.NetworkSettings | default({}) -%}
+          {%- set hc = c.get('HostConfig') or {} -%}
+          {%- set cfg = c.get('Config') or {} -%}
+          {%- set ns = c.get('NetworkSettings') or {} -%}
           {#- Parse environment -#}
           {%- set env_dict = {} -%}
-          {%- for e in cfg.Env | default([]) -%}
+          {%- for e in cfg.get('Env') or [] -%}
             {%- set kv = e.split('=', 1) -%}
             {%- if kv | length == 2 -%}
               {%- set _ = env_dict.update({kv[0]: kv[1]}) -%}
@@ -56,15 +56,15 @@
           {%- endfor -%}
           {#- Parse networks -#}
           {%- set net_list = [] -%}
-          {%- for net_name in ns.Networks | default({}) -%}
+          {%- for net_name in ns.get('Networks') or {} -%}
             {%- set _ = net_list.append({'name': net_name}) -%}
           {%- endfor -%}
           {#- Parse ports -#}
           {%- set port_list = [] -%}
-          {%- for port, bindings in (hc.PortBindings or {}) | items -%}
+          {%- for port, bindings in (hc.get('PortBindings') or {}) | items -%}
             {%- for b in bindings | default([]) -%}
-              {%- set hip = b.HostIp | default('') -%}
-              {%- set hport = b.HostPort | default('') -%}
+              {%- set hip = b.get('HostIp', '') -%}
+              {%- set hport = b.get('HostPort', '') -%}
               {%- if hip and hip != '0.0.0.0' and hip != '::' -%}
                 {%- set _ = port_list.append(hip ~ ':' ~ hport ~ ':' ~ port) -%}
               {%- else -%}
@@ -74,15 +74,15 @@
           {%- endfor -%}
           {#- Parse capabilities -#}
           {%- set caps = {} -%}
-          {%- if hc.CapAdd -%}
-            {%- set _ = caps.update({'add': hc.CapAdd}) -%}
+          {%- if hc.get('CapAdd') -%}
+            {%- set _ = caps.update({'add': hc.get('CapAdd')}) -%}
           {%- endif -%}
-          {%- if hc.CapDrop -%}
-            {%- set _ = caps.update({'drop': hc.CapDrop}) -%}
+          {%- if hc.get('CapDrop') -%}
+            {%- set _ = caps.update({'drop': hc.get('CapDrop')}) -%}
           {%- endif -%}
           {#- Build entry -#}
           {%- set tmpfs_list = [] -%}
-          {%- for tmpfs_path, tmpfs_opts in (hc.Tmpfs or {}) | items -%}
+          {%- for tmpfs_path, tmpfs_opts in (hc.get('Tmpfs') or {}) | items -%}
             {%- if tmpfs_opts -%}
               {%- set _ = tmpfs_list.append(tmpfs_path ~ ':' ~ tmpfs_opts) -%}
             {%- else -%}
@@ -91,30 +91,30 @@
           {%- endfor -%}
           {%- set entry = {
             'exists': true,
-            'command': cfg.Cmd,
-            'entrypoint': cfg.Entrypoint,
-            'user': cfg.User if cfg.User else none,
-            'working_dir': cfg.WorkingDir if cfg.WorkingDir else none,
-            'hostname': cfg.Hostname,
+            'command': cfg.get('Cmd'),
+            'entrypoint': cfg.get('Entrypoint'),
+            'user': cfg.get('User') if cfg.get('User') else none,
+            'working_dir': cfg.get('WorkingDir') if cfg.get('WorkingDir') else none,
+            'hostname': cfg.get('Hostname'),
             'ports': port_list,
             'networks': net_list,
-            'dns': hc.Dns | default([]),
-            'volumes': hc.Binds | default([]),
+            'dns': hc.get('Dns', []),
+            'volumes': hc.get('Binds', []),
             'tmpfs': tmpfs_list,
             'env': env_dict,
-            'labels': cfg.Labels | default({}),
-            'memory': hc.Memory | default(0),
-            'memory_swap': hc.MemorySwap | default(0),
-            'memory_reservation': hc.MemoryReservation | default(0),
-            'cpus': (hc.NanoCpus | default(0)) / 1000000000.0,
-            'healthcheck': cfg.Healthcheck,
-            'privileged': hc.Privileged | default(false),
-            'read_only': hc.ReadonlyRootfs | default(false),
+            'labels': cfg.get('Labels', {}),
+            'memory': hc.get('Memory', 0),
+            'memory_swap': hc.get('MemorySwap', 0),
+            'memory_reservation': hc.get('MemoryReservation', 0),
+            'cpus': (hc.get('NanoCpus', 0) or 0) / 1000000000.0,
+            'healthcheck': cfg.get('Healthcheck'),
+            'privileged': hc.get('Privileged', false),
+            'read_only': hc.get('ReadonlyRootfs', false),
             'capabilities': caps if caps else none,
-            'security_opts': hc.SecurityOpt | default([]),
-            'log_driver': (hc.LogConfig or {}).get('Type'),
-            'log_options': (hc.LogConfig or {}).get('Config', {}),
-            'restart_policy': (hc.RestartPolicy or {}).get('Name')
+            'security_opts': hc.get('SecurityOpt', []),
+            'log_driver': (hc.get('LogConfig') or {}).get('Type'),
+            'log_options': (hc.get('LogConfig') or {}).get('Config', {}),
+            'restart_policy': (hc.get('RestartPolicy') or {}).get('Name')
           } -%}
           {%- set _ = config.update({result.item.name: entry}) -%}
         {%- else -%}
