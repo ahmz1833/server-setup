@@ -8,7 +8,7 @@
         if (_apps_app.state | default('started') == 'absent')
         else (
           _apps_app.image
-          if (_apps_app.image is defined and _apps_app.image | length > 0)
+          if (_apps_app.image is defined and _apps_app.image and _apps_app.image | length > 0)
           else omit
         )
       }}
@@ -122,19 +122,19 @@
         {{
           _apps_app.ports
           if _apps_app.ports is defined
-          else (_existing.ports if (_preserve and _has_existing and _existing.ports | length > 0) else omit)
+          else (_existing.ports if (_preserve and _has_existing and _existing.ports and _existing.ports | length > 0) else omit)
         }}
       networks: >-
         {{
           _apps_app.networks
           if _apps_app.networks is defined
-          else (_existing.networks if (_preserve and _has_existing and _existing.networks | length > 0) else omit)
+          else (_existing.networks if (_preserve and _has_existing and _existing.networks and _existing.networks | length > 0) else omit)
         }}
       dns: >-
         {{
           _apps_app.dns
           if _apps_app.dns is defined
-          else (_existing.dns if (_preserve and _has_existing and _existing.dns | length > 0) else omit)
+          else (_existing.dns if (_preserve and _has_existing and _existing.dns and _existing.dns | length > 0) else omit)
         }}
 
       # Storage
@@ -142,13 +142,13 @@
         {{
           _resolved_volumes
           if _apps_app.volumes is defined
-          else (_existing.volumes if (_preserve and _has_existing and _existing.volumes | length > 0) else omit)
+          else (_existing.volumes if (_preserve and _has_existing and _existing.volumes and _existing.volumes | length > 0) else omit)
         }}
       tmpfs: >-
         {{
           _apps_app.tmpfs
           if _apps_app.tmpfs is defined
-          else (_existing.tmpfs if (_preserve and _has_existing and _existing.tmpfs | length > 0) else omit)
+          else (_existing.tmpfs if (_preserve and _has_existing and _existing.tmpfs and _existing.tmpfs | length > 0) else omit)
         }}
 
       # Environment (merged when preserve mode)
@@ -163,13 +163,13 @@
         {{
           _apps_app.memory
           if _apps_app.memory is defined
-          else (_existing.memory if (_preserve and _has_existing and _existing.memory | int > 0) else omit)
+          else (_existing.memory if (_preserve and _has_existing and _existing.memory and _existing.memory | int > 0) else omit)
         }}
       memory_swap: >-
         {{
           _apps_app.memory_swap
           if _apps_app.memory_swap is defined
-          else (_existing.memory_swap if (_preserve and _has_existing and _existing.memory_swap | int > 0) else omit)
+          else (_existing.memory_swap if (_preserve and _has_existing and _existing.memory_swap and _existing.memory_swap | int > 0) else omit)
         }}
       memory_reservation: >-
         {{
@@ -177,7 +177,7 @@
           if _apps_app.memory_reservation is defined
           else (
             _existing.memory_reservation
-            if (_preserve and _has_existing and _existing.memory_reservation | int > 0)
+            if (_preserve and _has_existing and _existing.memory_reservation and _existing.memory_reservation | int > 0)
             else omit
           )
         }}
@@ -185,7 +185,7 @@
         {{
           _apps_app.cpus
           if _apps_app.cpus is defined
-          else (_existing.cpus if (_preserve and _has_existing and _existing.cpus | float > 0) else omit)
+          else (_existing.cpus if (_preserve and _has_existing and _existing.cpus and _existing.cpus | float > 0) else omit)
         }}
 
       # Health
@@ -209,7 +209,7 @@
         {{
           _apps_app.security_opts
           if _apps_app.security_opts is defined
-          else (_existing.security_opts if (_preserve and _has_existing and _existing.security_opts | length > 0) else omit)
+          else (_existing.security_opts if (_preserve and _has_existing and _existing.security_opts and _existing.security_opts | length > 0) else omit)
         }}
 
       # Logging
@@ -225,7 +225,7 @@
           if _apps_app.log_options is defined
           else (
             _existing.log_options
-            if (_preserve and _has_existing and _existing.log_options | length > 0)
+            if (_preserve and _has_existing and _existing.log_options and _existing.log_options | length > 0)
             else apps_default_log_options
           )
         }}
