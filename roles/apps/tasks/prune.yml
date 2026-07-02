@@ -21,7 +21,7 @@
       loop: >-
         {%- set to_remove = [] -%}
         {%- set managed = apps_list | map(attribute='name') | list -%}
-        {%- set patterns = ['^sandbox-.*$'] + (apps_prune.whitelist_patterns | default([])) -%}
+        {%- set patterns = ['^sandbox-.*$', '^runner-.*$', '^worker-.*$'] + (apps_prune.whitelist_patterns | default([])) -%}
         {%- set whitelist_labels = apps_prune.whitelist_labels | default([]) -%}
         {%- for res in _apps_docker_full_info.results | default([]) -%}
           {%- set c = res.container -%}
