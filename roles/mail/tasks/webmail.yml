@@ -1,0 +1,37 @@
+---
+- name: Generate bcrypt hash for webmail admin password
+  community.docker.docker_container_exec:
+    container: webmail
+    command: php -r "echo password_hash('{{ mail_webmail_admin_password }}', PASSWORD_BCRYPT);"
+  register: mail_webmail_admin_hash
+  changed_when: false
+
+- name: Check current SnappyMail admin password
+  ansible.builtin.shell: |
+    set -o pipefail
+    grep "^admin_password =" "{{ mail_snappymail_data_dir }}/_data_/_default_/configs/application.ini" | cut -d'"' -f2 || echo ""
+  args:
+    executable: /bin/bash
+  register: _mail_webmail_current_admin_hash
+  changed_when: false
+  failed_when: false
+
+- name: Configure SnappyMail admin password
+  community.general.ini_file:
+    path: "{{ mail_snappymail_data_dir }}/_data_/_default_/configs/application.ini"
+    section: security
+    option: admin_password
+    value: '"{{ mail_webmail_admin_hash.stdout }}"'
+    mode: '0600'
+  when: >
+    mail_snappymail_force_reset_admin or
+    (_mail_webmail_current_admin_hash.stdout == "") or
+    (_mail_webmail_current_admin_hash.stdout == "$2y$10$U.E.wYtL4oB/qIotV9L7T.T1GjC8f.QkS6n9iO5hU4tI5d1ZpG6G.")
+
+- name: Configure SnappyMail admin panel secret path
+  community.general.ini_file:
+    path: "{{ mail_snappymail_data_dir }}/_data_/_default_/configs/application.ini"
+    section: security
+    option: admin_panel_key
+    value: '"{{ mail_webmail_admin_path }}"'
+    mode: '0600'

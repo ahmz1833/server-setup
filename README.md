@@ -96,6 +96,7 @@ GitHub Actions now automates this flow:
 | **`ahmz1833.server_setup.acme`** | DNS-01 / HTTP-01 certificates; uses **`asset`** where applicable. |
 | **`ahmz1833.server_setup.apps`** | Declarative `docker_container` stacks: deps, health wait, preserve mode, optional prune. |
 | **`ahmz1833.server_setup.sandbox`** | SSH on a dedicated port into per-user Docker sandboxes (`blockinfile` on `sshd_config`). |
+| **`ahmz1833.server_setup.mail`** | Docker-based mail server (DKIM/DMARC/SPF), SSoT user management, and SnappyMail. |
 | **`ahmz1833.server_setup.asset`** | Generic download / extract / install helper (binaries, files, packages); dependency of other roles. |
 
 Each role has its own **`roles/<name>/README.md`** for variables and examples.
@@ -193,6 +194,20 @@ Each role has its own **`roles/<name>/README.md`** for variables and examples.
 ```
 
 Connect as **`sandbox@host`** (or your `sandbox_shared_user`) on **`sandbox_ssh_port`**; see the sandbox role README.
+
+### Mail
+
+```yaml
+- hosts: mail_servers
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.mail
+      vars:
+        mail_domain: "example.com"
+        mail_hostname: "mail.example.com"
+        mail_admin_username: "admin"
+        mail_admin_password: "SuperSecretPassword123"
+```
 
 ---
 

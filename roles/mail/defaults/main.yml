@@ -1,0 +1,27 @@
+---
+# Domain and Network
+mail_domain: "example.com"
+mail_hostname: "mail.{{ mail_domain }}"
+mail_network_name: "mail-net"
+
+# Directories
+mail_data_dir: "/opt/apps/dms"
+mail_snappymail_data_dir: "/opt/apps/snappymail"
+
+# Containers configuration
+mail_whitelist_label_key: "apps.ansible.prune.whitelist"
+mail_whitelist_label_value: "true"
+mail_webmail_port: "8888"
+
+# Users Configuration
+mail_noreply_sender: "noreply"
+mail_noreply_password: "CHANGEME"
+mail_admin_username: "admin"
+mail_admin_password: "CHANGEME"
+mail_users: [] # List of dicts, e.g., [{username: "user1", password: "pwd"}]
+mail_users_whitelist_regex: "^$" # Regex for users to keep even if not in list. e.g. "^(postmaster|hostmaster)$"
+
+# Webmail / SnappyMail Configuration
+mail_webmail_admin_password: "CHANGEME"
+mail_webmail_admin_path: "admin"
+mail_snappymail_force_reset_admin: false

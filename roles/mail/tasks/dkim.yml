@@ -1,0 +1,28 @@
+---
+- name: Check if DKIM keys exist
+  ansible.builtin.stat:
+    path: "{{ mail_data_dir }}/config/opendkim/keys/{{ mail_domain }}/mail.txt"
+  register: _mail_dkim_stat
+
+- name: Generate DKIM keys
+  community.docker.docker_container_exec:
+    container: mailserver
+    command: setup config dkim keysize 2048 domain "{{ mail_domain }}"
+  when: not _mail_dkim_stat.stat.exists
+
+- name: Read DKIM public key
+  ansible.builtin.slurp:
+    src: "{{ mail_data_dir }}/config/opendkim/keys/{{ mail_domain }}/mail.txt"
+  register: _mail_dkim_raw
+  changed_when: false
+
+- name: Set DKIM cleaned key
+  ansible.builtin.set_fact:
+    _mail_dkim_pub_key_clean: "{{ _mail_dkim_raw['content'] | b64decode | regex_findall('\"([^\"]+)\"') | join('') }}"
+
+- name: Restart mailserver if DKIM was generated
+  community.docker.docker_container:
+    name: mailserver
+    state: started
+    restart: true
+  when: not _mail_dkim_stat.stat.exists

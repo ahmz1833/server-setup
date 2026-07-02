@@ -1,0 +1,18 @@
+---
+- name: Include setup tasks
+  ansible.builtin.include_tasks: setup.yml
+
+- name: Include deploy tasks
+  ansible.builtin.include_tasks: deploy.yml
+
+- name: Include DKIM tasks
+  ansible.builtin.include_tasks: dkim.yml
+
+- name: Include users tasks
+  ansible.builtin.include_tasks: users.yml
+
+- name: Include webmail tasks
+  ansible.builtin.include_tasks: webmail.yml
+
+- name: Include DNS tasks
+  ansible.builtin.include_tasks: dns.yml

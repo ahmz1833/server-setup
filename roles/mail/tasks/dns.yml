@@ -1,0 +1,35 @@
+---
+- name: Prompt user for DNS setup
+  ansible.builtin.debug:
+    msg: |
+      ===================================================================
+      ACTION REQUIRED: DNS CONFIGURATION
+      ===================================================================
+      Please configure the following DNS records for {{ mail_domain }}:
+
+      1. A Record:
+         Name: mail
+         Value: <your-server-ip>
+
+      2. MX Record:
+         Name: @
+         Value: mail.{{ mail_domain }}
+         Priority: 10
+
+      3. TXT Record (SPF):
+         Name: @
+         Value: v=spf1 mx ~all
+
+      4. TXT Record (DMARC):
+         Name: _dmarc
+         Value: v=DMARC1; p=quarantine; rua=mailto:postmaster@{{ mail_domain }}
+
+      5. TXT Record (DKIM):
+         Name: mail._domainkey
+         Value: {{ _mail_dkim_pub_key_clean | default('<DKIM Key not generated yet>') }}
+
+      6. A/CNAME Record for Webmail:
+         Name: webmail
+         Value: <your-server-ip> or CNAME to {{ mail_domain }}
+
+      ===================================================================

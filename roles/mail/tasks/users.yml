@@ -1,0 +1,29 @@
+---
+- name: Template users sync script
+  ansible.builtin.template:
+    src: sync-users.sh.j2
+    dest: "{{ mail_data_dir }}/config/sync-users.sh"
+    mode: "0755"
+
+- name: Execute users sync script in mailserver
+  community.docker.docker_container_exec:
+    container: mailserver
+    command: /tmp/docker-mailserver/sync-users.sh
+  register: mail_sync_users_out
+  changed_when: "'Adding new user:' in mail_sync_users_out.stdout
+                or 'Updating password for user:' in mail_sync_users_out.stdout
+                or 'Deleting unauthorized user:' in mail_sync_users_out.stdout"
+
+- name: Allow admin to spoof any sender address
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      echo "/.*/ {{ mail_admin_username | default('admin') }}@{{ mail_domain }}" > /etc/postfix/admin_sender_login.pcre
+      # user-patches.sh runs at startup, append our custom sender login map
+      CURRENT_MAPS=$(postconf -h smtpd_sender_login_maps)
+      if [[ "$CURRENT_MAPS" != *"admin_sender_login.pcre"* ]]; then
+        postconf -e "smtpd_sender_login_maps = $CURRENT_MAPS, pcre:/etc/postfix/admin_sender_login.pcre"
+      fi
+    dest: "{{ mail_data_dir }}/config/user-patches.sh"
+    mode: "0755"
+  notify: Restart mailserver

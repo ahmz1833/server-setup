@@ -1,0 +1,17 @@
+---
+- name: Ensure data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ mail_data_dir }}/config"
+    - "{{ mail_data_dir }}/mail-data"
+    - "{{ mail_data_dir }}/mail-state"
+    - "{{ mail_data_dir }}/mail-logs"
+    - "{{ mail_snappymail_data_dir }}"
+
+- name: Create mail network
+  community.docker.docker_network:
+    name: "{{ mail_network_name }}"
+    state: present

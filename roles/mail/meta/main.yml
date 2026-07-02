@@ -1,0 +1,37 @@
+---
+collections:
+  - community.docker
+
+galaxy_info:
+  role_name: mail
+  author: AHMZ
+  description: >-
+    Idempotent deployment of a secure mail server using docker-mailserver
+    and SnappyMail. Features include DKIM/DMARC/SPF setup, automated user
+    management with SSoT, and admin spoofing capabilities.
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+        - trixie
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - mail
+    - postfix
+    - dovecot
+    - docker-mailserver
+    - snappymail
+    - dkim
+
+dependencies: []

@@ -1,0 +1,65 @@
+#!/bin/bash
+set -e
+
+# Sync Users Script
+# This script ensures exactly the users defined in Ansible exist with correct passwords.
+
+# Desired users string in format user:password
+DESIRED_USERS=(
+  '{{ mail_noreply_sender }}@{{ mail_domain }}:{{ mail_noreply_password | replace("'\''", "'\''\\\'\''") }}'
+  '{{ mail_admin_username }}@{{ mail_domain }}:{{ mail_admin_password | replace("'\''", "'\''\\\'\''") }}'
+{% for u in mail_users %}
+  '{{ u.username }}@{{ mail_domain }}:{{ u.password | replace("'\''", "'\''\\\'\''") }}'
+{% endfor %}
+)
+
+# 1. Add or Update Users
+for entry in "${DESIRED_USERS[@]}"; do
+  user="${entry%%:*}"
+  pass="${entry#*:}"
+  
+  # Check if user exists by extracting their hash from postfix-accounts.cf
+  HASH=$(grep "^${user}|" /tmp/docker-mailserver/postfix-accounts.cf | cut -d '|' -f 2 || true)
+  
+  if [ -z "$HASH" ]; then
+    echo "Adding new user: $user"
+    setup email add "$user" "$pass"
+  else
+    # Check if password matches
+    if ! doveadm pw -t "$HASH" -p "$pass" >/dev/null 2>&1; then
+      echo "Updating password for user: $user"
+      setup email update "$user" "$pass"
+    fi
+  fi
+done
+
+# 2. Prune obsolete users
+CURRENT_USERS=$(setup email list | grep -Eo '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}' || true)
+WHITELIST_REGEX="{{ mail_users_whitelist_regex }}"
+
+# Create an array of just desired emails
+DESIRED_EMAILS=()
+for entry in "${DESIRED_USERS[@]}"; do
+  DESIRED_EMAILS+=("${entry%%:*}")
+done
+
+for current in $CURRENT_USERS; do
+  # Check if in desired
+  found=0
+  for desired in "${DESIRED_EMAILS[@]}"; do
+    if [ "$current" = "$desired" ]; then
+      found=1
+      break
+    fi
+  done
+  
+  if [ $found -eq 0 ]; then
+    # Not in desired, check whitelist
+    if ! echo "$current" | grep -Eq "$WHITELIST_REGEX"; then
+      echo "Deleting unauthorized user: $current"
+      setup email del "$current"
+    else
+      echo "Keeping whitelisted user: $current"
+    fi
+  fi
+done

@@ -1,7 +1,7 @@
 ---
 namespace: ahmz1833
 name: server_setup
-version: 1.2.7
+version: 1.3.0
 readme: README.md
 authors:
   - AHMZ <ahmz.ut@gmail.com>
@@ -10,8 +10,8 @@ description: >-
   Linux server provisioning and hardening: core (SSH, firewall, sysctl, users),
   node (Docker static engine, sing-box, GOST, X-UI, tools, node_exporter), Nginx
   with ModSecurity CRS and observability, ACME certificates, declarative Docker
-  apps, SSH Docker sandboxes, plus a shared asset installer role for binaries and
-  archives.
+  apps, SSH Docker sandboxes, mail server (docker-mailserver, SnappyMail), plus
+  a shared asset installer role for binaries and archives.
 
 license:
   - MIT
@@ -33,6 +33,9 @@ tags:
   - sandbox
   - proxy
   - tunnel
+  - mail
+  - postfix
+  - dovecot
 
 repository: https://github.com/ahmz1833/server-setup
 documentation: https://github.com/ahmz1833/server-setup/blob/master/README.md

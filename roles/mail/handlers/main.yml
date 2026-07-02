@@ -1,0 +1,6 @@
+---
+- name: Restart mailserver
+  community.docker.docker_container:
+    name: mailserver
+    state: started
+    restart: true

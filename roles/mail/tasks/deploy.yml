@@ -1,0 +1,84 @@
+---
+- name: Deploy mailserver container
+  community.docker.docker_container:
+    name: mailserver
+    image: hub.hamdocker.ir/mailserver/docker-mailserver:latest
+    state: started
+    restart_policy: unless-stopped
+    hostname: "{{ mail_hostname }}"
+    labels: "{{ {mail_whitelist_label_key: mail_whitelist_label_value} }}"
+    env:
+      DOMAINNAME: "{{ mail_domain }}"
+      DKIM_DOMAINS: "{{ mail_domain }}"
+      SSL_TYPE: "manual"
+      SSL_CERT_PATH: "/etc/ssl/certs/{{ mail_domain }}/fullchain.pem"
+      SSL_KEY_PATH: "/etc/ssl/certs/{{ mail_domain }}/privkey.pem"
+      PERMIT_DOCKER: "connected-networks"
+      POSTFIX_INET_PROTOCOLS: "ipv4"
+      ENABLE_DOVECOT: "1"
+      ENABLE_POP3: "0"
+      ENABLE_DKIM: "1"
+      ENABLE_SPF_CHECK: "1"
+      ENABLE_DMARC: "1"
+      ENABLE_FAIL2BAN: "0"
+      ENABLE_CLAMAV: "0"
+      ENABLE_AMAVIS: "0"
+      SPOOF_PROTECTION: "1"
+      LOG_LEVEL: "info"
+      POSTMASTER_ADDRESS: "postmaster@{{ mail_domain }}"
+      OVERRIDE_HOSTNAME: "{{ mail_hostname }}"
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - "/etc/ssl/certs/{{ mail_domain }}:/etc/ssl/certs/{{ mail_domain }}:ro"
+      - "{{ mail_data_dir }}/config:/tmp/docker-mailserver:rw"
+      - "{{ mail_data_dir }}/mail-data:/var/mail:rw"
+      - "{{ mail_data_dir }}/mail-state:/var/mail-state:rw"
+      - "{{ mail_data_dir }}/mail-logs:/var/log/mail:rw"
+    networks:
+      - name: "{{ mail_network_name }}"
+        aliases:
+          - "{{ mail_hostname }}"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "ss -lntp | grep -E ':25|:587|:993'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    security_opts:
+      - no-new-privileges:true
+    log_driver: "json-file"
+    log_options:
+      max-size: "10m"
+      max-file: "3"
+
+- name: Deploy webmail container
+  community.docker.docker_container:
+    name: webmail
+    image: hub.hamdocker.ir/djmaze/snappymail:latest
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "127.0.0.1:{{ mail_webmail_port }}:8888"
+    volumes:
+      - "{{ mail_snappymail_data_dir }}:/var/lib/snappymail:rw"
+    networks:
+      - name: "{{ mail_network_name }}"
+    labels: "{{ {mail_whitelist_label_key: mail_whitelist_label_value} }}"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8888"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    log_driver: "json-file"
+    log_options:
+      max-size: "10m"
+      max-file: "3"
+
+- name: Wait for mailserver to be up before running setup commands
+  ansible.builtin.pause:
+    seconds: 15
