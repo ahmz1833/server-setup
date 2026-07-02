@@ -107,7 +107,7 @@
             'memory_swap': hc.get('MemorySwap', 0),
             'memory_reservation': hc.get('MemoryReservation', 0),
             'cpus': (hc.get('NanoCpus', 0) or 0) / 1000000000.0,
-            'healthcheck': cfg.get('Healthcheck'),
+            'healthcheck': none,
             'privileged': hc.get('Privileged', false),
             'read_only': hc.get('ReadonlyRootfs', false),
             'capabilities': caps if caps else none,
