@@ -1,4 +1,13 @@
 ---
+- name: "Ensure custom directories exist for {{ _apps_app.name }}"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default(omit) }}"
+    group: "{{ item.group | default(omit) }}"
+    mode: "{{ item.mode | default(omit) }}"
+  loop: "{{ _apps_app.directories | default([]) }}"
+
 - name: "Deploy container: {{ _apps_app.name }}"
   community.docker.docker_container:
     name: "{{ _apps_app.name }}"
