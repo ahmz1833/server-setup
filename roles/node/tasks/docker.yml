@@ -245,3 +245,28 @@
     state: "{{ node_docker_enabled | ternary('started', 'stopped') }}"
     enabled: "{{ node_docker_enabled }}"
     daemon_reload: true
+
+- name: Ensure shell completion directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /usr/share/bash-completion/completions
+    - /usr/local/share/zsh/site-functions
+
+- name: Generate Docker Bash completion
+  ansible.builtin.shell: /usr/local/bin/docker completion bash > /usr/share/bash-completion/completions/docker
+  args:
+    creates: /usr/share/bash-completion/completions/docker
+  when: node_docker_enabled | bool
+  changed_when: false
+  failed_when: false
+
+- name: Generate Docker Zsh completion
+  ansible.builtin.shell: /usr/local/bin/docker completion zsh > /usr/local/share/zsh/site-functions/_docker
+  args:
+    creates: /usr/local/share/zsh/site-functions/_docker
+  when: node_docker_enabled | bool
+  changed_when: false
+  failed_when: false
