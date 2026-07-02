@@ -91,6 +91,7 @@
     protocol: "{{ item.proto | default('tcp') }}"
     destination_port: "{{ item.port | default(omit) }}"
     source: "{{ item.src | default('0.0.0.0/0') }}"
+    in_interface: "{{ item.in_interface | default(omit) }}"
     jump: ACCEPT
     comment: "{{ item.comment | default('custom') }}"
   loop: "{{ core_firewall_rules | rejectattr('ipset', 'defined') | rejectattr('v6_only', 'defined') | list }}"
@@ -171,6 +172,7 @@
         protocol: "{{ item.proto | default('tcp') }}"
         destination_port: "{{ item.port }}"
         source: "{{ item.src_v6 | default('::/0') }}"
+        in_interface: "{{ item.in_interface | default(omit) }}"
         jump: ACCEPT
         ip_version: ipv6
         comment: "{{ item.comment | default('custom') }}"
