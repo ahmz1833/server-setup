@@ -56,8 +56,15 @@
           {%- endfor -%}
           {#- Parse networks -#}
           {%- set net_list = [] -%}
-          {%- for net_name in ns.get('Networks') or {} -%}
-            {%- set _ = net_list.append({'name': net_name}) -%}
+          {%- for net_name, net_info in (ns.get('Networks') or {}) | items -%}
+            {%- set net_dict = {'name': net_name} -%}
+            {%- if net_info.get('Aliases') -%}
+              {%- set _ = net_dict.update({'aliases': net_info.get('Aliases')}) -%}
+            {%- endif -%}
+            {%- if net_info.get('IPAddress') -%}
+              {%- set _ = net_dict.update({'ipv4_address': net_info.get('IPAddress')}) -%}
+            {%- endif -%}
+            {%- set _ = net_list.append(net_dict) -%}
           {%- endfor -%}
           {#- Parse ports -#}
           {%- set port_list = [] -%}
@@ -73,13 +80,8 @@
             {%- endfor -%}
           {%- endfor -%}
           {#- Parse capabilities -#}
-          {%- set caps = {} -%}
-          {%- if hc.get('CapAdd') -%}
-            {%- set _ = caps.update({'add': hc.get('CapAdd')}) -%}
-          {%- endif -%}
-          {%- if hc.get('CapDrop') -%}
-            {%- set _ = caps.update({'drop': hc.get('CapDrop')}) -%}
-          {%- endif -%}
+          {%- set caps_add = hc.get('CapAdd') or [] -%}
+          {%- set caps_drop = hc.get('CapDrop') or [] -%}
           {#- Build entry -#}
           {%- set tmpfs_list = [] -%}
           {%- for tmpfs_path, tmpfs_opts in (hc.get('Tmpfs') or {}) | items -%}
@@ -108,9 +110,11 @@
             'memory_reservation': hc.get('MemoryReservation', 0),
             'cpus': (hc.get('NanoCpus', 0) or 0) / 1000000000.0,
             'healthcheck': none,
+            'network_mode': hc.get('NetworkMode'),
             'privileged': hc.get('Privileged', false),
             'read_only': hc.get('ReadonlyRootfs', false),
-            'capabilities': caps if caps else none,
+            'capabilities': caps_add if caps_add | length > 0 else none,
+            'cap_drop': caps_drop if caps_drop | length > 0 else none,
             'security_opts': hc.get('SecurityOpt', []),
             'log_driver': (hc.get('LogConfig') or {}).get('Type'),
             'log_options': (hc.get('LogConfig') or {}).get('Config', {}),

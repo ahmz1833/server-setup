@@ -7,6 +7,12 @@
         containers: true
       register: _apps_docker_info
 
+    - name: Get full container info
+      community.docker.docker_container_info:
+        name: "{{ item.Id }}"
+      loop: "{{ _apps_docker_info.containers | default([]) }}"
+      register: _apps_docker_full_info
+
     - name: Remove unmanaged containers
       community.docker.docker_container:
         name: "{{ item.name }}"
@@ -17,10 +23,11 @@
         {%- set managed = apps_list | map(attribute='name') | list -%}
         {%- set patterns = ['^sandbox-.*$'] + (apps_prune.whitelist_patterns | default([])) -%}
         {%- set whitelist_labels = apps_prune.whitelist_labels | default([]) -%}
-        {%- for c in _apps_docker_info.containers | default([]) -%}
-          {%- set name = c.Names[0] | regex_replace('^/', '') -%}
+        {%- for res in _apps_docker_full_info.results | default([]) -%}
+          {%- set c = res.container -%}
+          {%- set name = c.Name | regex_replace('^/', '') -%}
           {%- if name not in managed -%}
-            {%- set labels = c.Labels | default({}) -%}
+            {%- set labels = c.Config.Labels | default({}) -%}
             {%- set skip = namespace(val=false) -%}
             {%- for p in patterns -%}
               {%- if name is match(p) -%}{%- set skip.val = true -%}{%- endif -%}

@@ -31,6 +31,7 @@
     hostname: "{{ _cfg.hostname }}"
 
     # Networking
+    network_mode: "{{ _cfg.network_mode }}"
     ports: "{{ _cfg.ports }}"
     networks: "{{ _cfg.networks }}"
     dns_servers: "{{ _cfg.dns }}"
@@ -55,6 +56,7 @@
     privileged: "{{ _cfg.privileged }}"
     read_only: "{{ _cfg.read_only }}"
     capabilities: "{{ _cfg.capabilities }}"
+    cap_drop: "{{ _cfg.cap_drop }}"
     security_opts: "{{ _cfg.security_opts }}"
 
     # Logging
@@ -127,6 +129,12 @@
         ) }}
 
       # Networking
+      network_mode: >-
+        {{
+          _apps_app.network_mode
+          if _apps_app.network_mode is defined
+          else (_existing.network_mode if (_preserve and _has_existing and _existing.network_mode and _existing.network_mode != 'default') else omit)
+        }}
       ports: >-
         {{
           _apps_app.ports
@@ -212,7 +220,13 @@
         {{
           _apps_app.capabilities
           if _apps_app.capabilities is defined
-          else (_existing.capabilities if (_preserve and _has_existing and _existing.capabilities) else omit)
+          else (_existing.capabilities if (_preserve and _has_existing and _existing.capabilities and _existing.capabilities | length > 0) else omit)
+        }}
+      cap_drop: >-
+        {{
+          _apps_app.cap_drop
+          if _apps_app.cap_drop is defined
+          else (_existing.cap_drop if (_preserve and _has_existing and _existing.cap_drop and _existing.cap_drop | length > 0) else omit)
         }}
       security_opts: >-
         {{
