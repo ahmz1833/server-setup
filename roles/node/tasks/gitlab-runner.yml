@@ -11,3 +11,4 @@
     asset_version_cmd: "--version"
     asset_version_regex: 'Version:\s+([0-9.]+)'
     asset_version: "{{ node_gitlab_runner_version }}"
+    asset_download_locally: "{{ node_download_locally | default(false) }}"
