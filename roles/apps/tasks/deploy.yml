@@ -59,10 +59,21 @@
           {%- for net_name, net_info in (ns.get('Networks') or {}) | items -%}
             {%- set net_dict = {'name': net_name} -%}
             {%- if net_info.get('Aliases') -%}
-              {%- set _ = net_dict.update({'aliases': net_info.get('Aliases')}) -%}
+              {%- set clean_aliases = [] -%}
+              {%- set short_id = c.get('Id', '')[:12] -%}
+              {%- set container_name = result.item.name -%}
+              {%- for alias in net_info.get('Aliases') or [] -%}
+                {%- if alias != short_id and alias != container_name -%}
+                  {%- set _ = clean_aliases.append(alias) -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- if clean_aliases | length > 0 -%}
+                {%- set _ = net_dict.update({'aliases': clean_aliases}) -%}
+              {%- endif -%}
             {%- endif -%}
-            {%- if net_info.get('IPAddress') -%}
-              {%- set _ = net_dict.update({'ipv4_address': net_info.get('IPAddress')}) -%}
+            {%- set ipam = net_info.get('IPAMConfig') or {} -%}
+            {%- if ipam.get('IPv4Address') -%}
+              {%- set _ = net_dict.update({'ipv4_address': ipam.get('IPv4Address')}) -%}
             {%- endif -%}
             {%- set _ = net_list.append(net_dict) -%}
           {%- endfor -%}
