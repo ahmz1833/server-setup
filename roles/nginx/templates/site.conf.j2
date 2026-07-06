@@ -20,6 +20,30 @@
     access_log /var/log/nginx/{{ site.domain }}_access.log json_analytics;
 {% endif %}
 {%- endmacro %}
+{% macro site_access_log_maps(site) -%}
+{% if site_has_split_access_logs(site) -%}
+{% set site_key = site_log_key(site.domain) -%}
+{% set names = [site.domain] + (site.aliases | default([])) -%}
+{% set split_locations = site.locations | default([]) | selectattr('log_prefix', 'defined') | list -%}
+map $server_name$endpoint_name ${{ site_key }}_log_default {
+    default 1;
+{% for name in names -%}
+{% for loc in split_locations -%}
+    {{ name }}{{ loc.path }} 0;
+{% endfor -%}
+{% endfor -%}
+}
+{% for loc in split_locations -%}
+{% set prefix_key = loc.log_prefix | replace('-', '_') | replace('.', '_') -%}
+map $server_name$endpoint_name ${{ site_key }}_log_{{ prefix_key }} {
+    default 0;
+{% for name in names -%}
+    {{ name }}{{ loc.path }} 1;
+{% endfor -%}
+}
+{% endfor -%}
+{% endif -%}
+{%- endmacro %}
 {# ------------------------------- Security Headers --------------------------------- #}
 {% macro security_headers(site, is_ssl=false) %}
 {% set opt_x_frame = site.header_x_frame_options | default(nginx_header_x_frame_options) %}
@@ -123,12 +147,12 @@
 {% macro location_block(loc, site, is_ssl=false) %}
     location {{ loc.path }} {
         set $endpoint_name "{{ loc.path }}";
-{%- if loc.rate_limit is defined %}
+{% if loc.rate_limit is defined %}
 {% set zone = loc.rate_limit.zone | default(nginx_rate_limit_zone_name) %}
 {% set burst = loc.rate_limit.burst | default(nginx_rate_limit_burst) %}
 {% set nodelay = loc.rate_limit.nodelay | default(nginx_rate_limit_nodelay) %}
         limit_req zone={{ zone }} burst={{ burst }}{% if nodelay %} nodelay{% endif %};
-{%- endif %}
+{% endif %}
 {% if loc.upstream is defined %}
 {{ proxy_pass(loc.upstream, site, loc) }}
 {% endif %}
@@ -257,7 +281,8 @@ server {
 {% set _ = fallback_codes.append(code) %}
 {% endif %}
 {% endfor %}
-{# Generate server blocks #}
+{# Generate access log maps (http context) and server blocks #}
+{{ site_access_log_maps(item) }}
 {% if item.ssl_enabled | default(false) %}
 {# HTTP redirect server #}
 {{ server_block(item, 80, ssl=false, redirect_only=true) }}

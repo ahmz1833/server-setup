@@ -354,7 +354,7 @@ nginx_sites_example_full:
 #
 #     log_prefix: "name"               # [Optional] Separate access log file only
 #                                      #   → {domain}_{prefix}_access.log
-#                                      #   Routed via log_maps.conf (not per-location access_log)
+#                                      #   Maps + if= routing in site.conf (not per-location access_log)
 #                                      #   Error logs are not split per location; see README.
 #
 #     proxy_intercept_errors: "on"     # [Optional] Override error handling

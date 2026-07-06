@@ -322,7 +322,7 @@ More patterns (headers, redirects, static sites, raw `extra_config`) live in **`
 ## Observability
 
 - **JSON logs:** `logging.conf.j2` defines `json_analytics`; site template uses it for access logs. Location blocks set `$endpoint_name` to the location path so Promtail can aggregate without using raw `$request_uri` labels.
-- **Per-location access logs:** When a location sets `log_prefix`, `log_maps.conf.j2` routes access logs to `{domain}_{prefix}_access.log` using `$server_name` + `$endpoint_name` maps with `access_log ... if=`. This keeps split access logs correct even when `error_page` or other internal redirects finish in a different location (plain per-location `access_log` would send those entries to the server-level file).
+- **Per-location access logs:** When a location sets `log_prefix`, each site config emits `map` blocks (in `http` context, before its `server` blocks) and routes access logs via `access_log ... if=` using `$server_name` + `$endpoint_name`. This keeps split access logs correct even when `error_page` or other internal redirects finish in a different location.
 - **Error logs:** All nginx errors for a site go to a single `{domain}_error.log` at the server level. Per-location error logs are not supported — nginx cannot route `error_log` by location the way access logs can (`error_log` has no `if=` and does not accept variables in the path). `log_prefix` affects access logs only.
 - **Promtail:** When `nginx_promtail_install` is true, a config and systemd unit are installed; start is gated by `nginx_promtail_enabled`.
 - **Exporter:** `stub_status` on localhost + `nginx-prometheus-exporter`; enable with `nginx_exporter_enabled`.
