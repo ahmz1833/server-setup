@@ -32,6 +32,13 @@
 # -----------------------------------------------------------------------------
 # Generate Site Configurations
 # -----------------------------------------------------------------------------
+- name: Configure access log routing maps
+  ansible.builtin.template:
+    src: log_maps.conf.j2
+    dest: /etc/nginx/conf.d/log_maps.conf
+    mode: '0644'
+  notify: Reload nginx
+
 - name: Generate site configs
   ansible.builtin.template:
     src: site.conf.j2

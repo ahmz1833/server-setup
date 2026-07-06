@@ -352,8 +352,10 @@ nginx_sites_example_full:
 #
 #     upstream: "http://..."           # [Optional] Proxy destination
 #
-#     log_prefix: "name"               # [Optional] Separate log file
+#     log_prefix: "name"               # [Optional] Separate access log file only
 #                                      #   → {domain}_{prefix}_access.log
+#                                      #   Routed via log_maps.conf (not per-location access_log)
+#                                      #   Error logs are not split per location; see README.
 #
 #     proxy_intercept_errors: "on"     # [Optional] Override error handling
 #

@@ -1,6 +1,27 @@
 {# ===================================== Macros ===================================== #}
+{# --------------------------- Split Access Log Routing ----------------------------- #}
+{% macro site_log_key(domain) %}
+{{ domain | replace('.', '_') | replace('-', '_') }}
+{%- endmacro %}
+{% macro site_has_split_access_logs(site) %}
+{{ site.locations | default([]) | selectattr('log_prefix', 'defined') | list | length > 0 }}
+{%- endmacro %}
+{% macro site_access_log_directive(site) %}
+{% if site_has_split_access_logs(site) %}
+{% set site_key = site_log_key(site.domain) %}
+    access_log /var/log/nginx/{{ site.domain }}_access.log json_analytics if=${{ site_key }}_log_default;
+{% for loc in site.locations | default([]) %}
+{% if loc.log_prefix is defined %}
+{% set prefix_key = loc.log_prefix | replace('-', '_') | replace('.', '_') %}
+    access_log /var/log/nginx/{{ site.domain }}_{{ loc.log_prefix }}_access.log json_analytics if=${{ site_key }}_log_{{ prefix_key }};
+{% endif %}
+{% endfor %}
+{% else %}
+    access_log /var/log/nginx/{{ site.domain }}_access.log json_analytics;
+{% endif %}
+{%- endmacro %}
 {# ------------------------------- Security Headers --------------------------------- #}
-{% macro security_headers(site, is_ssl=false) -%}
+{% macro security_headers(site, is_ssl=false) %}
 {% set opt_x_frame = site.header_x_frame_options | default(nginx_header_x_frame_options) %}
 {% set opt_x_cto = site.header_x_content_type_options | default(nginx_header_x_content_type_options) %}
 {% set opt_x_xss = site.header_x_xss_protection | default(nginx_header_x_xss_protection) %}
@@ -38,7 +59,7 @@
 {% endif %}
 {%- endmacro %}
 {# ------------------------------ WAF Configuration --------------------------------- #}
-{% macro waf_config(site) -%}
+{% macro waf_config(site) %}
 {% if site.waf_enabled | default(false) %}
     modsecurity on;
 {% if site.waf_config is defined or site.waf_extra_rules is defined %}
@@ -57,7 +78,7 @@
 {% endif %}
 {%- endmacro %}
 {# --------------------------- Proxy Pass Configuration ----------------------------- #}
-{% macro proxy_pass(upstream, site, location=none) -%}
+{% macro proxy_pass(upstream, site, location=none) %}
 {% set intercept = location.proxy_intercept_errors | default(site.proxy_intercept_errors | default(nginx_proxy_intercept_errors)) if location else site.proxy_intercept_errors | default(nginx_proxy_intercept_errors) %}
 {% set timeout_connect = site.proxy_connect_timeout | default(nginx_proxy_connect_timeout) %}
 {% set timeout_send = site.proxy_send_timeout | default(nginx_proxy_send_timeout) %}
@@ -78,17 +99,8 @@
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 {%- endmacro %}
-{# ---------------------------------- Rate Limiting --------------------------------- #}
-{% macro rate_limit_config(loc) -%}
-{% if loc.rate_limit is defined %}
-{% set zone = loc.rate_limit.zone | default(nginx_rate_limit_zone_name) %}
-{% set burst = loc.rate_limit.burst | default(nginx_rate_limit_burst) %}
-{% set nodelay = loc.rate_limit.nodelay | default(nginx_rate_limit_nodelay) %}
-        limit_req zone={{ zone }} burst={{ burst }}{% if nodelay %} nodelay{% endif %};
-{% endif %}
-{%- endmacro %}
 {# ---------------------------- Error Pages Configuration --------------------------- #}
-{% macro error_pages(site, site_custom_codes, fallback_codes) -%}
+{% macro error_pages(site, site_custom_codes, fallback_codes) %}
     # Error Pages Configuration
 {% for code in site_custom_codes %}
     error_page {{ code }} /site_errors/{{ code }}.html;
@@ -96,7 +108,6 @@
 {% for code in fallback_codes %}
     error_page {{ code }} /global_errors/{{ code }}.html;
 {% endfor %}
-
 {% if site_custom_codes | length > 0 %}
     location /site_errors/ {
         internal;
@@ -109,35 +120,32 @@
     }
 {%- endmacro %}
 {# -------------------------------- Location Block ---------------------------------- #}
-{% macro location_block(loc, site, is_ssl=false) -%}
+{% macro location_block(loc, site, is_ssl=false) %}
     location {{ loc.path }} {
         set $endpoint_name "{{ loc.path }}";
-
-{% if loc.log_prefix is defined %}
-        access_log /var/log/nginx/{{ site.domain }}_{{ loc.log_prefix }}_access.log json_analytics;
-        error_log /var/log/nginx/{{ site.domain }}_{{ loc.log_prefix }}_error.log warn;
-{% endif %}
-
-{{ rate_limit_config(loc) }}
-
+{%- if loc.rate_limit is defined %}
+{% set zone = loc.rate_limit.zone | default(nginx_rate_limit_zone_name) %}
+{% set burst = loc.rate_limit.burst | default(nginx_rate_limit_burst) %}
+{% set nodelay = loc.rate_limit.nodelay | default(nginx_rate_limit_nodelay) %}
+        limit_req zone={{ zone }} burst={{ burst }}{% if nodelay %} nodelay{% endif %};
+{%- endif %}
 {% if loc.upstream is defined %}
 {{ proxy_pass(loc.upstream, site, loc) }}
 {% endif %}
-
 {% if loc.cache_control is defined %}
 {{ security_headers(site, is_ssl) | indent(8) }}
         add_header Cache-Control "{{ loc.cache_control }}";
 {% endif %}
-
 {% for k, v in (loc.nginx_config | default({})).items() %}
         {{ k }} {{ v }};
 {% endfor %}
-
-        {{ loc.extra_config | default('') | indent(8) }}
+{% if loc.extra_config is defined and loc.extra_config | trim | length > 0 %}
+        {{ loc.extra_config | indent(8) }}
+{% endif %}
     }
 {%- endmacro %}
 {# -------------------------------- SSL Configuration ------------------------------- #}
-{% macro ssl_config(site) -%}
+{% macro ssl_config(site) %}
     ssl_certificate {{ site.ssl_cert | default(nginx_ssl_cert_dir ~ '/' ~ site.domain ~ '/fullchain.pem') }};
     ssl_certificate_key {{ site.ssl_key | default(nginx_ssl_cert_dir ~ '/' ~ site.domain ~ '/privkey.pem') }};
     ssl_protocols {{ site.ssl_protocols | default(nginx_ssl_protocols) }};
@@ -155,7 +163,7 @@
 {% endif %}
 {%- endmacro %}
 {# --------------------------- ACME Webroot Configuration ------------------------- #}
-{% macro acme_challenge(site) -%}
+{% macro acme_challenge(site) %}
 {% if site.acme_challenge_enabled | default(nginx_acme_challenge_enabled) %}
     location ^~ /.well-known/acme-challenge/ {
         allow all;
@@ -166,34 +174,29 @@
 {% endif %}
 {%- endmacro %}
 {# -------------------- Full Server Block Content (non-redirect) -------------------- #}
-{% macro server_content(site, site_custom_codes, fallback_codes, is_ssl=false) -%}
+{% macro server_content(site, site_custom_codes, fallback_codes, is_ssl=false) %}
 {{ security_headers(site, is_ssl) }}
-
 {{ waf_config(site) }}
-
 {% for k, v in (site.nginx_config | default({})).items() %}
     {{ k }} {{ v }};
 {% endfor %}
-
-    {{ site.extra_config | default('') | indent(4) }}
-
+{% if site.extra_config is defined and site.extra_config | trim | length > 0 %}
+    {{ site.extra_config | indent(4) }}
+{% endif %}
 {{ error_pages(site, site_custom_codes, fallback_codes) }}
-
 {{ acme_challenge(site) }}
-
 {% if site.upstream is defined %}
     location / {
         set $endpoint_name "/";
 {{ proxy_pass(site.upstream, site) }}
     }
 {% endif %}
-
 {% for loc in site.locations | default([]) %}
 {{ location_block(loc, site, is_ssl) }}
 {% endfor %}
 {%- endmacro %}
 {# ------------------------------ Complete Server Block ----------------------------- #}
-{% macro server_block(site, port, ssl=false, redirect_only=false, site_custom_codes=[], fallback_codes=[]) -%}
+{% macro server_block(site, port, ssl=false, redirect_only=false, site_custom_codes=[], fallback_codes=[]) %}
 server {
 {% if ssl %}
     listen {{ port }} ssl http2;
@@ -208,16 +211,12 @@ server {
 {% endif %}
     server_name {{ site.domain }}{% if site.aliases is defined %} {{ site.aliases | join(' ') }}{% endif %};
     server_tokens {{ site.server_tokens | default(nginx_server_tokens) }};
-
 {% if ssl %}
 {{ ssl_config(site) }}
-
 {% endif %}
 {% if redirect_only %}
     set $endpoint_name "redirect";
-
 {{ acme_challenge(site) }}
-
     location / {
 {% if site.redirect_to is defined %}
         return 301 {{ site.redirect_to }}$request_uri;
@@ -227,10 +226,8 @@ server {
     }
 {% else %}
     set $endpoint_name "{% if site.redirect_to is defined %}redirect{% else %}root{% endif %}";
-
-    access_log /var/log/nginx/{{ site.domain }}_access.log json_analytics;
+{{ site_access_log_directive(site) }}
     error_log /var/log/nginx/{{ site.domain }}_error.log warn;
-
 {% if site.redirect_to is defined %}
     location / {
         return 301 {{ site.redirect_to }}$request_uri;
