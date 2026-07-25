@@ -50,6 +50,7 @@
     src: /usr/local/x-ui/x-ui.sh
     dest: /usr/bin/x-ui
     state: link
+    force: true
 
 # -----------------------------------------------------------------------------
 # X-UI Environment File (systemd EnvironmentFile + CLI)
