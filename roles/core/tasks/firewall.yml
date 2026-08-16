@@ -107,7 +107,7 @@
     match_set_flags: src
     jump: ACCEPT
     comment: "{{ item.comment | default(item.ipset) }}"
-  loop: "{{ _core_effective_firewall_rules | selectattr('ipset', 'defined') | rejectattr('v6_only', 'defined') | list }}"
+  loop: "{{ core_firewall_rules | selectattr('ipset', 'defined') | rejectattr('v6_only', 'defined') | list }}"
 
 - name: "IPv4: Set default policy in HOST-FIREWALL"
   ansible.builtin.iptables:
@@ -177,7 +177,7 @@
         jump: ACCEPT
         ip_version: ipv6
         comment: "{{ item.comment | default('custom') }}"
-      loop: "{{ _core_effective_firewall_rules | rejectattr('ipset', 'defined') | rejectattr('v4_only', 'defined') | list }}"
+      loop: "{{ core_firewall_rules | rejectattr('ipset', 'defined') | rejectattr('v4_only', 'defined') | list }}"
       when:
         - item.port is not defined or (item.port | string) != (core_ssh_port | string)
         - item.src is not defined or item.src_v6 is defined
