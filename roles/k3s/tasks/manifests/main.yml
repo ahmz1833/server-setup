@@ -11,13 +11,14 @@
         group: root
       when:
         - not (k3s_disable_traefik | bool)
-        - k3s_traefik_config.enabled | default(true) | bool
+        - ((k3s_traefik_config | default({})).enabled | default(true) | bool)
 
     - name: Remove Traefik HelmChartConfig manifest if Traefik is disabled
       ansible.builtin.file:
         path: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
         state: absent
-      when: k3s_disable_traefik | bool
+      when:
+        - k3s_disable_traefik | bool or not ((k3s_traefik_config | default({})).enabled | default(true) | bool)
 
     - name: Render user-defined manifests
       ansible.builtin.copy:
