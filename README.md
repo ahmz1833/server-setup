@@ -96,6 +96,7 @@ GitHub Actions now automates this flow:
 | **`ahmz1833.server_setup.acme`** | DNS-01 / HTTP-01 certificates; uses **`asset`** where applicable. |
 | **`ahmz1833.server_setup.apps`** | Declarative `docker_container` stacks: deps, health wait, preserve mode, optional prune. |
 | **`ahmz1833.server_setup.sandbox`** | SSH on a dedicated port into per-user Docker sandboxes (`blockinfile` on `sshd_config`). |
+| **`ahmz1833.server_setup.k3s`** | Composable, property-driven K3s cluster provisioning, Day 0/1/2 lifecycle, firewall isolation, and host Nginx coexistence. |
 | **`ahmz1833.server_setup.mail`** | Docker-based mail server (DKIM/DMARC/SPF), SSoT user management, and SnappyMail. |
 | **`ahmz1833.server_setup.asset`** | Generic download / extract / install helper (binaries, files, packages); dependency of other roles. |
 
@@ -207,6 +208,18 @@ Connect as **`sandbox@host`** (or your `sandbox_shared_user`) on **`sandbox_ssh_
         mail_hostname: "mail.example.com"
         mail_admin_username: "admin"
         mail_admin_password: "SuperSecretPassword123"
+```
+
+### K3s
+
+```yaml
+- hosts: k3s_servers:k3s_agents
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.core
+    - role: ahmz1833.server_setup.k3s
+      vars:
+        k3s_state: present
 ```
 
 ---

@@ -1,0 +1,9 @@
+---
+- name: Decommission Node and Uninstall K3s (Day 2)
+  hosts: decommission_nodes
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.k3s
+      vars:
+        k3s_state: absent
+        k3s_force_uninstall: true

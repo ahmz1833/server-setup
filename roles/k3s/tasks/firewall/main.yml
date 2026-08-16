@@ -1,0 +1,31 @@
+---
+- name: Assemble K3s firewall rules
+  when: k3s_firewall_manage | default(true) | bool
+  block:
+    - name: Ensure local facts directory exists
+      ansible.builtin.file:
+        path: "{{ k3s_firewall_facts_file | dirname }}"
+        state: directory
+        mode: "0755"
+      when: k3s_persist_firewall_facts | bool
+
+    - name: Persist K3s firewall rules as local facts for core role
+      ansible.builtin.copy:
+        content: "{{ {'firewall_rules': k3s_firewall_rules} | to_nice_json }}"
+        dest: "{{ k3s_firewall_facts_file }}"
+        mode: "0644"
+      when: k3s_persist_firewall_facts | bool
+
+    - name: Merge K3s firewall rules into core_firewall_rules  # noqa: var-naming[no-role-prefix]
+      ansible.builtin.set_fact:
+        core_firewall_rules: "{{ (core_firewall_rules | default([])) + k3s_firewall_rules }}"
+
+    - name: Invoke core firewall configuration
+      ansible.builtin.include_role:
+        name: ahmz1833.server_setup.core
+        tasks_from: firewall
+        apply:
+          tags:
+            - k3s
+            - firewall
+      when: core_manage_firewall | default(true) | bool

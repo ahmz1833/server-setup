@@ -1,0 +1,31 @@
+---
+- name: Manage K3s manifests on server nodes
+  when: k3s_role == 'server'
+  block:
+    - name: Render Traefik HelmChartConfig manifest
+      ansible.builtin.template:
+        src: traefik-config.yaml.j2
+        dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+        mode: '0600'
+        owner: root
+        group: root
+      when:
+        - not (k3s_disable_traefik | bool)
+        - ((k3s_traefik_config | default({})).enabled | default(true) | bool)
+
+    - name: Remove Traefik HelmChartConfig manifest if Traefik is disabled
+      ansible.builtin.file:
+        path: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+        state: absent
+      when:
+        - k3s_disable_traefik | bool or not ((k3s_traefik_config | default({})).enabled | default(true) | bool)
+
+    - name: Render user-defined manifests
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "/var/lib/rancher/k3s/server/manifests/{{ item.name }}"
+        mode: '0600'
+        owner: root
+        group: root
+      loop: "{{ k3s_manifests | default([]) }}"
+      when: item.name is defined and item.content is defined

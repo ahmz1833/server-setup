@@ -1,0 +1,30 @@
+---
+- name: Rotate TLS certificates on server node
+  when: k3s_role == 'server'
+  block:
+    - name: Stop K3s service before certificate rotation
+      ansible.builtin.systemd:
+        name: k3s
+        state: stopped
+
+    - name: Execute certificate rotation command
+      ansible.builtin.command: >-
+        {{ k3s_install_dir }}/k3s certificate rotate
+      changed_when: true
+
+    - name: Start K3s service after certificate rotation
+      ansible.builtin.systemd:
+        name: k3s
+        state: started
+
+    - name: Wait for K3s API server readiness after certificate rotation
+      ansible.builtin.uri:
+        url: "https://127.0.0.1:{{ k3s_https_listen_port }}/readyz"
+        validate_certs: false
+        status_code:
+          - 200
+          - 401
+      register: _k3s_rotate_readyz
+      until: _k3s_rotate_readyz.status in [200, 401]
+      retries: 30
+      delay: 5

@@ -1,0 +1,38 @@
+---
+# Shared task file to resolve and validate cluster registration token
+# across primary server, secondary servers, and worker agents.
+
+- name: Slurp cluster node-token from primary server when unresolvable locally
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  delegate_to: "{{ _k3s_primary_node }}"
+  register: _k3s_slurped_primary_token
+  failed_when: false
+  when:
+    - k3s_token | default('') | length == 0
+    - (hostvars[_k3s_primary_node]['_k3s_node_token'] | default('', true)) | length == 0
+
+- name: Register node-token fact on primary server
+  ansible.builtin.set_fact:
+    _k3s_node_token: >-
+      {{
+        k3s_token if (k3s_token | default('') | length > 0)
+        else (hostvars[_k3s_primary_node]['_k3s_node_token'] if (hostvars[_k3s_primary_node]['_k3s_node_token'] | default('', true) | length > 0)
+        else ((_k3s_slurped_primary_token.content | b64decode | trim)
+              if (_k3s_slurped_primary_token is defined and _k3s_slurped_primary_token.content is defined)
+              else ''))
+      }}
+  delegate_to: "{{ _k3s_primary_node }}"
+  delegate_facts: true
+
+- name: Set effective cluster token for current node
+  ansible.builtin.set_fact:
+    _k3s_effective_token: "{{ hostvars[_k3s_primary_node]['_k3s_node_token'] | default('', true) }}"
+
+- name: Assert effective cluster token is present
+  ansible.builtin.assert:
+    that:
+      - _k3s_effective_token | length > 0
+    fail_msg: >-
+      Cluster token could not be resolved from primary server '{{ _k3s_primary_node }}'.
+      Ensure the primary server has been provisioned and is reachable, or set 'k3s_token' explicitly.

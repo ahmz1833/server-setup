@@ -14,6 +14,17 @@
     state: present
   when: ansible_facts['os_family'] == 'RedHat'
 
+- name: Build effective firewall rules including detected K3s rules
+  ansible.builtin.set_fact:
+    _core_effective_firewall_rules: >-
+      {%- set base = core_firewall_rules | default([]) -%}
+      {%- set base_comments = base | selectattr('comment', 'defined') | map(attribute='comment') | list -%}
+      {%- set k3s = ansible_local.k3s | default({}) -%}
+      {%- set k3s_rules = k3s.firewall_rules | default([]) -%}
+      {%- set k3s_defined = k3s_rules | selectattr('comment', 'defined') | rejectattr('comment', 'in', base_comments) | list -%}
+      {%- set extra = (k3s_rules | rejectattr('comment', 'defined') | list) + k3s_defined -%}
+      {{ base + extra }}
+
 # =============================================================================
 # IPv4 HOST-FIREWALL Chain
 # =============================================================================
@@ -95,7 +106,7 @@
     in_interface: "{{ item.in_interface | default(omit) }}"
     jump: ACCEPT
     comment: "{{ item.comment | default('custom') }}"
-  loop: "{{ core_firewall_rules | rejectattr('ipset', 'defined') | rejectattr('v6_only', 'defined') | list }}"
+  loop: "{{ _core_effective_firewall_rules | rejectattr('ipset', 'defined') | rejectattr('v6_only', 'defined') | list }}"
   when: item.port is not defined or (item.port | string) != (core_ssh_port | string)
 
 - name: "IPv4: Apply ipset-based rules"
@@ -107,7 +118,7 @@
     match_set_flags: src
     jump: ACCEPT
     comment: "{{ item.comment | default(item.ipset) }}"
-  loop: "{{ core_firewall_rules | selectattr('ipset', 'defined') | rejectattr('v6_only', 'defined') | list }}"
+  loop: "{{ _core_effective_firewall_rules | selectattr('ipset', 'defined') | rejectattr('v6_only', 'defined') | list }}"
 
 - name: "IPv4: Set default policy in HOST-FIREWALL"
   ansible.builtin.iptables:
@@ -177,7 +188,7 @@
         jump: ACCEPT
         ip_version: ipv6
         comment: "{{ item.comment | default('custom') }}"
-      loop: "{{ core_firewall_rules | rejectattr('ipset', 'defined') | rejectattr('v4_only', 'defined') | list }}"
+      loop: "{{ _core_effective_firewall_rules | rejectattr('ipset', 'defined') | rejectattr('v4_only', 'defined') | list }}"
       when:
         - item.port is not defined or (item.port | string) != (core_ssh_port | string)
         - item.src is not defined or item.src_v6 is defined

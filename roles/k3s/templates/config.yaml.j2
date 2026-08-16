@@ -1,0 +1,126 @@
+# Ansible managed: Do not edit manually.
+# K3s configuration file (/etc/rancher/k3s/config.yaml)
+
+node-name: "{{ _k3s_node_name }}"
+{% if k3s_role == 'server' %}
+write-kubeconfig-mode: "0600"
+https-listen-port: {{ k3s_https_listen_port }}
+{% endif %}
+
+{% if k3s_role == 'server' %}
+{% if k3s_bind_address | default('') | length > 0 %}
+bind-address: "{{ k3s_bind_address }}"
+{% endif %}
+
+{% if k3s_cluster_cidr | default('') | length > 0 %}
+cluster-cidr: "{{ k3s_cluster_cidr }}"
+{% endif %}
+
+{% if k3s_service_cidr | default('') | length > 0 %}
+service-cidr: "{{ k3s_service_cidr }}"
+{% endif %}
+
+{% if k3s_flannel_backend | default('') | length > 0 %}
+flannel-backend: "{{ k3s_flannel_backend }}"
+{% endif %}
+{% endif %}
+
+{% if k3s_node_ip | default('') | length > 0 %}
+node-ip: "{{ k3s_node_ip }}"
+{% endif %}
+
+{% if k3s_role == 'server' %}
+{% if k3s_datastore_role == 'cluster-init' %}
+cluster-init: true
+{% elif k3s_datastore_role == 'join' %}
+{% if _k3s_api_server_url | default('') | length > 0 %}
+server: "{{ _k3s_api_server_url }}"
+{% endif %}
+{% endif %}
+
+{% if k3s_datastore_endpoint | default('') | length > 0 %}
+datastore-endpoint: "{{ k3s_datastore_endpoint }}"
+{% endif %}
+
+{% set disabled_components = [] %}
+{% if k3s_disable_servicelb | bool %}
+{% set _ = disabled_components.append('servicelb') %}
+{% endif %}
+{% if k3s_disable_traefik | bool %}
+{% set _ = disabled_components.append('traefik') %}
+{% endif %}
+{% for comp in k3s_disable_components | default([]) %}
+{% if comp not in disabled_components %}
+{% set _ = disabled_components.append(comp) %}
+{% endif %}
+{% endfor %}
+{% if disabled_components | length > 0 %}
+disable:
+{% for comp in disabled_components %}
+  - "{{ comp }}"
+{% endfor %}
+{% endif %}
+
+{% if _k3s_computed_tls_sans | default([]) | length > 0 %}
+tls-san:
+{% for san in _k3s_computed_tls_sans %}
+  - "{{ san }}"
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if k3s_role == 'agent' %}
+{% if _k3s_api_server_url | default('') | length > 0 %}
+server: "{{ _k3s_api_server_url }}"
+{% endif %}
+{% endif %}
+
+{% if k3s_role == 'server' %}
+{% if k3s_system_default_registry | default('') | length > 0 %}
+system-default-registry: "{{ k3s_system_default_registry }}"
+{% endif %}
+{% endif %}
+
+{% if k3s_pause_image | default('') | length > 0 %}
+pause-image: "{{ k3s_pause_image }}"
+{% endif %}
+
+{% if _k3s_effective_token | default('') | length > 0 %}
+token: "{{ _k3s_effective_token }}"
+{% endif %}
+
+{% set labels = [] %}
+{% if k3s_cluster_name | default('') | length > 0 %}
+{% set _ = labels.append('cluster-name=' ~ k3s_cluster_name) %}
+{% endif %}
+{% for key, val in (k3s_node_labels | default({})).items() %}
+{% set _ = labels.append(key ~ '=' ~ val) %}
+{% endfor %}
+{% if labels | length > 0 %}
+node-label:
+{% for label in labels %}
+  - "{{ label }}"
+{% endfor %}
+{% endif %}
+
+{% if k3s_node_taints | default([]) | length > 0 %}
+node-taint:
+{% for taint in k3s_node_taints %}
+  - "{{ taint }}"
+{% endfor %}
+{% endif %}
+
+{% for key, val in (k3s_config | default({})).items() %}
+{% if val is boolean %}
+{{ key }}: {{ val | lower }}
+{% elif val is number %}
+{{ key }}: {{ val }}
+{% elif val is sequence and not val is string %}
+{{ key }}:
+{% for item in val %}
+  - "{{ item }}"
+{% endfor %}
+{% else %}
+{{ key }}: "{{ val }}"
+{% endif %}
+{% endfor %}

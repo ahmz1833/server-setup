@@ -1,0 +1,23 @@
+---
+# Role validation tasks. Assertions for node execution mode, server datastore role,
+# and control plane inventory group existence.
+
+- name: Validate node execution mode
+  ansible.builtin.assert:
+    that:
+      - k3s_role in ['server', 'agent']
+    fail_msg: "k3s_role must be either 'server' or 'agent'. Current value: '{{ k3s_role }}'"
+
+- name: Validate server datastore role
+  ansible.builtin.assert:
+    that:
+      - k3s_datastore_role in ['standalone', 'cluster-init', 'join']
+    fail_msg: "k3s_datastore_role must be 'standalone', 'cluster-init', or 'join'. Current value: '{{ k3s_datastore_role }}'"
+  when: k3s_role == 'server'
+
+- name: Assert control plane inventory group exists
+  ansible.builtin.assert:
+    that:
+      - k3s_control_plane_group in groups
+      - (groups[k3s_control_plane_group] | length) > 0
+    fail_msg: "Inventory group '{{ k3s_control_plane_group }}' must exist and contain at least one master host."

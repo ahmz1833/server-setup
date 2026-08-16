@@ -1,0 +1,4 @@
+---
+# .ansible-lint configuration
+exclude_paths:
+  - "roles/*/examples/"

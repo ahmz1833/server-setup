@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-08-16
+
+### Added
+- **`ahmz1833.server_setup.k3s` Role**: Production-ready, property-driven K3s cluster provisioning, scale-out, and Day 0 / Day 1 / Day 2 operational management across any topology (Multi-Master HA etcd, standalone, and dedicated worker agents).
+- **DNS-Based Control Plane Load Balancing**: Declarative `k3s_control_plane_domain` and `k3s_control_plane_port` variables with automatic TLS SAN embedding and seamless integration with external load balancers or round-robin DNS.
+- **Bootstrapping `/etc/hosts` Support**: Automatic temporary control plane hostname resolution in `/etc/hosts` during cluster setup, cleanly removed in an `always:` post-provisioning block.
+- **Customizable Ingress & ServiceLB Integration**: Configurable Traefik `HelmChartConfig` port definitions supporting `LoadBalancer`, `ClusterIP`, and `NodePort` modes with explicit `hostPort` / `nodePort` assignments.
+- **Full Day 2 Operational Lifecycle**: Automated node draining/uncordoning (`k3s_state: drain`/`uncordon`), TLS certificate rotation (`rotate-certs`), local kubeconfig retrieval (`fetch-kubeconfig`), and safe node decommissioning (`absent` / `uninstall`).
+
 ## [1.3.8] - 2026-08-16
 
 ### Added
