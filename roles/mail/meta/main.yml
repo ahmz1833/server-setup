@@ -30,7 +30,7 @@ galaxy_info:
     - mail
     - postfix
     - dovecot
-    - docker-mailserver
+    - mailserver
     - snappymail
     - dkim
 
