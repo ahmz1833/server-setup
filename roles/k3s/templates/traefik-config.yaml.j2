@@ -1,0 +1,36 @@
+# Ansible managed: Traefik HelmChartConfig for K3s
+# Supports service.type ('LoadBalancer', 'ClusterIP', 'NodePort'), exposedPort, hostPort, and optional explicit nodePort.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+{% set svc_type = (k3s_traefik_config.service.type if (k3s_traefik_config is defined and k3s_traefik_config is mapping and k3s_traefik_config.service is defined and k3s_traefik_config.service is mapping and k3s_traefik_config.service.type is defined) else '') %}
+{% if svc_type | length > 0 %}
+    service:
+      type: {{ svc_type }}
+{% elif k3s_disable_servicelb | default(false) | bool %}
+    service:
+      type: ClusterIP
+{% endif %}
+    ports:
+      web:
+        port: {{ (k3s_traefik_config['ports']['web']['port']) | default(8000) }}
+        exposedPort: {{ (k3s_traefik_config['ports']['web']['exposedPort']) | default(80) }}
+{% if (k3s_traefik_config['ports']['web']['nodePort'] | default(none)) is not none %}
+        nodePort: {{ k3s_traefik_config['ports']['web']['nodePort'] }}
+{% endif %}
+{% if (k3s_traefik_config['ports']['web']['hostPort'] | default(none)) is not none %}
+        hostPort: {{ k3s_traefik_config['ports']['web']['hostPort'] }}
+{% endif %}
+      websecure:
+        port: {{ (k3s_traefik_config['ports']['websecure']['port']) | default(8443) }}
+        exposedPort: {{ (k3s_traefik_config['ports']['websecure']['exposedPort']) | default(443) }}
+{% if (k3s_traefik_config['ports']['websecure']['nodePort'] | default(none)) is not none %}
+        nodePort: {{ k3s_traefik_config['ports']['websecure']['nodePort'] }}
+{% endif %}
+{% if (k3s_traefik_config['ports']['websecure']['hostPort'] | default(none)) is not none %}
+        hostPort: {{ k3s_traefik_config['ports']['websecure']['hostPort'] }}
+{% endif %}

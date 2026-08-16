@@ -1,0 +1,17 @@
+---
+- name: Initialize primary K3s control plane server
+  ansible.builtin.include_tasks: server_init.yml
+  when:
+    - k3s_role == 'server'
+    - inventory_hostname == _k3s_primary_node
+
+- name: Join secondary K3s control plane servers
+  ansible.builtin.include_tasks: server_join.yml
+  when:
+    - k3s_role == 'server'
+    - inventory_hostname != _k3s_primary_node
+
+- name: Join K3s agent nodes
+  ansible.builtin.include_tasks: agent.yml
+  when:
+    - k3s_role == 'agent'

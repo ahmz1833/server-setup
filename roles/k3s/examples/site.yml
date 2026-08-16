@@ -1,0 +1,9 @@
+---
+- name: Provision and Manage K3s Cluster (Day 0 & Day 1)
+  hosts: k3s_servers:k3s_agents
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.core
+    - role: ahmz1833.server_setup.k3s
+      vars:
+        k3s_state: present

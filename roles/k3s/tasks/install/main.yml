@@ -1,0 +1,29 @@
+---
+- name: Inspect legacy systemd environment files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /etc/systemd/system/k3s.service.env
+    - /etc/systemd/system/k3s-agent.service.env
+  register: _k3s_legacy_env_stats
+
+- name: Remove unmanaged legacy installer environment files
+  ansible.builtin.file:
+    path: "{{ item.stat.path }}"
+    state: absent
+  loop: "{{ _k3s_legacy_env_stats.results }}"
+  when: item.stat.exists | default(false)
+
+- name: Install K3s binary asset via collection asset installer
+  ansible.builtin.include_role:
+    name: ahmz1833.server_setup.asset
+  vars:
+    asset_name: "k3s"
+    asset_version: "{{ k3s_version }}"
+    asset_url: "{{ k3s_asset_url }}"
+    asset_dest: "{{ k3s_install_dir }}/k3s"
+    asset_extract: false
+    asset_version_cmd: "--version"
+    asset_version_regex: 'k3s version (v[0-9]+\.[0-9]+\.[0-9]+[^\s]*)'
+    asset_download_locally: "{{ k3s_download_locally }}"
+    asset_service_stop: "{{ 'k3s' if k3s_role == 'server' else 'k3s-agent' }}"

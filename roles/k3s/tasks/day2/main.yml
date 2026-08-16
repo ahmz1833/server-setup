@@ -1,0 +1,20 @@
+---
+- name: Execute node drain operation
+  ansible.builtin.include_tasks: drain.yml
+  when: k3s_state == 'drain'
+
+- name: Execute node uncordon operation
+  ansible.builtin.include_tasks: uncordon.yml
+  when: k3s_state == 'uncordon'
+
+- name: Execute TLS certificate rotation operation
+  ansible.builtin.include_tasks: rotate_certs.yml
+  when: k3s_state == 'rotate-certs'
+
+- name: Execute local kubeconfig retrieval operation
+  ansible.builtin.include_tasks: fetch_kubeconfig.yml
+  when: k3s_state == 'fetch-kubeconfig'
+
+- name: Execute node decommissioning & cluster uninstallation
+  ansible.builtin.include_tasks: uninstall.yml
+  when: k3s_state in ['absent', 'uninstall']

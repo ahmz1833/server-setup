@@ -1,0 +1,29 @@
+---
+galaxy_info:
+  role_name: k3s
+  author: AHMZ
+  description: >-
+    Composable, property-driven, and production-ready Ansible role to provision, scale, and manage K3s clusters across any topology
+    (single-node, HA etcd, external datastore, worker agents) with strict firewall isolation and host Nginx coexistence.
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - k3s
+    - kubernetes
+    - cluster
+    - container
+    - etcd
+    - cloud
+
+dependencies: []

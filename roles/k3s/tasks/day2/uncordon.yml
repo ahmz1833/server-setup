@@ -1,0 +1,7 @@
+---
+- name: Uncordon node in cluster via primary server
+  ansible.builtin.command: >-
+    {{ k3s_install_dir }}/k3s kubectl uncordon {{ _k3s_node_name }}
+  delegate_to: "{{ _k3s_primary_node }}"
+  register: _k3s_uncordon_output
+  changed_when: _k3s_uncordon_output.rc == 0

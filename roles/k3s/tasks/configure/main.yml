@@ -1,0 +1,77 @@
+---
+- name: Ensure K3s configuration directory exists
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Ensure K3s manifests directory exists on server nodes
+  ansible.builtin.file:
+    path: /var/lib/rancher/k3s/server/manifests
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  when: k3s_role == 'server'
+
+- name: Render K3s environment configuration file
+  ansible.builtin.template:
+    src: k3s.env.j2
+    dest: /etc/rancher/k3s/k3s.env
+    mode: '0600'
+    owner: root
+    group: root
+  notify: Restart k3s
+
+- name: Configure systemd service for K3s server
+  when: k3s_role == 'server'
+  block:
+    - name: Render k3s.service unit
+      ansible.builtin.template:
+        src: k3s.service.j2
+        dest: /etc/systemd/system/k3s.service
+        mode: '0644'
+        owner: root
+        group: root
+      notify:
+        - Reload systemd
+        - Restart k3s
+
+    - name: Ensure k3s-agent service is stopped and disabled on server nodes
+      ansible.builtin.systemd:
+        name: k3s-agent
+        state: stopped
+        enabled: false
+      failed_when: false
+
+- name: Configure systemd service for K3s agent
+  when: k3s_role == 'agent'
+  block:
+    - name: Render k3s-agent.service unit
+      ansible.builtin.template:
+        src: k3s-agent.service.j2
+        dest: /etc/systemd/system/k3s-agent.service
+        mode: '0644'
+        owner: root
+        group: root
+      notify:
+        - Reload systemd
+        - Restart k3s
+
+    - name: Ensure k3s service is stopped and disabled on agent nodes
+      ansible.builtin.systemd:
+        name: k3s
+        state: stopped
+        enabled: false
+      failed_when: false
+
+- name: Render K3s declarative config.yaml
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: '0600'
+    owner: root
+    group: root
+  notify: Restart k3s

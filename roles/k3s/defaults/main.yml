@@ -1,0 +1,272 @@
+---
+# Meta Variables (inherited from playbook-level)
+k3s_enable_ipv6: "{{ enable_ipv6 | default(false) }}"
+k3s_download_locally: "{{ download_locally | default(false) }}"
+k3s_internet_restricted: "{{ is_iran | default(false) }}"
+
+# -----------------------------------------------------------------------------
+# K3s Role Defaults
+# -----------------------------------------------------------------------------
+
+# Operational State:
+#   - 'present'          : Provision / update node and cluster (Day 0 & Day 1)
+#   - 'absent'           : Decommission node and uninstall K3s (Day 2)
+#   - 'drain'            : Drain node using kubectl (Day 2)
+#   - 'uncordon'         : Uncordon node using kubectl (Day 2)
+#   - 'rotate-certs'     : Rotate TLS certificates on server nodes (Day 2)
+#   - 'fetch-kubeconfig' : Download /etc/rancher/k3s/k3s.yaml to local workstation (Day 1/2)
+#   - 'uninstall'        : Alias of 'absent' (Day 2)
+k3s_state: "present"
+
+# Guard safety flag required to execute 'absent' state (uninstallation)
+k3s_force_uninstall: false
+k3s_drain_ignore_errors: false
+k3s_drain_timeout: "300s"
+
+# Cluster Metadata
+k3s_cluster_name: "k3s"
+
+# Asset & Versioning Configuration
+k3s_version: "v1.36.3+k3s1"
+k3s_asset_url: "https://github.com/k3s-io/k3s/releases/download/%v/k3s"
+k3s_install_dir: "/usr/local/bin"
+
+# Topology & Node Roles:
+#   k3s_role: 'server' (control plane) or 'agent' (worker node)
+#   k3s_datastore_role:
+#     - 'standalone'   : Single server with embedded SQLite datastore
+#     - 'cluster-init' : Primary server initializing embedded etcd cluster (--cluster-init)
+#     - 'join'         : Secondary server joining etcd or agent node joining cluster
+k3s_role: "server"
+k3s_datastore_role: "standalone"
+k3s_datastore_endpoint: ""
+
+# Inventory Groups representing K3s server and agent nodes
+k3s_control_plane_group: "k3s_servers"
+k3s_agent_group: "k3s_agents"
+
+# Cluster Token (auto-discovered via slurp from primary server if empty)
+k3s_token: ""
+
+# Network & Endpoint Settings
+k3s_https_listen_port: 6443
+k3s_control_plane_domain: ""
+k3s_control_plane_port: "{{ k3s_https_listen_port }}"
+k3s_bind_address: ""
+k3s_node_ip: ""
+k3s_node_name: "" # Target node name in Kubernetes (auto-resolved from nodename/hostname if empty)
+k3s_cluster_cidr: "10.42.0.0/16"
+k3s_service_cidr: "10.43.0.0/16"
+k3s_flannel_backend: "vxlan"
+
+# Additional Subject Alternative Names (SANs) for the K3s API server certificate
+k3s_tls_sans: []
+
+# Node Scheduling Metadata
+k3s_node_labels: {}
+k3s_node_taints: []
+
+# Built-in Component & Ingress Control
+k3s_disable_servicelb: false
+k3s_disable_traefik: false
+k3s_disable_components: [] # e.g. ["local-storage", "metrics-server"]
+
+# Traefik HelmChartConfig customization (applied when Traefik is enabled)
+# service.type: 'LoadBalancer' (default when ServiceLB is active), 'ClusterIP' (when ServiceLB is disabled), or 'NodePort'.
+# nodePort: optional explicit NodePort assignment (e.g. 30080 / 30443) when service.type is set to 'NodePort'.
+k3s_traefik_config:
+  enabled: true
+  ports:
+    web:
+      port: 8000
+      exposedPort: 80
+      hostPort: null
+    websecure:
+      port: 8443
+      exposedPort: 443
+      hostPort: null
+
+# Raw Declarative Configuration Overrides (/etc/rancher/k3s/config.yaml)
+k3s_config: {}
+
+# Offline / Mirror Registry Settings
+# When k3s_internet_restricted is enabled, all k3s system chart images
+# (Traefik, CoreDNS, metrics-server, local-storage, servicelb, helm controller, ...) and the sandbox pause image are pulled from the mirror.
+# This is applied through k3s-native config keys (system-default-registry on servers, pause-image on every node).
+# which rewrite the image references in the deployed Helm chart values and pod manifests - containerd behavior is not changed.
+k3s_dockerhub_mirror: hub.hamdocker.ir
+k3s_system_default_registry: "{{ k3s_dockerhub_mirror if k3s_internet_restricted | bool else '' }}"
+k3s_pause_image: "{{ (k3s_system_default_registry + '/rancher/mirrored-pause:3.6') if k3s_system_default_registry | length > 0 else '' }}"
+
+# Environment Variables (/etc/rancher/k3s/k3s.env)
+k3s_env: {}
+
+# Extra Kubernetes Manifests to deploy into /var/lib/rancher/k3s/server/manifests/
+k3s_manifests: []
+
+# Firewall Integration Settings (consumed by core firewall role)
+k3s_firewall_manage: true
+k3s_firewall_enable_nodeport: false
+k3s_firewall_nodeport_range: "30000-32767"
+k3s_firewall_allowed_api_cidrs:
+  - "0.0.0.0/0"
+k3s_firewall_allowed_ingress_cidrs:
+  - "0.0.0.0/0"
+k3s_firewall_allowed_etcd_cidrs: []      # Default: allow all control plane nodes to talk to etcd peer/client ports (2379/2380)
+k3s_firewall_allowed_kubelet_cidrs: []   # Default: allow all cluster nodes to talk to kubelet API port (10250)
+
+# Persist the computed firewall rules as local facts so the standalone core role
+# can re-apply them on this host without running the k3s role.
+k3s_persist_firewall_facts: true
+k3s_firewall_facts_file: "/etc/ansible/facts.d/k3s.fact"
+
+# -----------------------------------------------------------------------------
+# Derived Cluster Topology & Fact Computations (Declarative Defaults)
+# -----------------------------------------------------------------------------
+
+# Primary control plane bootstrap hostname
+_k3s_primary_node: >-
+  {{
+    (groups[k3s_control_plane_group] | default([])
+     | map('extract', hostvars | default({}))
+     | selectattr('k3s_datastore_role', 'defined')
+     | selectattr('k3s_datastore_role', 'equalto', 'cluster-init')
+     | map(attribute='inventory_hostname')
+     | first
+     | default((groups[k3s_control_plane_group] | default(['localhost']))[0], true))
+  }}
+
+# Map of {host: reachable_IP} for every cluster node (control plane + agents)
+_k3s_host_ips: >-
+  {%- set resolved = {} -%}
+  {%- for host in (groups[k3s_control_plane_group] | default([])) + (groups[k3s_agent_group] | default([])) -%}
+    {%- set hv = hostvars[host] | default({}) -%}
+    {%- set h_afacts = hv['ansible_facts'] | default({}) -%}
+    {%- set bind_addr = hv['k3s_bind_address'] | default('', true) -%}
+    {%- set node_ip = hv['k3s_node_ip'] | default('', true) -%}
+    {%- set ans_host = hv['ansible_host'] | default('', true) -%}
+    {%- set has_v4 = h_afacts['default_ipv4'] is defined and h_afacts['default_ipv4']['address'] is defined -%}
+    {%- set def_ipv4 = h_afacts['default_ipv4']['address'] if has_v4 else '' -%}
+    {%- set has_v6 = h_afacts['default_ipv6'] is defined and h_afacts['default_ipv6']['address'] is defined -%}
+    {%- set def_ipv6 = h_afacts['default_ipv6']['address'] if has_v6 else '' -%}
+    {%- set ip = [bind_addr, node_ip, ans_host, def_ipv4, def_ipv6] | select('ne', '') | first | default('', true) -%}
+    {%- set _ = resolved.update({host: ip}) -%}
+  {%- endfor -%}
+  {{ resolved }}
+
+# Primary server IP address
+_k3s_primary_ip: "{{ (_k3s_host_ips | default({}))[_k3s_primary_node] | default('127.0.0.1', true) }}"
+
+# Effective API server endpoint URL (e.g. "https://10.0.0.1:6443")
+_k3s_api_server_url: >-
+  {{
+    ('https://' ~ k3s_control_plane_domain ~ ':' ~ k3s_control_plane_port)
+    if (k3s_control_plane_domain | length > 0)
+    else ('https://' ~ _k3s_primary_ip ~ ':' ~ k3s_https_listen_port)
+  }}
+
+# Dynamic TLS SANs for K3s API server certificate (control plane host IPs + hostnames + k3s_tls_sans + k3s_control_plane_domain)
+_k3s_computed_tls_sans: >-
+  {{
+    (((groups[k3s_control_plane_group] | default([])) | map('extract', _k3s_host_ips | default({})) | select('ne', '') | list)
+     + (groups[k3s_control_plane_group] | default([]))
+     + (k3s_tls_sans | default([]))
+     + ([k3s_control_plane_domain] if (k3s_control_plane_domain | length > 0) else []))
+    | unique | list
+  }}
+
+# Target Kubernetes node name for this host
+_k3s_node_name: >-
+  {{
+    [k3s_node_name | default('', true),
+     ansible_facts['nodename'] | default('', true),
+     ansible_facts['hostname'] | default('', true),
+     inventory_hostname]
+    | select('ne', '') | first
+  }}
+
+# All unique cluster node IPs across control plane and agent groups
+_k3s_all_cluster_ips: "{{ (_k3s_host_ips | default({})).values() | list | select('ne', '') | unique | list }}"
+
+# Merged, deterministic K3s firewall rule list (consumed by core firewall role)
+k3s_firewall_rules: >-
+  {%- set rules = [] -%}
+  {# Virtual CNI & Overlay interface rules #}
+  {%- set _ = rules.append({'in_interface': 'cni0', 'comment': 'k3s cni interface'}) -%}
+  {%- set _ = rules.append({'in_interface': 'flannel.1', 'comment': 'k3s flannel interface'}) -%}
+  {%- set _ = rules.append({'in_interface': 'kube-bridge', 'comment': 'k3s kube-bridge interface'}) -%}
+  {# API Server port rule #}
+  {%- if k3s_role == 'server' -%}
+    {%- for cidr in k3s_firewall_allowed_api_cidrs -%}
+      {%- if cidr == '0.0.0.0/0' or cidr == '::/0' -%}
+        {%- set _ = rules.append({'port': k3s_https_listen_port | int, 'comment': 'k3s api server'}) -%}
+      {%- elif ':' in cidr -%}
+        {%- set _ = rules.append({'port': k3s_https_listen_port | int, 'src_v6': cidr, 'v6_only': true, 'comment': 'k3s api server'}) -%}
+      {%- else -%}
+        {%- set _ = rules.append({'port': k3s_https_listen_port | int, 'src': cidr, 'v4_only': true, 'comment': 'k3s api server'}) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {# etcd peer/client rules #}
+    {%- set etcd_cidrs = k3s_firewall_allowed_etcd_cidrs if (k3s_firewall_allowed_etcd_cidrs | length > 0) else (_k3s_computed_tls_sans | default([])) -%}
+    {%- for etcd_src in etcd_cidrs -%}
+      {%- if etcd_src | length > 0 -%}
+        {%- if ':' in etcd_src -%}
+          {%- set _ = rules.append({'port': 2379, 'src_v6': etcd_src, 'v6_only': true, 'comment': 'k3s etcd client'}) -%}
+          {%- set _ = rules.append({'port': 2380, 'src_v6': etcd_src, 'v6_only': true, 'comment': 'k3s etcd peer'}) -%}
+        {%- elif etcd_src | regex_search('^[0-9.]+(/[0-9]+)?$') -%}
+          {%- set _ = rules.append({'port': 2379, 'src': etcd_src, 'v4_only': true, 'comment': 'k3s etcd client'}) -%}
+          {%- set _ = rules.append({'port': 2380, 'src': etcd_src, 'v4_only': true, 'comment': 'k3s etcd peer'}) -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+  {# Kubelet API port rule #}
+  {%- set kubelet_cidrs = k3s_firewall_allowed_kubelet_cidrs if (k3s_firewall_allowed_kubelet_cidrs | length > 0) else _k3s_all_cluster_ips -%}
+  {%- for k_src in kubelet_cidrs -%}
+    {%- if k_src | length > 0 -%}
+      {%- if ':' in k_src -%}
+        {%- set _ = rules.append({'port': 10250, 'src_v6': k_src, 'v6_only': true, 'comment': 'k3s kubelet api'}) -%}
+      {%- elif k_src | regex_search('^[0-9.]+(/[0-9]+)?$') -%}
+        {%- set _ = rules.append({'port': 10250, 'src': k_src, 'v4_only': true, 'comment': 'k3s kubelet api'}) -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {# Flannel overlay rules #}
+  {%- if k3s_flannel_backend == 'wireguard-native' -%}
+    {%- set _ = rules.append({'port': 51820, 'proto': 'udp', 'comment': 'k3s flannel wireguard ipv4'}) -%}
+    {%- set _ = rules.append({'port': 51821, 'proto': 'udp', 'comment': 'k3s flannel wireguard ipv6'}) -%}
+  {%- else -%}
+    {%- set _ = rules.append({'port': 8472, 'proto': 'udp', 'comment': 'k3s flannel vxlan overlay'}) -%}
+  {%- endif -%}
+  {# Ingress ports (exposedPort 80 / 443) when Traefik and ServiceLB are enabled #}
+  {%- if not (k3s_disable_traefik | bool) and not (k3s_disable_servicelb | bool) -%}
+    {%- set has_t_ports = k3s_traefik_config is defined and k3s_traefik_config is mapping and k3s_traefik_config.ports is defined -%}
+    {%- set t_ports = k3s_traefik_config.ports if has_t_ports else {} -%}
+    {%- set t_web = (t_ports.web if (t_ports.web is defined and t_ports.web is mapping) else {}) -%}
+    {%- set t_websec = (t_ports.websecure if (t_ports.websecure is defined and t_ports.websecure is mapping) else {}) -%}
+    {%- set web_exp = t_web.exposedPort | default(80) -%}
+    {%- set websec_exp = t_websec.exposedPort | default(443) -%}
+    {%- set ing_cidrs = k3s_firewall_allowed_ingress_cidrs if k3s_firewall_allowed_ingress_cidrs is defined else ['0.0.0.0/0'] -%}
+    {%- for cidr in ing_cidrs -%}
+      {%- if cidr == '0.0.0.0/0' or cidr == '::/0' -%}
+        {%- set _ = rules.append({'port': web_exp | int, 'comment': 'k3s ingress web'}) -%}
+        {%- set _ = rules.append({'port': websec_exp | int, 'comment': 'k3s ingress websecure'}) -%}
+      {%- elif ':' in cidr -%}
+        {%- set _ = rules.append({'port': web_exp | int, 'src_v6': cidr, 'v6_only': true, 'comment': 'k3s ingress web'}) -%}
+        {%- set _ = rules.append({'port': websec_exp | int, 'src_v6': cidr, 'v6_only': true, 'comment': 'k3s ingress websecure'}) -%}
+      {%- else -%}
+        {%- set _ = rules.append({'port': web_exp | int, 'src': cidr, 'v4_only': true, 'comment': 'k3s ingress web'}) -%}
+        {%- set _ = rules.append({'port': websec_exp | int, 'src': cidr, 'v4_only': true, 'comment': 'k3s ingress websecure'}) -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+  {# NodePort service range rule #}
+  {%- if k3s_firewall_enable_nodeport | bool -%}
+    {%- set _ = rules.append({'port': k3s_firewall_nodeport_range, 'proto': 'tcp', 'comment': 'k3s nodeport tcp'}) -%}
+    {%- set _ = rules.append({'port': k3s_firewall_nodeport_range, 'proto': 'udp', 'comment': 'k3s nodeport udp'}) -%}
+  {%- endif -%}
+  {{ rules }}
+
+# Local Kubeconfig Retrieval Defaults
+k3s_kubeconfig_local_dest: "~/.kube/config.k3s"
+k3s_kubeconfig_mode: "0600"

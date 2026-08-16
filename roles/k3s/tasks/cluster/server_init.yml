@@ -1,0 +1,29 @@
+---
+- name: Ensure K3s primary server is started and enabled
+  ansible.builtin.systemd:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: Wait for primary K3s API server readiness
+  ansible.builtin.uri:
+    url: "https://127.0.0.1:{{ k3s_https_listen_port }}/readyz"
+    validate_certs: false
+    status_code:
+      - 200
+      - 401
+  register: _k3s_readyz
+  until: _k3s_readyz.status in [200, 401]
+  retries: 30
+  delay: 5
+
+- name: Resolve and validate cluster token
+  ansible.builtin.include_tasks: resolve_token.yml
+
+- name: Re-render config.yaml with effective token if slurped
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: '0600'
+    owner: root
+    group: root

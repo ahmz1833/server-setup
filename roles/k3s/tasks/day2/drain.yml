@@ -1,0 +1,14 @@
+---
+- name: Drain node from cluster via primary server
+  ansible.builtin.command: >-
+    {{ k3s_install_dir }}/k3s kubectl drain {{ _k3s_node_name }}
+    --ignore-daemonsets
+    --delete-emptydir-data
+    --force
+    --timeout={{ k3s_drain_timeout | default('300s') }}
+  delegate_to: "{{ _k3s_primary_node }}"
+  register: _k3s_drain_output
+  failed_when:
+    - _k3s_drain_output.rc != 0
+    - not (k3s_drain_ignore_errors | default(false) | bool)
+  changed_when: _k3s_drain_output.rc == 0

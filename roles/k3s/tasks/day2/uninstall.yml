@@ -1,0 +1,91 @@
+---
+- name: Assert force uninstall guard is enabled
+  ansible.builtin.assert:
+    that:
+      - k3s_force_uninstall | default(false) | bool
+    fail_msg: "Uninstallation aborted. You must set 'k3s_force_uninstall: true' to decommission a node or remove K3s."
+
+- name: Drain node from Kubernetes cluster before uninstallation
+  ansible.builtin.command: >-
+    {{ k3s_install_dir }}/k3s kubectl drain {{ _k3s_node_name }}
+    --ignore-daemonsets
+    --delete-emptydir-data
+    --force
+    --timeout={{ k3s_drain_timeout | default('300s') }}
+  delegate_to: "{{ _k3s_primary_node }}"
+  register: _k3s_uninstall_drain_output
+  failed_when: false
+  changed_when: _k3s_uninstall_drain_output.rc == 0
+  when: inventory_hostname != _k3s_primary_node
+
+- name: Safely remove node from Kubernetes cluster
+  ansible.builtin.command: >-
+    {{ k3s_install_dir }}/k3s kubectl delete node {{ _k3s_node_name }}
+  delegate_to: "{{ _k3s_primary_node }}"
+  register: _k3s_delete_node_output
+  failed_when: false
+  changed_when: _k3s_delete_node_output.rc == 0
+  when: inventory_hostname != _k3s_primary_node
+
+- name: Stop K3s services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop:
+    - k3s
+    - k3s-agent
+  failed_when: false
+
+- name: Check for official K3s uninstall scripts
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /usr/local/bin/k3s-uninstall.sh
+    - /usr/local/bin/k3s-agent-uninstall.sh
+  register: _k3s_uninstall_script_stats
+
+- name: Execute official K3s uninstall script if present
+  ansible.builtin.command: "{{ item.stat.path }}"
+  loop: "{{ _k3s_uninstall_script_stats.results }}"
+  when: item.stat.exists | default(false)
+  failed_when: false
+  changed_when: true
+
+- name: Remove K3s binary asset
+  ansible.builtin.file:
+    path: "{{ k3s_install_dir }}/k3s"
+    state: absent
+
+- name: Remove K3s firewall local facts to avoid stale rules
+  ansible.builtin.file:
+    path: "{{ k3s_firewall_facts_file | default('/etc/ansible/facts.d/k3s.fact') }}"
+    state: absent
+
+- name: Unmount active K3s and Kubelet mount points
+  ansible.builtin.shell: |
+    set -o pipefail
+    for m in $(grep -E '/var/lib/(kubelet|rancher/k3s)|/run/k3s' /proc/mounts | awk '{print $2}' | sort -r); do
+      umount -f -l "$m" || true
+    done
+  args:
+    executable: /bin/bash
+  failed_when: false
+  changed_when: false
+
+- name: Remove K3s configuration and runtime directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/rancher/k3s
+    - /var/lib/rancher/k3s
+    - /var/lib/kubelet
+    - /etc/systemd/system/k3s.service
+    - /etc/systemd/system/k3s-agent.service
+    - /etc/systemd/system/k3s.service.env
+    - /etc/systemd/system/k3s-agent.service.env
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true

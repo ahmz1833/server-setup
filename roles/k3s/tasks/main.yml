@@ -1,0 +1,53 @@
+---
+- name: Execute K3s provision & management (Day 0 & Day 1)
+  when: k3s_state | default('present') == 'present'
+  block:
+    - name: Validate configuration and inventory scheme
+      ansible.builtin.include_tasks: validate/main.yml
+
+    - name: Ensure K3s binary asset is installed
+      ansible.builtin.include_tasks: install/main.yml
+
+    - name: Configure K3s service and environment
+      ansible.builtin.include_tasks: configure/main.yml
+
+    - name: Add temporary control plane domain entry to /etc/hosts for cluster bootstrapping
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "{{ _k3s_primary_ip }} {{ k3s_control_plane_domain }} # k3s temporary bootstrap entry"
+        regexp: '.*# k3s temporary bootstrap entry'
+        state: present
+      when:
+        - k3s_control_plane_domain | length > 0
+        - _k3s_primary_ip | length > 0
+
+    - name: Orchestrate K3s cluster lifecycle
+      ansible.builtin.include_tasks: cluster/main.yml
+
+    - name: Apply K3s firewall rules
+      ansible.builtin.include_tasks: firewall/main.yml
+
+    - name: Deploy Kubernetes manifests
+      ansible.builtin.include_tasks: manifests/main.yml
+
+    - name: Flush queued handlers before cleaning up temporary bootstrap hosts entry
+      ansible.builtin.meta: flush_handlers
+
+  always:
+    - name: Remove temporary control plane domain entry from /etc/hosts after setup
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '.*# k3s temporary bootstrap entry'
+        state: absent
+      when:
+        - k3s_state | default('present') == 'present'
+        - k3s_control_plane_domain | default('', true) | length > 0
+
+- name: Execute K3s Day 2 cluster operation
+  when: k3s_state | default('present') != 'present'
+  block:
+    - name: Validate node and cluster facts for Day 2 operation
+      ansible.builtin.include_tasks: validate/main.yml
+
+    - name: Run Day 2 operation
+      ansible.builtin.include_tasks: day2/main.yml

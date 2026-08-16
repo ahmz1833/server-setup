@@ -1,0 +1,17 @@
+---
+- name: Resolve and validate cluster token for agent node
+  ansible.builtin.include_tasks: resolve_token.yml
+
+- name: Update config.yaml with resolved agent parameters
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: '0600'
+    owner: root
+    group: root
+
+- name: Ensure K3s agent service is started and enabled
+  ansible.builtin.systemd:
+    name: k3s-agent
+    state: started
+    enabled: true

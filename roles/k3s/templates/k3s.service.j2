@@ -1,0 +1,22 @@
+[Unit]
+Description=Lightweight Kubernetes (k3s server)
+Documentation=https://k3s.io
+After=network-online.target firewalld.service iptables.service nftables.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+EnvironmentFile=-/etc/rancher/k3s/k3s.env
+ExecStart={{ k3s_install_dir }}/k3s server --config /etc/rancher/k3s/config.yaml
+KillMode=process
+Delegate=yes
+LimitNOFILE=1048576
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+TimeoutStartSec=0
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

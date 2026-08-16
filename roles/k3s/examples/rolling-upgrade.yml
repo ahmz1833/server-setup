@@ -1,0 +1,20 @@
+---
+- name: Rolling Upgrade K3s Control Plane
+  hosts: k3s_servers
+  serial: 1
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.k3s
+      vars:
+        k3s_state: present
+        k3s_version: "v1.36.3+k3s1"
+
+- name: Rolling Upgrade K3s Worker Agents
+  hosts: k3s_agents
+  serial: 2
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.k3s
+      vars:
+        k3s_state: present
+        k3s_version: "v1.36.3+k3s1"
