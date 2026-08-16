@@ -95,7 +95,7 @@
     in_interface: "{{ item.in_interface | default(omit) }}"
     jump: ACCEPT
     comment: "{{ item.comment | default('custom') }}"
-  loop: "{{ _core_effective_firewall_rules | rejectattr('ipset', 'defined') | rejectattr('v6_only', 'defined') | list }}"
+  loop: "{{ core_firewall_rules | rejectattr('ipset', 'defined') | rejectattr('v6_only', 'defined') | list }}"
   when: item.port is not defined or (item.port | string) != (core_ssh_port | string)
 
 - name: "IPv4: Apply ipset-based rules"
