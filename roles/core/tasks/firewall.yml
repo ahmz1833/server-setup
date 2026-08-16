@@ -19,7 +19,8 @@
     _core_effective_firewall_rules: >-
       {%- set base = core_firewall_rules | default([]) -%}
       {%- set base_comments = base | selectattr('comment', 'defined') | map(attribute='comment') | list -%}
-      {%- set k3s_rules = ansible_local.k3s.firewall_rules | default([]) -%}
+      {%- set k3s = ansible_local.k3s | default({}) -%}
+      {%- set k3s_rules = k3s.firewall_rules | default([]) -%}
       {%- set k3s_defined = k3s_rules | selectattr('comment', 'defined') | rejectattr('comment', 'in', base_comments) | list -%}
       {%- set extra = (k3s_rules | rejectattr('comment', 'defined') | list) + k3s_defined -%}
       {{ base + extra }}
