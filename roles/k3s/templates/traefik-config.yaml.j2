@@ -15,22 +15,25 @@ spec:
     service:
       type: ClusterIP
 {% endif %}
+    {%- set t_ports = (k3s_traefik_config.ports if (k3s_traefik_config is defined and k3s_traefik_config is mapping and k3s_traefik_config.ports is defined and k3s_traefik_config.ports is mapping) else {}) -%}
+    {%- set t_web = (t_ports.web if (t_ports.web is defined and t_ports.web is mapping) else {}) -%}
+    {%- set t_websec = (t_ports.websecure if (t_ports.websecure is defined and t_ports.websecure is mapping) else {}) -%}
     ports:
       web:
-        port: {{ (k3s_traefik_config['ports']['web']['port']) | default(8000) }}
-        exposedPort: {{ (k3s_traefik_config['ports']['web']['exposedPort']) | default(80) }}
-{% if (k3s_traefik_config['ports']['web']['nodePort'] | default(none)) is not none %}
-        nodePort: {{ k3s_traefik_config['ports']['web']['nodePort'] }}
+        port: {{ t_web.port | default(8000) }}
+        exposedPort: {{ t_web.exposedPort | default(80) }}
+{% if (t_web.nodePort | default(none)) is not none %}
+        nodePort: {{ t_web.nodePort }}
 {% endif %}
-{% if (k3s_traefik_config['ports']['web']['hostPort'] | default(none)) is not none %}
-        hostPort: {{ k3s_traefik_config['ports']['web']['hostPort'] }}
+{% if (t_web.hostPort | default(none)) is not none %}
+        hostPort: {{ t_web.hostPort }}
 {% endif %}
       websecure:
-        port: {{ (k3s_traefik_config['ports']['websecure']['port']) | default(8443) }}
-        exposedPort: {{ (k3s_traefik_config['ports']['websecure']['exposedPort']) | default(443) }}
-{% if (k3s_traefik_config['ports']['websecure']['nodePort'] | default(none)) is not none %}
-        nodePort: {{ k3s_traefik_config['ports']['websecure']['nodePort'] }}
+        port: {{ t_websec.port | default(8443) }}
+        exposedPort: {{ t_websec.exposedPort | default(443) }}
+{% if (t_websec.nodePort | default(none)) is not none %}
+        nodePort: {{ t_websec.nodePort }}
 {% endif %}
-{% if (k3s_traefik_config['ports']['websecure']['hostPort'] | default(none)) is not none %}
-        hostPort: {{ k3s_traefik_config['ports']['websecure']['hostPort'] }}
+{% if (t_websec.hostPort | default(none)) is not none %}
+        hostPort: {{ t_websec.hostPort }}
 {% endif %}
