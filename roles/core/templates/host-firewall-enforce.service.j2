@@ -1,0 +1,15 @@
+# Ansible managed: Do not edit manually.
+[Unit]
+Description=Continuous HOST-FIREWALL chain enforcement daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/host-firewall-enforce.sh
+Restart=always
+RestartSec=3s
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

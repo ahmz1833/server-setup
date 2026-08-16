@@ -31,3 +31,8 @@
   ansible.builtin.systemd:
     name: ipset-restore
     state: restarted
+
+- name: Restart host-firewall-enforce
+  ansible.builtin.systemd:
+    name: host-firewall-enforce
+    state: restarted
