@@ -114,7 +114,7 @@ If `core_manage_nameservers` is true, the role may **remove a symlink** and writ
 - **Dedicated `HOST-FIREWALL` Custom Chain**:
   To prevent container engines (K3s, Kube-Router, Docker, Podman) from wiping host firewall rules or resetting default `INPUT` chain policies during daemon restarts, all host firewall rules are isolated inside a dedicated `HOST-FIREWALL` chain.
   - `-I INPUT 1 -j HOST-FIREWALL` ensures host security rules execute at position 1 of `INPUT` before any dynamic K8s/container rules.
-  - Allowed host ports (SSH, ICMP, whitelisted custom rules, CNI interfaces `cni0`/`flannel.1`) are accepted in `HOST-FIREWALL`. Unallowed traffic hits `-j DROP` at the bottom of `HOST-FIREWALL`.
+  - Allowed host ports (SSH, ICMP, whitelisted custom rules) are accepted in `HOST-FIREWALL` (interface-specific exceptions can be added via `core_firewall_rules`, e.g. `in_interface: cni0`). Unallowed traffic hits `-j DROP` at the bottom of `HOST-FIREWALL`.
   - `:INPUT ACCEPT` default policy remains uninhibited for K8s pod/service routing.
 - **Continuous Enforcement Daemon (`host-firewall-enforce`)**:
   Deploys a lightweight background systemd service (`host-firewall-enforce.service` / `/usr/local/bin/host-firewall-enforce.sh`) that continuously monitors and enforces `-I INPUT 1 -j HOST-FIREWALL` at index 1 of `INPUT`.
