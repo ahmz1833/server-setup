@@ -122,8 +122,8 @@
     _asset_install_needed: >-
       {{
         not _asset_stat.stat.exists
-        or (_asset_installed_version | default('0.0.0', true))
-        is not ansible.builtin.version(_asset_target_ver, _asset_op)
+        or ((_asset_installed_version | default('0.0.0', true) | string | regex_replace('^v', ''))
+            is not ansible.builtin.version((_asset_target_ver | string | regex_replace('^v', '')), _asset_op))
       }}
 
 # Build proxy environment variables

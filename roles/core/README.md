@@ -108,10 +108,19 @@ With `core_swap_enabled: false`, the disable path runs **`swapoff -a`** (all swa
 
 If `core_manage_nameservers` is true, the role may **remove a symlink** and write a static file. On hosts using **systemd-resolved**, reconcile with your DNS strategy.
 
-### IPSet / firewall
+### IPSet / Firewall Architecture
 
-- **ipset** uses `systemd` unit **`ipset-restore`** for boot-time restore.
-- **Firewall** uses **`ansible.builtin.iptables`** (legacy **iptables** backend). Distros defaulting to **nftables** only may still ship the `iptables` compatibility tools — verify on minimal images.
+- **IPSet**: Uses systemd unit **`ipset-restore`** for boot-time restore.
+- **Dedicated `HOST-FIREWALL` Custom Chain**:
+  To prevent container engines (K3s, Kube-Router, Docker, Podman) from wiping host firewall rules or resetting default `INPUT` chain policies during daemon restarts, all host firewall rules are isolated inside a dedicated `HOST-FIREWALL` chain.
+  - `-I INPUT 1 -j HOST-FIREWALL` ensures host security rules execute at position 1 of `INPUT` before any dynamic K8s/container rules.
+  - Allowed host ports (SSH, ICMP, whitelisted custom rules) are accepted in `HOST-FIREWALL` (interface-specific exceptions can be added via `core_firewall_rules`, e.g. `in_interface: cni0`). Unallowed traffic hits `-j DROP` at the bottom of `HOST-FIREWALL`.
+  - `:INPUT ACCEPT` default policy remains uninhibited for K8s pod/service routing.
+- **Continuous Enforcement Daemon (`host-firewall-enforce`)**:
+  Deploys a lightweight background systemd service (`host-firewall-enforce.service` / `/usr/local/bin/host-firewall-enforce.sh`) that continuously monitors and enforces `-I INPUT 1 -j HOST-FIREWALL` at index 1 of `INPUT`.
+  - `core_firewall_enforce_interval`: Loop check interval in seconds (default: `300` / 5 minutes).
+- **Rule Persistence**:
+  Saving rules via `/etc/iptables/rules.v4` persists **ONLY** `HOST-FIREWALL` definitions and jump rules, excluding dynamic ephemeral container chains (`KUBE-*`, `CNI-*`, `FLANNEL-*`, `DOCKER-*`).
 
 ---
 

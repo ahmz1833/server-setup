@@ -1,0 +1,27 @@
+#!/bin/bash
+# Ansible managed: Continuous HOST-FIREWALL chain enforcement daemon
+set -euo pipefail
+
+INTERVAL="${HOST_FIREWALL_INTERVAL:-{{ core_firewall_enforce_interval | default(300) }}}"
+
+enforce_v4() {
+  if ! iptables -L INPUT 1 -n 2>/dev/null | grep -q "HOST-FIREWALL"; then
+    iptables -D INPUT -j HOST-FIREWALL 2>/dev/null || true
+    iptables -I INPUT 1 -j HOST-FIREWALL
+  fi
+}
+
+enforce_v6() {
+  if ! ip6tables -L INPUT 1 -n 2>/dev/null | grep -q "HOST-FIREWALL"; then
+    ip6tables -D INPUT -j HOST-FIREWALL 2>/dev/null || true
+    ip6tables -I INPUT 1 -j HOST-FIREWALL
+  fi
+}
+
+while true; do
+  enforce_v4 || true
+{% if core_enable_ipv6 | default(false) | bool %}
+  enforce_v6 || true
+{% endif %}
+  sleep "$INTERVAL"
+done

@@ -236,6 +236,7 @@ core_firewall_ssh_src: "0.0.0.0/0"
 core_firewall_ssh_src_v6: "::/0"
 core_firewall_block_scans: true
 core_firewall_allow_ping: true
+core_firewall_enforce_interval: 300
 
 # Example:
 # core_firewall_rules:
