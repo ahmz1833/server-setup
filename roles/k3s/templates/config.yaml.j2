@@ -110,6 +110,11 @@ node-taint:
 {% endfor %}
 {% endif %}
 
+{% if k3s_node_local_dns | bool and not (k3s_config | default({})).get('kubelet-arg') %}
+kubelet-arg:
+  - "cluster-dns={{ k3s_node_local_dns_ip }}"
+{% endif %}
+
 {% for key, val in (k3s_config | default({})).items() %}
 {% if val is boolean %}
 {{ key }}: {{ val | lower }}

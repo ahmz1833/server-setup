@@ -20,6 +20,35 @@
       when:
         - k3s_disable_traefik | bool or not ((k3s_traefik_config | default({})).enabled | default(true) | bool)
 
+    - name: Resolve live kube-dns ClusterIP for node-local-dns
+      ansible.builtin.command: "{{ k3s_install_dir }}/k3s kubectl get svc -n kube-system kube-dns -o jsonpath='{.spec.clusterIP}'"
+      register: _k3s_node_local_dns_svc
+      changed_when: false
+      until: _k3s_node_local_dns_svc.stdout | default('', true) | trim | length > 0
+      retries: 30
+      delay: 5
+      when: k3s_node_local_dns | bool
+
+    - name: Populate node-local-dns kube-dns target from live service
+      ansible.builtin.set_fact:
+        k3s_node_local_dns_kube_dns_ip: "{{ _k3s_node_local_dns_svc.stdout | trim }}"
+      when: k3s_node_local_dns | bool
+
+    - name: Render node-local-dns manifest when enabled
+      ansible.builtin.template:
+        src: node-local-dns.yaml.j2
+        dest: /var/lib/rancher/k3s/server/manifests/node-local-dns.yaml
+        mode: '0600'
+        owner: root
+        group: root
+      when: k3s_node_local_dns | bool
+
+    - name: Remove node-local-dns manifest when disabled
+      ansible.builtin.file:
+        path: /var/lib/rancher/k3s/server/manifests/node-local-dns.yaml
+        state: absent
+      when: not (k3s_node_local_dns | bool)
+
     - name: Render user-defined manifests
       ansible.builtin.copy:
         content: "{{ item.content }}"

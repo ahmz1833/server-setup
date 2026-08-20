@@ -98,6 +98,22 @@ k3s_dockerhub_mirror: hub.hamdocker.ir
 k3s_system_default_registry: "{{ k3s_dockerhub_mirror if k3s_internet_restricted | bool else '' }}"
 k3s_pause_image: "{{ (k3s_system_default_registry + '/rancher/mirrored-pause:3.6') if k3s_system_default_registry | length > 0 else '' }}"
 
+# Node-Local DNS Cache (NodeLocalDNSCache)
+k3s_node_local_dns: false
+k3s_node_local_dns_ip: "169.254.20.10"
+# Node-cache image. When the cluster pulls through a registry mirror (k3s_internet_restricted),
+# registry.k8s.io images are served from the mirror's `k8smirror/` namespace (e.g. hub.hamdocker.ir/k8smirror/k8s-dns-node-cache).
+k3s_node_local_dns_image_repo: >-
+  {{
+    ((k3s_system_default_registry | default('')) + '/k8smirror/k8s-dns-node-cache')
+    if (k3s_system_default_registry | default('') | length > 0)
+    else 'registry.k8s.io/dns/k8s-dns-node-cache'
+  }}
+k3s_node_local_dns_image_tag: "1.26.8"
+# External upstream resolvers for non-cluster queries.
+# When empty, the node-cache uses the upstream servers found in the host /etc/resolv.conf (standard behavior).
+k3s_node_local_dns_upstream: []
+
 # Environment Variables (/etc/rancher/k3s/k3s.env)
 k3s_env: {}
 
