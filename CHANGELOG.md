@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.2] - 2026-08-21
+
+### Fixed
+- **K3s NodeLocalDNSCache TTL Tuning**: Reduced cluster domain DNS cache TTL (success from 30s to 5s, denial from 5s to 1s) in `node-local-dns.yaml.j2` to accelerate service discovery and pod endpoint updates across dynamic cluster workloads.
+
 ## [1.4.1] - 2026-08-20
 
 ### Added

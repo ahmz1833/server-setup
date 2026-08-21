@@ -43,8 +43,8 @@ data:
     {{ k3s_cluster_domain | default('cluster.local') }}:53 {
         errors
         cache {
-                success 9984 30
-                denial 9984 5
+                success 9984 5
+                denial 9984 1
         }
         reload
         loop
