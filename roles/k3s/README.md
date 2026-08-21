@@ -107,7 +107,7 @@ Designed for **systemd** Linux. **Gather facts** must be enabled so host archite
 | `k3s_node_labels` | `{}` | Key-value dictionary of node labels. |
 | `k3s_node_taints` | `[]` | List of node taints (e.g. `["node-role.kubernetes.io/control-plane=true:NoSchedule"]`). |
 | `k3s_config` | `{}` | Arbitrary extra key-value pairs rendered into `/etc/rancher/k3s/config.yaml`. |
-| `k3s_env` | `{}` | Arbitrary extra environment variables rendered into `/etc/rancher/k3s/k3s.env`. |
+| `k3s_env` | `{}` | Arbitrary extra environment variables rendered into `/etc/rancher/k3s/k3s.env` (e.g. image-pull proxy settings, see below). |
 | `k3s_manifests` | `[]` | List of additional Kubernetes YAML manifests to deploy into `/var/lib/rancher/k3s/server/manifests/`. |
 
 ### Offline / Mirror Registry Settings
@@ -123,6 +123,22 @@ Designed for **systemd** Linux. **Gather facts** must be enabled so host archite
 system-default-registry: "hub.hamdocker.ir"
 pause-image: "hub.hamdocker.ir/rancher/mirrored-pause:3.6"
 ```
+
+### Image Pull Proxy (set / unset)
+
+K3s and its embedded containerd inherit `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` from the systemd environment file `/etc/rancher/k3s/k3s.env`, which is fully rendered from `k3s_env`.
+
+**Set** (per host or group):
+
+```yaml
+k3s_env:
+  HTTP_PROXY: "http://proxy.example.com:3128"
+  HTTPS_PROXY: "http://proxy.example.com:3128"
+  # Always exclude cluster-internal traffic from proxying:
+  NO_PROXY: "localhost,127.0.0.1,::1,.svc,.cluster.local,10.42.0.0/16,10.43.0.0/16"
+```
+
+**Unset**: remove the keys from `k3s_env` and re-run the role — the managed file drops them and K3s restarts without proxy environment.
 
 ### Firewall Integration Settings
 

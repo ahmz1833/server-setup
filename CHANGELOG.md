@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.5] - 2026-08-21
+
+### Changed
+- **K3s Image Pull Proxy Documentation**: Documented how to set/unset image-pull proxy environment (`HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`) through the existing `k3s_env` variable in `roles/k3s`, including cluster-internal `NO_PROXY` exclusions.
+
 ## [1.4.4] - 2026-08-21
 
 ### Fixed
