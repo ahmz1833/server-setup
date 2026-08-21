@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] - 2026-08-20
+
+### Added
+- **K3s NodeLocalDNSCache Support**: Implemented NodeLocalDNSCache DaemonSet deployment, Corefile template, live kube-dns ClusterIP discovery, and kubelet `cluster-dns` configuration (`k3s_node_local_dns`) for low-latency node-local DNS caching and upstream fallback.
+
 ## [1.4.0] - 2026-08-16
 
 ### Added
