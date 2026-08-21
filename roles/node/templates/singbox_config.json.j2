@@ -68,7 +68,7 @@
       {
         "query_type": ["AAAA"],
         "action": "predefined",
-        "rcode": "REFUSED"
+        "rcode": "NOERROR"
       },
 {% endif %}
 {% for rule in dns_rules %}
@@ -84,6 +84,9 @@
 {% endif %}
     ],
     "strategy": "{{ dns_strategy }}",
+{%- if dns.get('final') %}
+    "final": "{{ dns['final'] }}",
+{% endif %}
     "independent_cache": true
   },
   "inbounds": [

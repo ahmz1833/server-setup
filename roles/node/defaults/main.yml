@@ -203,6 +203,7 @@ node_singbox_tun_route_exclude_address:
 node_singbox_dns:
   remote: "tls://8.8.8.8"
   direct: "local"
+  final: "dns-remote"  # Use "dns-direct" when you have problem with remote dns resolution
   fakeip: true
   strategy: "ipv4_only"
   rules: []

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.4] - 2026-08-21
+
+### Fixed
+- **Sing-box DNS Routing**: Added configurable final DNS server routing, defaulting to the remote resolver while allowing direct resolution when remote DNS resolution is unavailable.
+- **Sing-box IPv6 Queries**: Return `NOERROR` for blocked AAAA queries so IPv4-only configurations handle IPv6 lookups without treating them as resolver failures.
+
 ## [1.4.3] - 2026-08-21
 
 ### Added
