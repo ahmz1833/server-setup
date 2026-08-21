@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.3] - 2026-08-21
+
+### Added
+- **Sing-box TUN Route Exclusions**: Added `node_singbox_tun_route_exclude_address` to `roles/node` defaults and template to route private/LAN CIDRs (RFC1918, link-local, CGNAT) and K3s cluster/pod/service networks direct on the host, preventing tunnel hijacking of local and cluster traffic.
+
 ## [1.4.2] - 2026-08-21
 
 ### Fixed

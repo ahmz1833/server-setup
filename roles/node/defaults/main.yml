@@ -188,6 +188,16 @@ node_singbox_tun_auto_redirect: "{{ node_singbox_tun_auto_route }}"
 node_singbox_tun_strict_route: true
 node_singbox_tun_inet4_address: "172.19.0.1/30"
 node_singbox_tun_inet6_address: "fdfe:dcba:9876::1/126"
+# CIDRs that must bypass the TUN entirely (routed direct on the host).
+# Default: ALL private ranges (RFC1918 + link-local + CGNAT) so the tunnel
+# never hijacks LAN / cluster traffic. On k3s nodes the pod/service CIDRs
+# (10.42.0.0/16, 10.43.0.0/16) are already covered by 10.0.0.0/8.
+node_singbox_tun_route_exclude_address:
+  - "10.0.0.0/8"      # RFC1918 (covers k3s pod 10.42/16 + service 10.43/16 CIDRs)
+  - "172.16.0.0/12"   # RFC1918
+  - "192.168.0.0/16"  # RFC1918
+  - "169.254.0.0/16"  # link-local (node-local-dns)
+  - "100.64.0.0/10"   # CGNAT
 
 # DNS Configuration (Examples in examples/singbox.yml)
 node_singbox_dns:
