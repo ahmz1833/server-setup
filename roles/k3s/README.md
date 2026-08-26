@@ -103,10 +103,14 @@ Designed for **systemd** Linux. **Gather facts** must be enabled so host archite
 | `k3s_disable_servicelb` | `false` | Disable built-in Klipper ServiceLB. |
 | `k3s_disable_traefik` | `false` | Disable built-in Traefik ingress. |
 | `k3s_disable_components` | `[]` | List of built-in components to disable (e.g. `["local-storage", "metrics-server"]`). |
-| `k3s_traefik_config` | `{...}` | Custom Traefik `HelmChartConfig` port definitions. Supports `service.type` (`'LoadBalancer'`, `'ClusterIP'`, `'NodePort'`), `ports.web/websecure.port`, `exposedPort`, `hostPort`, and optional explicit `nodePort` (e.g. `30080` / `30443`). |
+| `k3s_traefik_config` | `{...}` | Custom Traefik `HelmChartConfig` definitions. Supports `service.type` (`'LoadBalancer'`, `'ClusterIP'`, `'NodePort'`), `service.externalTrafficPolicy` (`'Local'` preserves the real client IP — with the default `Cluster` the packet is SNATed to a node address before Traefik sees it, so applications record the cluster instead of the user; Local automatically forces `deployment.kind: DaemonSet`, since only nodes running a Traefik pod answer), explicit `deployment.kind`, `forwardedHeaders.trustedIPs` / `.insecure` (XFF/X-Real-IP trust controls, see [Client IP Detection](#client-ip-detection--trusted-proxies-xff--x-real-ip)), optional per-entrypoint `ports.web/websecure.forwardedHeaders`, `ports.web/websecure.port`, `exposedPort`, `hostPort`, and optional explicit `nodePort` (e.g. `30080` / `30443`). |
 | `k3s_node_labels` | `{}` | Key-value dictionary of node labels. |
 | `k3s_node_taints` | `[]` | List of node taints (e.g. `["node-role.kubernetes.io/control-plane=true:NoSchedule"]`). |
-| `k3s_config` | `{}` | Arbitrary extra key-value pairs rendered into `/etc/rancher/k3s/config.yaml`. |
+| `k3s_config` | `{}` | Arbitrary extra key-value pairs rendered into `/etc/rancher/k3s/config.yaml`. `kubelet-arg` is rejected here — kubelet flags belong in `k3s_kubelet_args` only. |
+| `k3s_kubelet_args` | `[]` | Kubelet flags as `key=value` strings — the single source for `config.yaml`'s `kubelet-arg`, merged with the flags the role contributes (node-local DNS, CPU manager). Duplicates of role-contributed flags are skipped. |
+| `k3s_cpu_manager_policy` | `"none"` | Kubelet CPU manager policy. `static` gives whole dedicated cores to Guaranteed containers whose CPU limit is an integer, leaving everything else on the shared pool. Requires reserved CPU > 0 (below), or the kubelet refuses to start. Changing it on a live node discards `/var/lib/kubelet/cpu_manager_state`, which the role handles. |
+| `k3s_kube_reserved` | `""` | e.g. `"cpu=500m,memory=512Mi"` — resources withheld from pods for Kubernetes daemons. |
+| `k3s_system_reserved` | `""` | e.g. `"cpu=500m,memory=512Mi"` — resources withheld for the OS. |
 | `k3s_env` | `{}` | Arbitrary extra environment variables rendered into `/etc/rancher/k3s/k3s.env` (e.g. image-pull proxy settings, see below). |
 | `k3s_manifests` | `[]` | List of additional Kubernetes YAML manifests to deploy into `/var/lib/rancher/k3s/server/manifests/`. |
 
@@ -191,6 +195,59 @@ ServiceLB is K3s's built-in, lightweight Layer 4 (TCP/UDP) load balancer control
 - **Config**: `k3s_disable_servicelb: true`, `service.type: NodePort`, `nodePort: 30080`, `k3s_firewall_enable_nodeport: true`
 - **Flow**: `Internet` ➔ `External HAProxy (80/443)` ➔ `Node IP:30080` ➔ `Traefik Pod` ➔ `Application Pod`
 - **Use Case**: High-availability production clusters with external load balancing and strict firewall isolation (`k3s_firewall_allowed_ingress_cidrs: ["<HAProxy_IP>/32"]`).
+
+#### 4. Client IP Preservation (`externalTrafficPolicy: Local`)
+- **Config**: `k3s_traefik_config.service.externalTrafficPolicy: 'Local'` (combinable with any service type above)
+- **Effect**: The real client IP reaches Traefik (`X-Forwarded-For`, access logs) instead of a SNATed node address.
+- **Requirement**: With `Local`, only nodes running a Traefik pod answer traffic — nodes without one silently drop connections. The role therefore **enforces `deployment.kind: DaemonSet`** so every node runs Traefik; combining `Local` with an explicit non-DaemonSet kind fails validation.
+
+### Client IP Detection & Trusted Proxies (XFF / X-Real-IP)
+
+**How client IP detection works by default.** Traefik derives the client address from the **TCP peer** of the incoming connection (`RemoteAddr`) and *overwrites* `X-Forwarded-For` / `X-Real-Ip` on the request it forwards to your application:
+
+1. With no `forwardedHeaders` configuration (role default), `insecure` is `false` and `trustedIPs` is empty — so any inbound `X-Forwarded-*` header, from anyone, is treated as **spoofed and discarded**. Clients cannot forge an identity; applications see exactly what Traefik saw on the socket.
+2. What Traefik saw on the socket depends on the exposure path:
+   - Direct to node ports (`LoadBalancer` + ServiceLB with `externalTrafficPolicy: Local`, or `hostPort`) → the real client IP. ✅
+   - Any SNAT path (default `Cluster` traffic policy) → a node/klipper IP, not the user.
+   - Behind your own edge proxy or CDN → the proxy's IP, unless it is declared trusted.
+
+**Trusting legitimate rewriting hops (`trustedIPs`).** When requests arrive through proxies you control (HAProxy/Nginx VIPs, Cloudflare, …), those hops append the real client to `X-Forwarded-For` — but per rule 1 above Traefik throws that away unless their addresses are whitelisted. Entries in `trustedIPs` are the only sources whose forwarded headers are accepted and extended; anything else is stripped.
+
+```yaml
+k3s_traefik_config:
+  enabled: true
+  forwardedHeaders:
+    # Global trust list applied to BOTH entrypoints (web & websecure).
+    # Your edge load balancer(s) + CDN ranges. Invalid entries fail validation.
+    trustedIPs:
+      - "10.0.0.15/32"          # on-prem HAProxy VIP
+      - "173.245.48.0/20"       # Cloudflare IPv4 (excerpt)
+      - "2400:cb00::/32"        # Cloudflare IPv6 (excerpt)
+  ports:
+    websecure:
+      # Optional per-entrypoint override; replaces the global list for this entrypoint only.
+      # forwardedHeaders:
+      #   trustedIPs: [...]
+      port: 8443
+      exposedPort: 443
+```
+
+| Key | Default | Meaning |
+| :--- | :--- | :--- |
+| `forwardedHeaders.trustedIPs` | `[]` | IPs/CIDRs (v4+v6) allowed to set/extend `X-Forwarded-*` / `X-Real-IP`. Everything else is rejected as spoofed. |
+| `forwardedHeaders.insecure` | `false` | Trust forwarded headers from **any** source. Spoofable — never enable on public nodes. |
+
+> **Rule of thumb**: keep the list minimal and exact. Every entry is a party you vouch for; a compromised or misconfigured host inside `trustedIPs` can impersonate any client IP to your entire cluster.
+
+**Maintaining CDN ranges** (they rotate — automate refresh):
+
+| Provider | Source |
+| :--- | :--- |
+| Cloudflare | <https://www.cloudflare.com/ips/> (`.../ips-v4`, `/ips-v6`) |
+| Fastly | <https://api.fastly.com/public-ip-list> |
+| AWS CloudFront | <https://ip-ranges.amazonaws.com/ip-ranges.json> (`service == "CLOUDFRONT"`) |
+| Google Cloud LB | <https://www.gstatic.com/ipranges/cloud.json> |
+| Azure | <https://www.microsoft.com/en-us/download/details.aspx?id=56519> |
 
 ---
 

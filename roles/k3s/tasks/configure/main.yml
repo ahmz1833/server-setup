@@ -7,6 +7,15 @@
     owner: root
     group: root
 
+- name: Reject kubelet-arg inside k3s_config
+  ansible.builtin.assert:
+    that: (k3s_config | default({}, true))['kubelet-arg'] is not defined
+    fail_msg: >-
+      'kubelet-arg' is no longer accepted inside k3s_config — it would collide with the
+      kubelet flags the role contributes itself (node-local DNS, CPU manager). Put those
+      flags in k3s_kubelet_args instead.
+    success_msg: "k3s_config carries no kubelet-arg overrides."
+
 - name: Ensure K3s manifests directory exists on server nodes
   ansible.builtin.file:
     path: /var/lib/rancher/k3s/server/manifests
@@ -74,4 +83,21 @@
     mode: '0600'
     owner: root
     group: root
+  notify: Restart k3s
+
+- name: Read saved kubelet CPU manager state
+  ansible.builtin.slurp:
+    src: /var/lib/kubelet/cpu_manager_state
+  register: _k3s_cpu_manager_state
+  failed_when: false
+  changed_when: false
+
+- name: Discard kubelet CPU manager state when the policy changed
+  ansible.builtin.file:
+    path: /var/lib/kubelet/cpu_manager_state
+    state: absent
+  when:
+    - _k3s_cpu_manager_state.content is defined
+    - ((_k3s_cpu_manager_state.content | b64decode | from_json).policyName | default('none'))
+      != (k3s_cpu_manager_policy | default('none'))
   notify: Restart k3s

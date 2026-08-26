@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.7] - 2026-08-26
+
+### Added
+- **K3s kubelet-arg Assembly**: Role-contributed kubelet flags (node-local DNS `cluster-dns`) are emitted together with user-supplied flags (`k3s_kubelet_args`) instead of whichever copy won the duplicate YAML key.
+- **K3s CPU Manager Support**: New `k3s_cpu_manager_policy`, `k3s_kube_reserved`, and `k3s_system_reserved` variables; stale `/var/lib/kubelet/cpu_manager_state` is discarded automatically when the policy changes (kubelet refuses to start otherwise).
+- **Traefik Service External Traffic Policy**: Configurable `service.externalTrafficPolicy` rendered into the Traefik `HelmChartConfig`.
+- **Traefik DaemonSet Enforcement for Local Traffic Policy**: `service.externalTrafficPolicy: 'Local'` automatically pins Traefik to `deployment.kind: DaemonSet` (with Local, only nodes running a Traefik pod answer traffic); an explicit contradictory deployment kind fails validation.
+- **Traefik Forwarded Header Trust Controls**: New `forwardedHeaders.trustedIPs` / `.insecure` settings (global, with per-entrypoint overrides via `ports.web/websecure.forwardedHeaders`) governing acceptance of `X-Forwarded-For` / `X-Real-Ip`, enabling trusted-proxy and CDN whitelisting; IP/CIDR entries are format-validated during provisioning.
+- **Kubelet Arg Variable Isolation**: Kubelet flags are configured exclusively through `k3s_kubelet_args`; setting `kubelet-arg` inside `k3s_config` fails validation instead of being merged or silently dropped.
+
+### Fixed
+- **Traefik HelmChartConfig Rendering**: Fixed Jinja2 whitespace stripping that moved the `ports:` block out of `spec.valuesContent` onto the manifest root, silently discarding all port customization.
+
+## [1.4.6] - 2026-08-26
+
+### Added
+- **Mail Sync Change Report**: The mail user-sync run now reports which accounts were added, updated, deleted, or kept.
+- **Mail Role Prerequisites Documentation**: Documented hard requirements in `roles/mail/README.md` — manual TLS certificates must exist before the run (`SSL_TYPE=manual`, read-only bind mount), ports 25/465/587/993 must be opened outside the role, required DNS records (A, MX, SPF, DMARC, DKIM), and provider PTR/rDNS expectations.
+- **Mail SMTP Client Usage Guide**: Documented how other systems send mail through the server using the `noreply` credential (submission 587 + STARTTLS) and how `SPOOF_PROTECTION` restricts sender identity, with the admin account as the only spoof-capable exception.
+
+### Changed
+- **Mail User Sync Hardening**: The sync script is now written root-owned with `0700` permissions, executed via explicit `/bin/bash`, and removed after every run — successful or failed — so credentials never linger on disk; script write/execute tasks are suppressed from Ansible logs (`no_log`).
+
 ## [1.4.5] - 2026-08-21
 
 ### Changed
