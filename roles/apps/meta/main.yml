@@ -18,6 +18,9 @@ galaxy_info:
         - focal
         - jammy
         - noble
+        - plucky
+        - questing
+        - resolute
     - name: Debian
       versions:
         - bullseye

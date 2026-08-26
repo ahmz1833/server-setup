@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.8] - 2026-08-26
+
+### Fixed
+- **sudo-rs Compatibility (Ubuntu 25.10+/26.04)**: The per-user sudoers file written by the `core` role (`/etc/sudoers.d/<user>`) now ends with a newline. Ubuntu 26.04 LTS ships sudo-rs as the default sudo implementation, and its stricter `visudo -cf %s` validation rejects files without a trailing line terminator ("missing line terminator at end of file"), which made user provisioning fail on 26.04 hosts while older releases passed. Classic GNU sudo accepts both forms, so existing hosts are unaffected.
+
+### Changed
+- **Platform Metadata**: All roles' `meta/main.yml` now declare Ubuntu `plucky` (25.04), `questing` (25.10), and `resolute` (26.04 LTS) alongside focal/jammy/noble, matching actual support.
+
 ## [1.4.7] - 2026-08-26
 
 ### Added

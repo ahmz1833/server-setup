@@ -76,7 +76,7 @@
 - name: Configure sudo privileges
   ansible.builtin.copy:
     dest: "/etc/sudoers.d/{{ item.name }}"
-    content: "{{ item.name }} ALL=(ALL) {{ 'NOPASSWD:' if item.sudoer_no_pass | default(false) else '' }}ALL"
+    content: "{{ item.name }} ALL=(ALL) {{ 'NOPASSWD:' if item.sudoer_no_pass | default(false) else '' }}ALL\n"
     owner: root
     group: root
     mode: '0440'
