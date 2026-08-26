@@ -12,7 +12,20 @@ Features include DKIM/DMARC/SPF setup, automated user management (Single Source 
 |-------------|--------|
 | **Ansible** | 2.14+ (`meta/main.yml`). |
 | **Collections** | `community.docker` |
-| **Target** | Linux with **Docker** installed and running. |
+| **Target** | Linux with **Docker** installed and running (the `node` role does this). |
+| **TLS certificate** | `/etc/ssl/certs/<mail_domain>/{fullchain,privkey}.pem` must exist **before** this role runs — the container is deployed with `SSL_TYPE=manual` pointing at exactly those paths and is bind-mounted read-only. Issue them with the `acme` role for `mail.<domain>` first; without them the mailserver starts with no usable TLS and submission on 587/465 fails. |
+| **Open ports** | 25 (MX), 465 (implicit TLS), 587 (submission), 993 (IMAPS). This role does **not** manage the firewall — add them to `core_firewall_rules`. Note that many hosting providers block outbound 25 by default, which breaks delivery rather than reception. |
+| **DNS** | A record for the host, MX, SPF, DMARC and the DKIM TXT record the role prints at the end of a run. Mail from a domain with no SPF/DKIM alignment is filed as spam by most receivers — the run is not finished until those records exist. |
+| **Reverse DNS** | The provider's PTR for the host's IP should resolve to `mail_hostname`. Receivers check it, and it is the one record that cannot be set from here. |
+
+### Sending from inside another system
+
+The `noreply` account exists to be used as an SMTP client credential by an
+application (`mail_noreply_sender` / `mail_noreply_password`): connect to
+`mail_hostname` on **587 with STARTTLS**, authenticate as
+`noreply@<mail_domain>`, and send `From:` that same address. `SPOOF_PROTECTION`
+is on, so an account may only send as itself — the single exception is the admin
+account, which the role maps as allowed to spoof any sender.
 
 ---
 

@@ -3,16 +3,31 @@
   ansible.builtin.template:
     src: sync-users.sh.j2
     dest: "{{ mail_data_dir }}/config/sync-users.sh"
-    mode: "0755"
+    owner: root
+    group: root
+    mode: "0700"
+  no_log: true
 
 - name: Execute users sync script in mailserver
   community.docker.docker_container_exec:
     container: mailserver
-    command: /tmp/docker-mailserver/sync-users.sh
+    command: /bin/bash /tmp/docker-mailserver/sync-users.sh
   register: mail_sync_users_out
   changed_when: "'Adding new user:' in mail_sync_users_out.stdout
                 or 'Updating password for user:' in mail_sync_users_out.stdout
                 or 'Deleting unauthorized user:' in mail_sync_users_out.stdout"
+  no_log: true
+
+- name: Report what the user sync changed
+  ansible.builtin.debug:
+    msg: "{{ mail_sync_users_out.stdout_lines | default([])
+             | select('match', '^(Adding|Updating|Deleting|Keeping)') | list }}"
+
+# Always removed, so a failed sync does not leave the credentials behind either.
+- name: Remove the users sync script
+  ansible.builtin.file:
+    path: "{{ mail_data_dir }}/config/sync-users.sh"
+    state: absent
 
 - name: Allow admin to spoof any sender address
   ansible.builtin.copy:
