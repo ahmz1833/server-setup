@@ -110,12 +110,32 @@ node-taint:
 {% endfor %}
 {% endif %}
 
-{% if k3s_node_local_dns | bool and not (k3s_config | default({})).get('kubelet-arg') %}
+{% set kubelet_args = [] %}
+{% if k3s_node_local_dns | bool %}
+{% set _ = kubelet_args.append('cluster-dns=' ~ k3s_node_local_dns_ip) %}
+{% endif %}
+{% if k3s_cpu_manager_policy | default('none') != 'none' %}
+{% set _ = kubelet_args.append('cpu-manager-policy=' ~ k3s_cpu_manager_policy) %}
+{% endif %}
+{% if k3s_kube_reserved | default('') | length > 0 %}
+{% set _ = kubelet_args.append('kube-reserved=' ~ k3s_kube_reserved) %}
+{% endif %}
+{% if k3s_system_reserved | default('') | length > 0 %}
+{% set _ = kubelet_args.append('system-reserved=' ~ k3s_system_reserved) %}
+{% endif %}
+{% for arg in k3s_kubelet_args | default([]) %}
+{% if arg not in kubelet_args %}
+{% set _ = kubelet_args.append(arg) %}
+{% endif %}
+{% endfor %}
+{% if kubelet_args | length > 0 %}
 kubelet-arg:
-  - "cluster-dns={{ k3s_node_local_dns_ip }}"
+{% for arg in kubelet_args %}
+  - "{{ arg }}"
+{% endfor %}
 {% endif %}
 
-{% for key, val in (k3s_config | default({})).items() %}
+{% for key, val in (k3s_config | default({})).items() if key != 'kubelet-arg' %}
 {% if val is boolean %}
 {{ key }}: {{ val | lower }}
 {% elif val is number %}

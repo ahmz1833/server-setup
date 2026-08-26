@@ -2,6 +2,41 @@
 - name: Manage K3s manifests on server nodes
   when: k3s_role == 'server'
   block:
+    - name: Validate Traefik externalTrafficPolicy / deployment kind combination
+      ansible.builtin.assert:
+        that:
+          - not (((k3s_traefik_config | default({})).service | default({})).externalTrafficPolicy | default('') | lower == 'local')
+            or (((k3s_traefik_config.deployment.kind | default('DaemonSet')) | lower) == 'daemonset')
+        fail_msg: >-
+          Traefik service.externalTrafficPolicy: 'Local' only routes traffic to nodes running a Traefik pod,
+          so it requires deployment.kind: 'DaemonSet'. Set k3s_traefik_config.deployment.kind to 'DaemonSet'.
+        success_msg: "Traefik externalTrafficPolicy/deployment kind configuration is consistent."
+      when:
+        - not (k3s_disable_traefik | bool)
+        - ((k3s_traefik_config | default({})).enabled | default(true) | bool)
+
+    - name: Validate Traefik forwardedHeaders trusted IP entries
+      vars:
+        _k3s_traefik_fh_global: "{{ (k3s_traefik_config | default({})).forwardedHeaders | default({}) }}"
+        _k3s_traefik_fh_web: "{{ ((k3s_traefik_config | default({})).ports | default({})).web.forwardedHeaders | default({}) }}"
+        _k3s_traefik_fh_websec: "{{ ((k3s_traefik_config | default({})).ports | default({})).websecure.forwardedHeaders | default({}) }}"
+        _k3s_traefik_trusted_ips: >-
+          {{
+            (_k3s_traefik_fh_global.trustedIPs | default([], true))
+            + (_k3s_traefik_fh_web.trustedIPs | default([], true))
+            + (_k3s_traefik_fh_websec.trustedIPs | default([], true))
+          }}
+      ansible.builtin.assert:
+        that:
+          - _k3s_traefik_trusted_ips | length == (_k3s_traefik_trusted_ips | select('match', '^[0-9A-Fa-f:.]+(/[0-9]{1,3})?$') | list | length)
+        fail_msg: >-
+          Invalid entry in Traefik forwardedHeaders trustedIPs (expected IP or CIDR, IPv4 or IPv6):
+          {{ _k3s_traefik_trusted_ips | reject('match', '^[0-9A-Fa-f:.]+(/[0-9]{1,3})?$') | list }}
+        success_msg: "Traefik forwardedHeaders trustedIPs entries are valid IP/CIDR values."
+      when:
+        - not (k3s_disable_traefik | bool)
+        - ((k3s_traefik_config | default({})).enabled | default(true) | bool)
+
     - name: Render Traefik HelmChartConfig manifest
       ansible.builtin.template:
         src: traefik-config.yaml.j2

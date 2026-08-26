@@ -73,9 +73,18 @@ k3s_disable_components: [] # e.g. ["local-storage", "metrics-server"]
 
 # Traefik HelmChartConfig customization (applied when Traefik is enabled)
 # service.type: 'LoadBalancer' (default when ServiceLB is active), 'ClusterIP' (when ServiceLB is disabled), or 'NodePort'.
+# service.externalTrafficPolicy: 'Local' preserves the real client IP at the service boundary.
+# It forces deployment.kind: 'DaemonSet' (enforced automatically; an explicit non-DaemonSet kind together with Local fails validation).
+# forwardedHeaders: X-Forwarded-For / X-Real-IP trust controls.
+# Traefik derives the client IP from the TCP peer and overwrites these headers; headers from any source NOT in trustedIPs are treated as spoofed and dropped.
+# List every legitimate rewriting hop here (edge HAProxy/Nginx, CDN ranges) or their client view is discarded too.
+# Per-entrypoint overrides: k3s_traefik_config.ports.web.forwardedHeaders / ports.websecure.forwardedHeaders.
 # nodePort: optional explicit NodePort assignment (e.g. 30080 / 30443) when service.type is set to 'NodePort'.
 k3s_traefik_config:
   enabled: true
+  forwardedHeaders:
+    insecure: false # true trusts XFF/X-Real-IP from ANY source (spoofable) — avoid on public nodes
+    trustedIPs: [] # e.g. ["10.0.0.0/8", "<HAProxy_IP>/32", "<CDN ranges — see README>"]
   ports:
     web:
       port: 8000
@@ -87,7 +96,19 @@ k3s_traefik_config:
       hostPort: null
 
 # Raw Declarative Configuration Overrides (/etc/rancher/k3s/config.yaml)
+# Note: 'kubelet-arg' is NOT accepted here - kubelet flags live exclusively in k3s_kubelet_args below.
 k3s_config: {}
+
+# Kubelet flags as "key=value" strings, rendered into config.yaml's kubelet-arg.
+k3s_kubelet_args: []
+
+# CPU Manager (kubelet --cpu-manager-policy).
+# The kubelet REFUSES TO START on the static policy unless reserved CPU is greater than zero.
+# The policy carves the *unreserved* whole cores into the exclusive pool and needs somewhere to put everything else.
+# So the reservations below are applied together with it.
+k3s_cpu_manager_policy: "none"     # "none" | "static"
+k3s_kube_reserved: ""              # e.g. "cpu=500m,memory=512Mi"
+k3s_system_reserved: ""            # e.g. "cpu=500m,memory=512Mi"
 
 # Offline / Mirror Registry Settings
 # When k3s_internet_restricted is enabled, all k3s system chart images
