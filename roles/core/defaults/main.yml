@@ -25,8 +25,8 @@ core_hosts_list: []
 # APT Mirrors Configuration
 core_set_apt_mirrors: "{{ core_is_iran }}"
 
-core_base_mirror_ubuntu: "https://ir.ubuntu.sindad.cloud"
-core_base_mirror_debian: "https://mirrors.pardisco.co/debian"
+core_base_mirror_ubuntu: "https://mirror.cdn.ir/repository/ubuntu"
+core_base_mirror_debian: "https://mirror.cdn.ir/repository/debian"
 
 # yamllint disable rule:colons
 core_apt_mirrors:
