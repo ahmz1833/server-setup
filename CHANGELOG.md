@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.9] - 2026-09-25
+
+### Fixed
+- **core**: The Debian/Ubuntu package-cache task no longer trusts `cache_valid_time` right after the role rewrites APT mirrors — the stale index from the previous mirror survived and package lookups failed with "No package matching 'htop' is available". The refresh is now forced whenever the mirror swap changed anything, and the update retries 3 times (5 s delay) against flaky mirrors.
+- **core**: The default Iranian mirrors moved to the Nexus CDN `https://mirror.cdn.ir/repository/{debian,ubuntu}` (note the `/repository/` prefix; trixie + noble Release verified 200) — Debian was previously `mirrors.pardisco.co` (connection timeouts), Ubuntu `ir.ubuntu.sindad.cloud`. Override with `core_base_mirror_debian` / `core_base_mirror_ubuntu` per site if needed.
+
 ## [1.4.8] - 2026-08-26
 
 ### Fixed
