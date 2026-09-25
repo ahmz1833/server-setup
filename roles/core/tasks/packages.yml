@@ -128,8 +128,14 @@
 - name: Update package cache (Debian family)
   ansible.builtin.apt:
     update_cache: true
-    cache_valid_time: "{{ core_apt_cache_valid_time | default(3600) }}"
+    # A mirror swap invalidates the cached index; never trust cache_valid_time
+    # right after the sources were rewritten, and retry against flaky mirrors.
+    cache_valid_time: "{{ 0 if _core_apt_mirror_task is changed else (core_apt_cache_valid_time | default(3600)) }}"
   when: ansible_facts['os_family'] == 'Debian'
+  register: _core_apt_update
+  retries: "{{ core_apt_update_retries | default(3) }}"
+  delay: "{{ core_apt_update_retry_delay | default(5) }}"
+  until: _core_apt_update is succeeded
 
 - name: Install common packages
   ansible.builtin.package:
