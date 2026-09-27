@@ -154,8 +154,19 @@
     state: stopped
     enabled: false
   failed_when: false
+  register: core_ssh_socket
   notify: Restart sshd
   when: ansible_facts['os_family'] == 'Debian'
+
+# The socket-activated listener survives a service restart and keeps port 22,
+# while stopping ssh.socket removes /run/sshd - that locks SSH out.
+- name: Hand SSH over from the socket to the service
+  ansible.builtin.shell: |
+    systemctl stop ssh.service
+    pkill -f '^sshd: .*\[listener\]' || true
+    systemctl start ssh.service
+  changed_when: true
+  when: core_ssh_socket is changed
 
 - name: Ensure standard SSH service is enabled
   ansible.builtin.systemd:
