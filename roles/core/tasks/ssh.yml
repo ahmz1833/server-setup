@@ -160,13 +160,25 @@
 
 # The socket-activated listener survives a service restart and keeps port 22,
 # while stopping ssh.socket removes /run/sshd - that locks SSH out.
-- name: Hand SSH over from the socket to the service
-  ansible.builtin.shell: |
-    systemctl stop ssh.service
-    pkill -f '^sshd: .*\[listener\]' || true
-    systemctl start ssh.service
-  changed_when: true
+- name: Hand SSH over from the socket to the service  # noqa: no-handler
   when: core_ssh_socket is changed
+  block:
+    - name: Stop SSH service
+      ansible.builtin.systemd:
+        name: ssh
+        state: stopped
+
+    - name: Kill leftover socket listener
+      ansible.builtin.command:
+        argv: [pkill, -f, '^sshd: .*\[listener\]']
+      register: core_ssh_pkill
+      changed_when: core_ssh_pkill.rc == 0
+      failed_when: core_ssh_pkill.rc > 1
+
+    - name: Start SSH service
+      ansible.builtin.systemd:
+        name: ssh
+        state: started
 
 - name: Ensure standard SSH service is enabled
   ansible.builtin.systemd:
