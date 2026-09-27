@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **k3s**: `k3s_traefik_config.ports.<web|websecure>.transport` is passed to Traefik (e.g. `respondingTimeouts.readTimeout`).
+
 ## [1.4.9] - 2026-09-25
 
 ### Fixed
