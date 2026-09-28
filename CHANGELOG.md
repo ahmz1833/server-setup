@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **core**: Disabling `ssh.socket` no longer locks SSH out on Ubuntu 24.04 (leftover listener kept port 22, `/run/sshd` removed).
+
 ## [1.4.9] - 2026-09-25
 
 ### Fixed
