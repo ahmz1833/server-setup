@@ -54,6 +54,7 @@
 
       [Route]
       Gateway={{ item.item.gateway }}
+      GatewayOnLink=yes
       {% endif %}
       {% endif %}
     owner: root
