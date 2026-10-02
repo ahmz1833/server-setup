@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.4.14] - 2026-10-02
 
 ### Fixed
 - **node**: x-ui cert paths were never parsed (over-escaped regex in a folded scalar), so certs were re-applied and x-ui restarted every run.
