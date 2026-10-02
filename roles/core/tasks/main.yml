@@ -31,7 +31,8 @@
   ansible.builtin.import_tasks: sysctl.yml
   when: core_manage_sysctl
   tags: [core, core-sysctl]
-- name: Core Setup - Static IPv6
+
+- name: Core Setup - IPv6 Interfaces
   ansible.builtin.import_tasks: ipv6.yml
   tags: [core, core-ipv6]
 
