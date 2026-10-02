@@ -431,6 +431,12 @@ node_xui_skip_hsts: false
 #     XUI_LOG_LEVEL: "warning"
 node_xui_env: {}
 
+# Panel DB settings with no CLI flag (sqlite), e.g. { subEnable: false, subPort: 2097 }
+node_xui_settings: {}
+node_xui_db_path: /etc/x-ui/x-ui.db
+# Hash of applied username:password (3.6+ hides the username)
+node_xui_cred_marker: /etc/x-ui/.ansible-credentials
+
 # Register the panel API token (3x-ui v3.0+) as the `node_xui_api_token` fact.
 node_xui_get_api_token: false
 

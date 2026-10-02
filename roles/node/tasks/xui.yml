@@ -102,13 +102,34 @@
   changed_when: false
   failed_when: false
 
+# 3.6+: cert paths only via -getCert; username no longer shown
+- name: Get current X-UI certificate settings
+  ansible.builtin.command: /usr/local/x-ui/x-ui setting -getCert
+  register: _node_xui_current_certs
+  changed_when: false
+  failed_when: false
+
+- name: Read applied X-UI credentials marker
+  ansible.builtin.slurp:
+    src: "{{ node_xui_cred_marker }}"
+  register: _node_xui_cred_marker
+  failed_when: false
+
 - name: Parse current X-UI settings
   ansible.builtin.set_fact:
     _node_xui_current_port: "{{ _node_xui_current_settings.stdout | regex_search('port:\\s*(\\d+)', '\\1') | default([], true) | first | default('') }}"
     _node_xui_current_path: "{{ _node_xui_current_settings.stdout | regex_search('webBasePath:\\s*(\\S+)', '\\1') | default([], true) | first | default('') }}"
     _node_xui_current_user: "{{ _node_xui_current_settings.stdout | regex_search('username:\\s*(\\S+)', '\\1') | default([], true) | first | default('') }}"
-    _node_xui_current_cert: "{{ _node_xui_current_settings.stdout | regex_search('webCertFile:\\s*(\\S*)', '\\1') | default([], true) | first | default('') }}"
-    _node_xui_current_key: "{{ _node_xui_current_settings.stdout | regex_search('webKeyFile:\\s*(\\S*)', '\\1') | default([], true) | first | default('') }}"
+    _node_xui_current_cert: >-
+      {{ (((_node_xui_current_certs.stdout | default('')) | regex_findall('^cert:[ \\t]*(\\S*)', multiline=True))
+          + (_node_xui_current_settings.stdout | regex_findall('webCertFile:\\s*(\\S*)')))
+         | first | default('') }}
+    _node_xui_current_key: >-
+      {{ (((_node_xui_current_certs.stdout | default('')) | regex_findall('^key:[ \\t]*(\\S*)', multiline=True))
+          + (_node_xui_current_settings.stdout | regex_findall('webKeyFile:\\s*(\\S*)')))
+         | first | default('') }}
+    _node_xui_cred_hash: "{{ (node_xui_username ~ ':' ~ node_xui_password) | hash('sha256') }}"
+    _node_xui_cred_applied: "{{ (_node_xui_cred_marker.content | default('') | b64decode | trim) }}"
 
 - name: Determine if X-UI settings need update
   ansible.builtin.set_fact:
@@ -116,7 +137,8 @@
       {{
         (_node_xui_current_port | string) != (node_xui_port | string)
         or _node_xui_current_path != node_xui_web_base_path
-        or _node_xui_current_user != node_xui_username
+        or (_node_xui_current_user | length > 0 and _node_xui_current_user != node_xui_username)
+        or (_node_xui_current_user | length == 0 and _node_xui_cred_applied != _node_xui_cred_hash)
       }}
     _node_xui_certs_changed: >-
       {{
@@ -136,6 +158,32 @@
   no_log: true
   when: _node_xui_settings_changed
 
+- name: Record applied X-UI credentials
+  ansible.builtin.copy:
+    content: "{{ _node_xui_cred_hash }}\n"
+    dest: "{{ node_xui_cred_marker }}"
+    mode: '0600'
+    owner: root
+    group: root
+  no_log: true
+
+- name: Check X-UI certificate files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ node_xui_cert_path }}"
+    - "{{ node_xui_key_path }}"
+  register: _node_xui_cert_files
+  when:
+    - node_xui_cert_path | length > 0
+    - node_xui_key_path | length > 0
+
+- name: Set X-UI certificate readiness
+  ansible.builtin.set_fact:
+    _node_xui_cert_ready: >-
+      {{ (_node_xui_cert_files.results | default([]) | selectattr('stat', 'defined')
+          | selectattr('stat.exists') | list | length) == 2 }}
+
 - name: Apply X-UI SSL Certificates
   ansible.builtin.command: >
     /usr/local/x-ui/x-ui cert
@@ -147,6 +195,41 @@
     - node_xui_cert_path | length > 0
     - node_xui_key_path | length > 0
     - _node_xui_certs_changed
+    - _node_xui_cert_ready
+
+# Panel DB settings without CLI flags (e.g. subPort); sqlite only
+- name: Apply X-UI database settings
+  ansible.builtin.shell: |
+    set -euo pipefail
+    python3 - <<'PY'
+    import json, os, sqlite3
+    want = json.loads(os.environ["XUI_SETTINGS"])
+    db = sqlite3.connect(os.environ["XUI_DB"], timeout=30)
+    changed = []
+    for k, v in want.items():
+        v = str(v).lower() if isinstance(v, bool) else str(v)
+        row = db.execute("SELECT value FROM settings WHERE key = ?", (k,)).fetchone()
+        if row is None:
+            db.execute("INSERT INTO settings (key, value) VALUES (?, ?)", (k, v))
+        elif row[0] != v:
+            db.execute("UPDATE settings SET value = ? WHERE key = ?", (v, k))
+        else:
+            continue
+        changed.append(k)
+    db.commit()
+    print(json.dumps(changed))
+    PY
+  args:
+    executable: /bin/bash
+  environment:
+    XUI_SETTINGS: "{{ node_xui_settings | to_json }}"
+    XUI_DB: "{{ node_xui_db_path }}"
+  register: _node_xui_db_settings
+  changed_when: (_node_xui_db_settings.stdout | from_json | length) > 0
+  notify: Restart x-ui
+  when:
+    - node_xui_settings | length > 0
+    - node_xui_db_type | lower == 'sqlite'
 
 - name: Retrieve X-UI panel API token
   ansible.builtin.command: /usr/local/x-ui/x-ui setting -getApiToken
