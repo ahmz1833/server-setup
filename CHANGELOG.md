@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.4.12] - 2026-10-02
 
 ### Added
 - **core**: `core_ipv6_interfaces` — IPv6 per interface (auto RA/DHCPv6 or static) via networkd drop-in.
