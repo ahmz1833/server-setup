@@ -378,6 +378,14 @@ node_gost_tls_valid_days: 3650
 # Pin these hosts' self-signed certs into ca.pem
 node_gost_tls_trust_hosts: []
 
+# Kernel-level egress guard: REJECT packets of sockets marked `mark`
+# (gost service `sockopts: { mark: ... }`) to these networks, e.g.
+#   node_gost_egress_guard:
+#     mark: 24663
+#     deny: [127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+#     deny6: ["::1/128", "fc00::/7", "fe80::/10"]
+node_gost_egress_guard: {}
+
 # -----------------------------------------------------------------------------
 # X-UI PANEL
 # -----------------------------------------------------------------------------

@@ -1,0 +1,35 @@
+#!/bin/sh
+# Managed by Ansible: drop gost egress (mark {{ node_gost_egress_guard.mark }}) to denied networks
+set -e
+CHAIN=GOST-EGRESS
+MARK={{ node_gost_egress_guard.mark }}
+
+up() { # $1=iptables|ip6tables, rest=networks
+  ipt=$1; shift
+  $ipt -w -N $CHAIN 2>/dev/null || $ipt -w -F $CHAIN
+  for net in "$@"; do $ipt -w -A $CHAIN -d "$net" -j REJECT; done
+  $ipt -w -C OUTPUT -m mark --mark $MARK -j $CHAIN 2>/dev/null || $ipt -w -I OUTPUT -m mark --mark $MARK -j $CHAIN
+}
+
+down() {
+  ipt=$1
+  while $ipt -w -D OUTPUT -m mark --mark $MARK -j $CHAIN 2>/dev/null; do :; done
+  $ipt -w -F $CHAIN 2>/dev/null || true
+  $ipt -w -X $CHAIN 2>/dev/null || true
+}
+
+case "$1" in
+  up)
+    up iptables {{ node_gost_egress_guard.deny | default([]) | join(' ') }}
+{% if node_gost_egress_guard.deny6 | default([]) | length > 0 %}
+    if [ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null)" = 0 ]; then
+      up ip6tables {{ node_gost_egress_guard.deny6 | join(' ') }}
+    fi
+{% endif %}
+    ;;
+  down)
+    down iptables
+    if command -v ip6tables >/dev/null; then down ip6tables; fi
+    ;;
+  *) echo "usage: $0 up|down" >&2; exit 2 ;;
+esac

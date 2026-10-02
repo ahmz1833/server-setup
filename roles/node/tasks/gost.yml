@@ -43,6 +43,20 @@
   notify: Restart gost
   when: node_gost_config | length == 0
 
+- name: Install GOST egress guard
+  ansible.builtin.template:
+    src: gost-egress-guard.sh.j2
+    dest: /usr/local/sbin/gost-egress-guard
+    mode: '0755'
+  when: node_gost_egress_guard | length > 0
+  notify: Restart gost
+
+- name: Remove GOST egress guard
+  ansible.builtin.file:
+    path: /usr/local/sbin/gost-egress-guard
+    state: absent
+  when: node_gost_egress_guard | length == 0
+
 - name: Configure GOST systemd service
   ansible.builtin.template:
     src: gost.service.j2
