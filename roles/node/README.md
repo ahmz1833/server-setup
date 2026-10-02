@@ -111,6 +111,7 @@ Unmapped CPU families fall back to the raw architecture string (downloads may **
 - **GOST**: configuration is YAML in `node_gost_config`; see **`examples/gost.yml`**.
   - **TLS**: `node_gost_tls_selfsigned` → `key.pem`/`cert.pem`; `node_gost_tls_trust_hosts` → pinned `ca.pem`.
   - **Service**: `node_gost_limit_nofile`, `node_gost_environment`.
+  - **Guard**: `node_gost_egress_guard` rejects marked (`sockopts.mark`) traffic to private nets; `node_gost_ingress_allow` limits port sources.
 
 ---
 

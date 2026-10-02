@@ -205,6 +205,12 @@ core_sysctl_extra: {}
 # Enable IP forwarding (required for NAT/routing)
 core_sysctl_ip_forward: false
 
+# Per-interface IPv6 via networkd drop-in (needs core_enable_ipv6).
+# mode: auto (RA/SLAAC + DHCPv6, default) | static
+#   - { interface: eth0 }
+#   - { interface: ens3, mode: static, addresses: ["2001:db8::2/64"], gateway: "2001:db8::1" }
+core_ipv6_interfaces: []
+
 # -----------------------------------------------------------------------------
 # IPSet Configuration
 # -----------------------------------------------------------------------------

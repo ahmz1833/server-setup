@@ -1,0 +1,64 @@
+#!/bin/sh
+# Managed by Ansible: gost egress deny (by mark) and ingress allowlist (by port)
+set -e
+v6() { [ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null)" = 0 ] && command -v ip6tables >/dev/null; }
+
+chain() { # $1=ipt $2=chain $3=parent $4..=match for jump
+  ipt=$1 c=$2 p=$3; shift 3
+  $ipt -w -N "$c" 2>/dev/null || $ipt -w -F "$c"
+  $ipt -w -C "$p" "$@" -j "$c" 2>/dev/null || $ipt -w -I "$p" "$@" -j "$c"
+}
+
+unchain() { # $1=ipt $2=chain $3=parent $4..=match
+  ipt=$1 c=$2 p=$3; shift 3
+  while $ipt -w -D "$p" "$@" -j "$c" 2>/dev/null; do :; done
+  $ipt -w -F "$c" 2>/dev/null || true
+  $ipt -w -X "$c" 2>/dev/null || true
+}
+
+up() {
+{% if node_gost_egress_guard %}
+  chain iptables GOST-EGRESS OUTPUT -m mark --mark {{ node_gost_egress_guard.mark }}
+{% for net in node_gost_egress_guard.deny | default([]) %}
+  iptables -w -A GOST-EGRESS -d {{ net }} -j REJECT
+{% endfor %}
+  if v6; then
+    chain ip6tables GOST-EGRESS OUTPUT -m mark --mark {{ node_gost_egress_guard.mark }}
+{% for net in node_gost_egress_guard.deny6 | default([]) %}
+    ip6tables -w -A GOST-EGRESS -d {{ net }} -j REJECT
+{% endfor %}
+  fi
+{% endif %}
+{% if node_gost_ingress_allow %}
+  chain iptables GOST-INGRESS INPUT
+  if v6; then chain ip6tables GOST-INGRESS INPUT; fi
+{% for rule in node_gost_ingress_allow %}
+{% for src in rule.src %}
+{% if ':' in src %}
+  if v6; then ip6tables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} -s {{ src }} -j ACCEPT; fi
+{% else %}
+  iptables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} -s {{ src }} -j ACCEPT
+{% endif %}
+{% endfor %}
+  iptables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} -j DROP
+  if v6; then ip6tables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} -j DROP; fi
+{% endfor %}
+{% endif %}
+  :
+}
+
+down() {
+  for ipt in iptables ip6tables; do
+    command -v $ipt >/dev/null || continue
+{% if node_gost_egress_guard %}
+    unchain $ipt GOST-EGRESS OUTPUT -m mark --mark {{ node_gost_egress_guard.mark }}
+{% endif %}
+    unchain $ipt GOST-INGRESS INPUT
+  done
+}
+
+case "$1" in
+  up) up ;;
+  down) down ;;
+  *) echo "usage: $0 up|down" >&2; exit 2 ;;
+esac

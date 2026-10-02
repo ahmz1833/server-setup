@@ -1,0 +1,84 @@
+---
+# networkd drop-in on the .network file networkd actually uses (provider or netplan)
+- name: Validate IPv6 interfaces
+  ansible.builtin.assert:
+    that:
+      - item.interface is defined
+      - item.mode | default('auto') in ['auto', 'static']
+      - item.mode | default('auto') == 'auto' or (item.addresses | default([]) | length > 0)
+    fail_msg: "Bad core_ipv6_interfaces entry: {{ item }}"
+    quiet: true
+  loop: "{{ core_ipv6_interfaces }}"
+  when: core_enable_ipv6 | bool
+
+- name: Find networkd files for IPv6 interfaces
+  ansible.builtin.shell: |
+    set -o pipefail
+    networkctl status {{ item.interface | quote }} --no-pager | awk -F': ' '/Network File/ {print $2}'
+  args:
+    executable: /bin/bash
+  loop: "{{ core_ipv6_interfaces }}"
+  loop_control:
+    label: "{{ item.interface }}"
+  register: _core_ipv6_netfiles
+  changed_when: false
+  failed_when: _core_ipv6_netfiles.stdout | trim == ''
+  when: core_enable_ipv6 | bool
+
+- name: Create networkd drop-in directories
+  ansible.builtin.file:
+    path: "/etc/systemd/network/{{ item.stdout | trim | basename }}.d"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: "{{ _core_ipv6_netfiles.results | default([]) | selectattr('stdout', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.item.interface }}"
+  when: core_enable_ipv6 | bool
+
+- name: Configure IPv6 interfaces
+  ansible.builtin.copy:
+    dest: "/etc/systemd/network/{{ item.stdout | trim | basename }}.d/60-ansible-ipv6.conf"
+    content: |
+      [Network]
+      LinkLocalAddressing=ipv6
+      {% if item.item.mode | default('auto') == 'auto' %}
+      IPv6AcceptRA=yes
+      {% else %}
+      IPv6AcceptRA=no
+      {% for addr in item.item.addresses %}
+      Address={{ addr }}
+      {% endfor %}
+      {% if item.item.gateway | default('') %}
+
+      [Route]
+      Gateway={{ item.item.gateway }}
+      GatewayOnLink=yes
+      {% endif %}
+      {% endif %}
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ _core_ipv6_netfiles.results | default([]) | selectattr('stdout', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.item.interface }}"
+  register: _core_ipv6_dropins
+  when: core_enable_ipv6 | bool
+  notify: Reconfigure networkd
+
+- name: Find stale IPv6 drop-ins
+  ansible.builtin.find:
+    paths: /etc/systemd/network
+    patterns: 60-ansible-ipv6.conf
+    recurse: true
+  register: _core_ipv6_existing
+
+- name: Remove stale IPv6 drop-ins
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: >-
+    {{ _core_ipv6_existing.files | map(attribute='path')
+       | difference(_core_ipv6_dropins.results | default([]) | selectattr('dest', 'defined') | map(attribute='dest')) }}
+  notify: Reconfigure networkd

@@ -32,6 +32,10 @@
   when: core_manage_sysctl
   tags: [core, core-sysctl]
 
+- name: Core Setup - IPv6 Interfaces
+  ansible.builtin.import_tasks: ipv6.yml
+  tags: [core, core-ipv6]
+
 - name: Core Setup - IPSet Configuration
   ansible.builtin.import_tasks: ipset.yml
   when: core_manage_ipset and core_ipsets | length > 0
