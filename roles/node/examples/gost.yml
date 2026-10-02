@@ -453,6 +453,93 @@ example_production:
       format: json
       output: /var/log/gost/gost.log
 
+# -----------------------------------------------------------------------------
+# Example 20: Reverse Tunnel with Pinned Self-Signed TLS (gost >= 3.3.0)
+# -----------------------------------------------------------------------------
+# Client dials TLS sessions in; server's proxy egresses via client.
+example_reverse_tunnel_server:
+  node_gost_enabled: true
+  node_gost_tls_selfsigned: true
+  node_gost_tls_common_name: tun.example.com
+  node_gost_config:
+    services:
+      - name: tunnel
+        addr: ":8443"
+        handler:
+          type: tunnel
+          auth: { username: tun, password: tunsecret }
+          metadata:
+            entrypoint: "127.0.0.1:20443"
+            mux.version: 2
+            mux.maxReceiveBuffer: 67108864
+            mux.maxStreamBuffer: 16777216
+        listener:
+          type: tls
+          tls:
+            certFile: /etc/gost/tls/cert.pem
+            keyFile: /etc/gost/tls/key.pem
+      - name: proxy
+        addr: ":2443"
+        bypass: private-nets
+        handler:
+          type: auto
+          chain: via-client
+          auth: { username: user, password: proxysecret }
+        listener:
+          type: tcp
+    chains:
+      - name: via-client
+        hops:
+          - name: hop-0
+            nodes:
+              - name: entrypoint
+                addr: "127.0.0.1:20443"
+                connector:
+                  type: tunnel
+                  metadata:
+                    tunnel.id: 3ad2a7bb-6b5a-4c0e-9d7f-1f2e3a4b5c6d
+                dialer:
+                  type: tcp
+    bypasses:
+      - name: private-nets
+        matchers: [127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, localhost]
+
+example_reverse_tunnel_client:
+  node_gost_enabled: true
+  node_gost_tls_trust_hosts: [tunnel-server]   # inventory name of the server
+  node_gost_config:
+    services:
+      # one service per session
+      - name: tun-1
+        addr: ":0"
+        handler: { type: rtcp }
+        listener: { type: rtcp, chain: to-server }
+      - name: tun-2
+        addr: ":0"
+        handler: { type: rtcp }
+        listener: { type: rtcp, chain: to-server }
+    chains:
+      - name: to-server
+        hops:
+          - name: hop-0
+            nodes:
+              - name: server
+                addr: "203.0.113.10:8443"
+                connector:
+                  type: tunnel
+                  auth: { username: tun, password: tunsecret }
+                  metadata:
+                    tunnel.id: 3ad2a7bb-6b5a-4c0e-9d7f-1f2e3a4b5c6d
+                    mux.version: 2
+                    mux.maxReceiveBuffer: 67108864
+                    mux.maxStreamBuffer: 16777216
+                dialer:
+                  type: tls
+                  tls:
+                    secure: true
+                    serverName: tun.example.com
+                    caFile: /etc/gost/tls/ca.pem
+
 # =============================================================================
 # SERVICE TYPES REFERENCE
 # =============================================================================

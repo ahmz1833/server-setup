@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **node**: gost self-signed TLS (`node_gost_tls_selfsigned`) and cert pinning (`node_gost_tls_trust_hosts`).
+- **node**: `node_gost_limit_nofile`, `node_gost_environment`.
+
 ### Fixed
 - **core**: Disabling `ssh.socket` no longer locks SSH out on Ubuntu 24.04 (leftover listener kept port 22, `/run/sshd` removed).
 
