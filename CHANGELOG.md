@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- **core**: `core_ipv6_static` — static IPv6 via systemd-networkd drop-in.
+- **core**: `core_ipv6_interfaces` — IPv6 per interface (auto RA/DHCPv6 or static) via networkd drop-in.
 - **node**: `node_gost_egress_guard` — iptables guard for marked gost egress.
 
 ## [1.4.11] - 2026-10-02

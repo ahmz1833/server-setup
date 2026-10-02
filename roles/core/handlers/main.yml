@@ -6,7 +6,7 @@
 - name: Reconfigure networkd
   ansible.builtin.shell: |
     networkctl reload
-    {% for i in core_ipv6_static %}
+    {% for i in core_ipv6_interfaces %}
     networkctl reconfigure {{ i.interface | quote }}
     {% endfor %}
   changed_when: true

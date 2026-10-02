@@ -56,7 +56,7 @@ The role is built for **systemd**-based hosts. It works best on **Debian/Ubuntu*
 | `core-users` | Users |
 | `core-ssh` | SSH (+ users tag overlap) |
 | `core-sysctl` | Sysctl |
-| `core-ipv6` | Static IPv6 (`core_ipv6_static`, networkd drop-in) |
+| `core-ipv6` | IPv6 per interface (`core_ipv6_interfaces`: auto RA/DHCPv6 or static) |
 | `core-ipset` | IPSet (+ cron auto-ipset) |
 | `core-firewall` | Firewall |
 | `core-fail2ban` | Fail2ban |
