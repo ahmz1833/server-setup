@@ -7,6 +7,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - **acme**: Cloudflare DNS-01 automation (`acme_dns_provider: cloudflare`).
 
+### Changed
+- **node**: Default versions: sing-box 1.14.2, x-ui 3.8.5, gost 3.3.0, docker 29.8.2, buildx 0.37.2, compose 5.6.0, node_exporter 1.12.1, gitlab-runner 19.4.1, dust 1.2.6, fzf 0.74.4, eza 0.23.5, yazi 26.9.1, zoxide 0.10.0, starship 1.26.0, wgcf 2.3.0. sing-box 1.14 warns on `independent_cache` / `store_rdrc` (removed in 1.16).
+
 ## [1.4.12] - 2026-10-02
 
 ### Added
