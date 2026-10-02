@@ -43,7 +43,7 @@ Let’s Encrypt (ACME v2) certificate issuance and renewal with **cryptography o
 | `acme_reload_command` | If non-empty, run this command with `become` instead of reloading `acme_reload_service`. | `""` |
 | `acme_dns_provider` | DNS-01 automation: `""` (manual) or `cloudflare`. Per-cert `dns_provider` overrides. | `""` |
 | `acme_cloudflare_api_token` | Cloudflare token for `cloudflare` provider. | `""` |
-| `acme_dns_propagation_timeout` | Seconds to wait for TXT records (checked via Cloudflare DoH). | `120` |
+| `acme_dns_propagation_delay` | Seconds to wait after creating TXT records. | `15` |
 
 Staging example:
 
@@ -74,7 +74,7 @@ Each item describes one certificate.
 
 - Required for **wildcard** names.
 - Default: the role **pauses** and prints TXT record names/values; you create them at your DNS provider, then continue.
-- **Cloudflare**: `acme_dns_provider: cloudflare` + `acme_cloudflare_api_token` (Zone:DNS:Edit) creates, waits for, and removes the TXT records; works with `acme_noninteractive`. Zone: per-cert `zone`, `acme_cloudflare_zone`, else the last two labels.
+- **Cloudflare**: `acme_dns_provider: cloudflare` + `acme_cloudflare_api_token` (Zone:DNS:Edit) removes stale, creates, and cleans up the TXT records; works with `acme_noninteractive`. Zone: per-cert `zone`, `acme_cloudflare_zone`, else the last two labels.
 - With `acme_noninteractive: true`, the role **stops** with an error (use HTTP-01, interactive mode, or external DNS automation outside this role).
 
 ### HTTP-01

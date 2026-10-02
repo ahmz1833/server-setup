@@ -55,7 +55,7 @@ acme_dns_provider: ""
 # Cloudflare API token (Zone:DNS:Edit); zone defaults to the last two labels
 acme_cloudflare_api_token: ""
 acme_cloudflare_zone: ""
-acme_dns_propagation_timeout: 120
+acme_dns_propagation_delay: 15
 
 # -----------------------------------------------------------------------------
 # Certificate Definitions

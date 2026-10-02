@@ -26,6 +26,20 @@
     - acme_challenge is changed
     - _acme_dns_provider == 'cloudflare'
   block:
+    # Drop leftovers (e.g. an interrupted run) so only fresh values exist
+    - name: Remove stale Cloudflare TXT records
+      community.general.cloudflare_dns:
+        api_token: "{{ acme_cloudflare_api_token }}"
+        zone: "{{ acme_cert_item.zone | default(acme_cloudflare_zone, true) | default(acme_current_cn.split('.')[-2:] | join('.'), true) }}"
+        record: "{{ item }}"
+        type: TXT
+        state: absent
+      loop: "{{ _acme_dns_records | map(attribute='record') | unique | list }}"
+      timeout: 60
+      delegate_to: localhost
+      become: false
+      no_log: true
+
     - name: Add Cloudflare TXT records
       community.general.cloudflare_dns:
         api_token: "{{ acme_cloudflare_api_token }}"
@@ -38,25 +52,15 @@
       loop: "{{ _acme_dns_records }}"
       loop_control:
         label: "{{ item.record }}"
+      timeout: 60
       delegate_to: localhost
       become: false
       no_log: true
 
-    - name: Wait for TXT records to propagate
-      ansible.builtin.uri:
-        url: "https://cloudflare-dns.com/dns-query?name={{ item.record }}&type=TXT"
-        headers:
-          Accept: application/dns-json
-        return_content: true
-      register: _acme_dns_check
-      until: >-
-        (_acme_dns_check.json.Answer | default([]) | map(attribute='data')
-         | map('regex_replace', '"', '') | list) is contains(item.resource_value)
-      retries: "{{ (acme_dns_propagation_timeout | int / 5) | int }}"
-      delay: 5
-      loop: "{{ _acme_dns_records }}"
-      loop_control:
-        label: "{{ item.record }}"
+    # Cloudflare authoritative NS update within seconds; resolvers may cache old values
+    - name: Wait for Cloudflare propagation
+      ansible.builtin.wait_for:
+        timeout: "{{ acme_dns_propagation_delay | int }}"
       delegate_to: localhost
       become: false
 
@@ -138,6 +142,7 @@
       loop: "{{ _acme_dns_records }}"
       loop_control:
         label: "{{ item.record }}"
+      timeout: 60
       when: _acme_dns_provider == 'cloudflare'
       delegate_to: localhost
       become: false
