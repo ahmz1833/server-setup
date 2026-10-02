@@ -170,7 +170,7 @@ node_arch_lazyjournal_linux: "{{ node_arch_lazyjournal_linux_map.get(ansible_fac
 # -----------------------------------------------------------------------------
 node_singbox_install: '{{ node_internet_restricted }}'
 node_singbox_enabled: false
-node_singbox_version: "1.13.13"
+node_singbox_version: "1.14.2"
 # sing-box release tarball: auto uses -musl on Alpine; glibc | musl to force
 node_singbox_libc: auto
 
@@ -316,16 +316,16 @@ node_tools_packages:
 # Downloads and executes bootstrap script for shell environment setup
 # (zsh, dotfiles, etc.)
 node_bootstrap_enabled: true
-node_dust_version: '1.2.4'
-node_fzf_version: '0.73.1'
-node_eza_version: '0.23.4'
-node_yazi_version: '26.5.6'
+node_dust_version: '1.2.6'
+node_fzf_version: '0.74.4'
+node_eza_version: '0.23.5'
+node_yazi_version: '26.9.1'
 node_gitui_version: '0.28.1'
 node_lazyjournal_version: '0.8.6'
-node_zoxide_version: '0.9.9'
-node_starship_version: '1.25.1'
+node_zoxide_version: '0.10.0'
+node_starship_version: '1.26.0'
 node_wgcf_install: false
-node_wgcf_version: '2.2.31'
+node_wgcf_version: '2.3.0'
 node_bootstrap_script_url: "{{ node_internet_restricted | default(false) |
   ternary('https://s3.ahmz.ir/dots/bootstrap.sh',
   'https://raw.githubusercontent.com/ahmz1833/dots/main/bootstrap.sh') }}"
@@ -347,7 +347,7 @@ node_lazydocker_version: '0.25.2'
 # -----------------------------------------------------------------------------
 node_gost_install: true
 node_gost_enabled: false
-node_gost_version: "3.2.6"
+node_gost_version: "3.3.0"
 
 # Configuration passed directly to GOST
 # Example:
@@ -396,7 +396,7 @@ node_gost_ingress_allow: []
 node_xui_install: false
 node_xui_enabled: false
 node_xui_repo: "MHSanaei/3x-ui"
-node_xui_version: "3.5.0"
+node_xui_version: "3.8.5"
 
 # Panel Configuration (Ansible acts as the Source of Truth)
 node_xui_port: 2053
@@ -431,6 +431,12 @@ node_xui_skip_hsts: false
 #     XUI_LOG_LEVEL: "warning"
 node_xui_env: {}
 
+# Panel DB settings with no CLI flag (sqlite), e.g. { subEnable: false, subPort: 2097 }
+node_xui_settings: {}
+node_xui_db_path: /etc/x-ui/x-ui.db
+# Hash of applied username:password (3.6+ hides the username)
+node_xui_cred_marker: /etc/x-ui/.ansible-credentials
+
 # Register the panel API token (3x-ui v3.0+) as the `node_xui_api_token` fact.
 node_xui_get_api_token: false
 
@@ -457,7 +463,7 @@ node_xui_distro: "{{ node_xui_distro_map.get(ansible_facts['os_family'], node_xu
 # -----------------------------------------------------------------------------
 node_docker_enabled: true
 node_docker_min_version: "29.2.0"
-node_docker_version: "29.5.3"
+node_docker_version: "29.8.2"
 node_docker_package_dir: "/usr/local/lib/docker"
 node_docker_cli_plugin_dir: "/usr/local/libexec/docker/cli-plugins"
 
@@ -495,22 +501,22 @@ node_docker_metrics_addr: "127.0.0.1:9323"
 
 # Docker CLI plugins
 node_docker_buildx_install: true
-node_docker_buildx_version: "0.34.1"
+node_docker_buildx_version: "0.37.2"
 node_docker_compose_install: true
-node_docker_compose_version: "5.1.4"
+node_docker_compose_version: "5.6.0"
 
 # -----------------------------------------------------------------------------
 # GITLAB RUNNER
 # -----------------------------------------------------------------------------
 node_gitlab_runner_install: false
-node_gitlab_runner_version: "17.0.0"
+node_gitlab_runner_version: "19.4.1"
 
 # -----------------------------------------------------------------------------
 # PROMETHEUS NODE EXPORTER
 # -----------------------------------------------------------------------------
 node_exporter_install: true
 node_exporter_enabled: false
-node_exporter_version: "1.11.1"
+node_exporter_version: "1.12.1"
 node_exporter_listen_address: "127.0.0.1:9100"
 
 # Collector Configuration

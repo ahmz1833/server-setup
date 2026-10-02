@@ -41,6 +41,9 @@ Let’s Encrypt (ACME v2) certificate issuance and renewal with **cryptography o
 | `acme_webroot_test_timeout` | Seconds for the HTTP check from the controller to `http://<CN>/.well-known/...`. | `5` |
 | `acme_reload_service` | Service name passed to `ansible.builtin.service` with `state: reloaded` after deploy. Set to `""` to skip. | `nginx` |
 | `acme_reload_command` | If non-empty, run this command with `become` instead of reloading `acme_reload_service`. | `""` |
+| `acme_dns_provider` | DNS-01 automation: `""` (manual) or `cloudflare`. Per-cert `dns_provider` overrides. | `""` |
+| `acme_cloudflare_api_token` | Cloudflare token for `cloudflare` provider. | `""` |
+| `acme_dns_propagation_delay` | Seconds to wait after creating TXT records. | `15` |
 
 Staging example:
 
@@ -70,7 +73,8 @@ Each item describes one certificate.
 ### DNS-01
 
 - Required for **wildcard** names.
-- The role **does not** create DNS records. It **pauses** and prints TXT record names/values; you create them at your DNS provider, then continue.
+- Default: the role **pauses** and prints TXT record names/values; you create them at your DNS provider, then continue.
+- **Cloudflare**: `acme_dns_provider: cloudflare` + `acme_cloudflare_api_token` (Zone:DNS:Edit) removes stale, creates, and cleans up the TXT records; works with `acme_noninteractive`. Zone: per-cert `zone`, `acme_cloudflare_zone`, else the last two labels.
 - With `acme_noninteractive: true`, the role **stops** with an error (use HTTP-01, interactive mode, or external DNS automation outside this role).
 
 ### HTTP-01
