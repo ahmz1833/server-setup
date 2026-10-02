@@ -386,6 +386,10 @@ node_gost_tls_trust_hosts: []
 #     deny6: ["::1/128", "fc00::/7", "fe80::/10"]
 node_gost_egress_guard: {}
 
+# Ingress allowlist for gost ports (others DROP), e.g.
+#   - { port: 8443, src: ["198.51.100.7", "2001:db8::7"] }
+node_gost_ingress_allow: []
+
 # -----------------------------------------------------------------------------
 # X-UI PANEL
 # -----------------------------------------------------------------------------

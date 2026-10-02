@@ -8,9 +8,9 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-{% if node_gost_egress_guard %}
-ExecStartPre=/usr/local/sbin/gost-egress-guard up
-ExecStopPost=/usr/local/sbin/gost-egress-guard down
+{% if node_gost_egress_guard or node_gost_ingress_allow %}
+ExecStartPre=/usr/local/sbin/gost-guard up
+ExecStopPost=/usr/local/sbin/gost-guard down
 {% endif %}
 ExecStart={{ node_gost_bin_path }} -C /etc/gost/config.yml
 Restart=on-failure
