@@ -121,12 +121,12 @@
     _node_xui_current_path: "{{ _node_xui_current_settings.stdout | regex_search('webBasePath:\\s*(\\S+)', '\\1') | default([], true) | first | default('') }}"
     _node_xui_current_user: "{{ _node_xui_current_settings.stdout | regex_search('username:\\s*(\\S+)', '\\1') | default([], true) | first | default('') }}"
     _node_xui_current_cert: >-
-      {{ (((_node_xui_current_certs.stdout | default('')) | regex_findall('^cert:[ \\t]*(\\S*)', multiline=True))
-          + (_node_xui_current_settings.stdout | regex_findall('webCertFile:\\s*(\\S*)')))
+      {{ (((_node_xui_current_certs.stdout | default('')) | regex_findall('^cert:[ \t]*(\S*)', multiline=True))
+          + (_node_xui_current_settings.stdout | regex_findall('webCertFile:\s*(\S*)')))
          | first | default('') }}
     _node_xui_current_key: >-
-      {{ (((_node_xui_current_certs.stdout | default('')) | regex_findall('^key:[ \\t]*(\\S*)', multiline=True))
-          + (_node_xui_current_settings.stdout | regex_findall('webKeyFile:\\s*(\\S*)')))
+      {{ (((_node_xui_current_certs.stdout | default('')) | regex_findall('^key:[ \t]*(\S*)', multiline=True))
+          + (_node_xui_current_settings.stdout | regex_findall('webKeyFile:\s*(\S*)')))
          | first | default('') }}
     _node_xui_cred_hash: "{{ (node_xui_username ~ ':' ~ node_xui_password) | hash('sha256') }}"
     _node_xui_cred_applied: "{{ (_node_xui_cred_marker.content | default('') | b64decode | trim) }}"
