@@ -22,6 +22,10 @@
     owner: root
     group: root
 
+- name: Manage GOST TLS material
+  ansible.builtin.include_tasks: gost_tls.yml
+  when: (node_gost_tls_selfsigned | bool) or (node_gost_tls_trust_hosts | length > 0)
+
 - name: Generate GOST configuration
   ansible.builtin.copy:
     content: "{{ node_gost_config | to_nice_yaml(indent=2) }}"

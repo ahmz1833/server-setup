@@ -109,6 +109,8 @@ Unmapped CPU families fall back to the raw architecture string (downloads may **
 
 - **X-UI**: panel port defaults to `node_xui_port` and is managed by the role; the current CLI does not expose subscription-port management.
 - **GOST**: configuration is YAML in `node_gost_config`; see **`examples/gost.yml`**.
+  - **TLS**: `node_gost_tls_selfsigned` → `key.pem`/`cert.pem`; `node_gost_tls_trust_hosts` → pinned `ca.pem`.
+  - **Service**: `node_gost_limit_nofile`, `node_gost_environment`.
 
 ---
 
