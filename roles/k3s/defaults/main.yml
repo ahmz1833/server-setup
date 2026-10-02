@@ -80,6 +80,7 @@ k3s_disable_components: [] # e.g. ["local-storage", "metrics-server"]
 # List every legitimate rewriting hop here (edge HAProxy/Nginx, CDN ranges) or their client view is discarded too.
 # Per-entrypoint overrides: k3s_traefik_config.ports.web.forwardedHeaders / ports.websecure.forwardedHeaders.
 # nodePort: optional explicit NodePort assignment (e.g. 30080 / 30443) when service.type is set to 'NodePort'.
+# transport: per-entrypoint Traefik transport, e.g. ports.websecure.transport.respondingTimeouts.readTimeout: 30m (default 60s cuts large uploads).
 k3s_traefik_config:
   enabled: true
   forwardedHeaders:

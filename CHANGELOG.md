@@ -11,6 +11,11 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **core**: Disabling `ssh.socket` no longer locks SSH out on Ubuntu 24.04 (leftover listener kept port 22, `/run/sshd` removed).
 
+## [1.4.10] - 2026-09-28
+
+### Added
+- **k3s**: `k3s_traefik_config.ports.<web|websecure>.transport` is passed to Traefik (e.g. `respondingTimeouts.readTimeout`).
+
 ## [1.4.9] - 2026-09-25
 
 ### Fixed
