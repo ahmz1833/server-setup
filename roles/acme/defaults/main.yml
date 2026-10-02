@@ -50,6 +50,13 @@ acme_reload_service: "nginx"
 # Example: "/usr/local/bin/reload-certs.sh"
 acme_reload_command: ""
 
+# DNS-01 automation: "" (manual TXT prompt) | "cloudflare"
+acme_dns_provider: ""
+# Cloudflare API token (Zone:DNS:Edit); zone defaults to the last two labels
+acme_cloudflare_api_token: ""
+acme_cloudflare_zone: ""
+acme_dns_propagation_timeout: 120
+
 # -----------------------------------------------------------------------------
 # Certificate Definitions
 # -----------------------------------------------------------------------------

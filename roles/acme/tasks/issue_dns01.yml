@@ -14,6 +14,52 @@
   delegate_to: localhost
   become: false
 
+- name: Set DNS-01 provider
+  ansible.builtin.set_fact:
+    _acme_dns_provider: "{{ acme_cert_item.dns_provider | default(acme_dns_provider) }}"
+    _acme_dns_records: >-
+      {{ (acme_challenge.challenge_data | default({})).values()
+         | map(attribute='dns-01') | list }}
+
+- name: Create DNS-01 records on Cloudflare
+  when:
+    - acme_challenge is changed
+    - _acme_dns_provider == 'cloudflare'
+  block:
+    - name: Add Cloudflare TXT records
+      community.general.cloudflare_dns:
+        api_token: "{{ acme_cloudflare_api_token }}"
+        zone: "{{ acme_cert_item.zone | default(acme_cloudflare_zone, true) | default(acme_current_cn.split('.')[-2:] | join('.'), true) }}"
+        record: "{{ item.record }}"
+        type: TXT
+        value: "{{ item.resource_value }}"
+        ttl: 120
+        state: present
+      loop: "{{ _acme_dns_records }}"
+      loop_control:
+        label: "{{ item.record }}"
+      delegate_to: localhost
+      become: false
+      no_log: true
+
+    - name: Wait for TXT records to propagate
+      ansible.builtin.uri:
+        url: "https://cloudflare-dns.com/dns-query?name={{ item.record }}&type=TXT"
+        headers:
+          Accept: application/dns-json
+        return_content: true
+      register: _acme_dns_check
+      until: >-
+        (_acme_dns_check.json.Answer | default([]) | map(attribute='data')
+         | map('regex_replace', '"', '') | list) is contains(item.resource_value)
+      retries: "{{ (acme_dns_propagation_timeout | int / 5) | int }}"
+      delay: 5
+      loop: "{{ _acme_dns_records }}"
+      loop_control:
+        label: "{{ item.record }}"
+      delegate_to: localhost
+      become: false
+
 - name: Prompt for DNS and validate    # noqa: no-handler
   when: acme_challenge is changed
   block:
@@ -24,7 +70,9 @@
           not create DNS records. Set acme_noninteractive false for interactive
           mode, use challenge http-01 with a reachable webroot, or issue certs
           another way in CI.
-      when: acme_noninteractive | default(false) | bool
+      when:
+        - acme_noninteractive | default(false) | bool
+        - _acme_dns_provider != 'cloudflare'
 
     - name: Prompt for manual DNS TXT record creation
       ansible.builtin.pause:
@@ -59,6 +107,7 @@
       when:
         - acme_challenge.challenge_data is defined
         - not (acme_noninteractive | default(false) | bool)
+        - _acme_dns_provider != 'cloudflare'
       delegate_to: localhost
       become: false
 
@@ -77,3 +126,19 @@
         data: "{{ acme_challenge }}"
       delegate_to: localhost
       become: false
+  always:
+    - name: Remove Cloudflare TXT records
+      community.general.cloudflare_dns:
+        api_token: "{{ acme_cloudflare_api_token }}"
+        zone: "{{ acme_cert_item.zone | default(acme_cloudflare_zone, true) | default(acme_current_cn.split('.')[-2:] | join('.'), true) }}"
+        record: "{{ item.record }}"
+        type: TXT
+        value: "{{ item.resource_value }}"
+        state: absent
+      loop: "{{ _acme_dns_records }}"
+      loop_control:
+        label: "{{ item.record }}"
+      when: _acme_dns_provider == 'cloudflare'
+      delegate_to: localhost
+      become: false
+      no_log: true

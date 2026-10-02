@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **acme**: Cloudflare DNS-01 automation (`acme_dns_provider: cloudflare`).
+
 ## [1.4.12] - 2026-10-02
 
 ### Added
