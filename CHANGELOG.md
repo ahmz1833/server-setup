@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.4.11] - 2026-10-02
 
 ### Added
 - **node**: gost self-signed TLS (`node_gost_tls_selfsigned`) and cert pinning (`node_gost_tls_trust_hosts`).
