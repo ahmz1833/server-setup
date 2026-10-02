@@ -1,0 +1,83 @@
+---
+- name: Create GOST TLS directory
+  ansible.builtin.file:
+    path: "{{ node_gost_tls_dir }}"
+    state: directory
+    mode: '0700'
+    owner: root
+    group: root
+
+- name: Generate GOST self-signed certificate
+  when: node_gost_tls_selfsigned | bool
+  block:
+    - name: Generate GOST TLS private key
+      community.crypto.openssl_privatekey:
+        path: "{{ node_gost_tls_dir }}/key.pem"
+        type: ECC
+        curve: secp256r1
+        mode: '0600'
+      notify: Restart gost
+
+    - name: Build GOST TLS certificate signing request
+      community.crypto.openssl_csr_pipe:
+        privatekey_path: "{{ node_gost_tls_dir }}/key.pem"
+        common_name: "{{ node_gost_tls_common_name }}"
+        subject_alt_name: "{{ node_gost_tls_sans or ['DNS:' ~ node_gost_tls_common_name] }}"
+      changed_when: false
+      register: _node_gost_tls_csr
+
+    - name: Generate GOST TLS certificate
+      community.crypto.x509_certificate:
+        path: "{{ node_gost_tls_dir }}/cert.pem"
+        privatekey_path: "{{ node_gost_tls_dir }}/key.pem"
+        csr_content: "{{ _node_gost_tls_csr.csr }}"
+        provider: selfsigned
+        selfsigned_not_after: "+{{ node_gost_tls_valid_days }}d"
+        mode: '0644'
+      notify: Restart gost
+
+    - name: Read GOST TLS certificate
+      ansible.builtin.slurp:
+        src: "{{ node_gost_tls_dir }}/cert.pem"
+      register: _node_gost_tls_cert
+
+    # Lets peers in the same play pin it
+    - name: Publish GOST TLS certificate
+      ansible.builtin.set_fact:
+        node_gost_tls_cert_pem: "{{ _node_gost_tls_cert.content | b64decode }}"
+
+- name: Pin trusted GOST certificates
+  when: node_gost_tls_trust_hosts | length > 0
+  block:
+    - name: Fetch certificates of trusted hosts outside this play
+      ansible.builtin.slurp:
+        src: "{{ hostvars[item].node_gost_tls_dir | default(node_gost_tls_dir) }}/cert.pem"
+      delegate_to: "{{ item }}"
+      loop: "{{ node_gost_tls_trust_hosts }}"
+      when: hostvars[item].node_gost_tls_cert_pem is not defined
+      register: _node_gost_tls_trusted
+
+    - name: Assemble GOST trusted certificates
+      ansible.builtin.set_fact:
+        _node_gost_tls_bundle: >-
+          {{ node_gost_tls_trust_hosts
+             | map('extract', hostvars, 'node_gost_tls_cert_pem')
+             | select('defined') | list
+             + (_node_gost_tls_trusted.results
+                | selectattr('content', 'defined')
+                | map(attribute='content') | map('b64decode') | list) }}
+
+    - name: Ensure every trusted host provided a certificate
+      ansible.builtin.assert:
+        that: _node_gost_tls_bundle | length == node_gost_tls_trust_hosts | length
+        fail_msg: "Missing gost cert from {{ node_gost_tls_trust_hosts }}"
+        quiet: true
+
+    - name: Write GOST trusted CA bundle
+      ansible.builtin.copy:
+        content: "{{ _node_gost_tls_bundle | map('trim') | join('\n') }}\n"
+        dest: "{{ node_gost_tls_dir }}/ca.pem"
+        mode: '0644'
+        owner: root
+        group: root
+      notify: Restart gost

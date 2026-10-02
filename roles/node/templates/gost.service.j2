@@ -11,7 +11,10 @@ Group=root
 ExecStart={{ node_gost_bin_path }} -C /etc/gost/config.yml
 Restart=on-failure
 RestartSec=5
-LimitNOFILE=65535
+LimitNOFILE={{ node_gost_limit_nofile }}
+{% for key, value in node_gost_environment | dictsort %}
+Environment="{{ key }}={{ value }}"
+{% endfor %}
 
 [Install]
 WantedBy=multi-user.target

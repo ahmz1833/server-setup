@@ -361,6 +361,23 @@ node_gost_version: "3.2.6"
 #           type: tcp
 node_gost_config: {}
 
+# systemd unit: fd limit, extra env (e.g. { GOGC: "200" })
+node_gost_limit_nofile: 65535
+node_gost_environment: {}
+
+# TLS files dir (gost's built-in cert, CN=gost.run, is fingerprintable)
+node_gost_tls_dir: /etc/gost/tls
+
+# Generate self-signed key.pem / cert.pem
+node_gost_tls_selfsigned: false
+node_gost_tls_common_name: "{{ inventory_hostname }}"
+# Default: [ "DNS:<common_name>" ]
+node_gost_tls_sans: []
+node_gost_tls_valid_days: 3650
+
+# Pin these hosts' self-signed certs into ca.pem
+node_gost_tls_trust_hosts: []
+
 # -----------------------------------------------------------------------------
 # X-UI PANEL
 # -----------------------------------------------------------------------------
