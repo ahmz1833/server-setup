@@ -33,6 +33,15 @@ up() {
   chain iptables GOST-INGRESS INPUT
   if v6; then chain ip6tables GOST-INGRESS INPUT; fi
 {% for rule in node_gost_ingress_allow %}
+{% if rule.connlimit is defined %}
+  iptables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} --syn -m connlimit --connlimit-above {{ rule.connlimit }} --connlimit-mask 32 -j REJECT --reject-with tcp-reset
+  if v6; then ip6tables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} --syn -m connlimit --connlimit-above {{ rule.connlimit }} --connlimit-mask 128 -j REJECT --reject-with tcp-reset; fi
+{% endif %}
+{% if rule.rate is defined %}
+  iptables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} --syn -m hashlimit --hashlimit-above {{ rule.rate }} --hashlimit-burst {{ rule.burst | default(rule.rate.split('/')[0] | int * 2) }} --hashlimit-mode srcip --hashlimit-name gost{{ rule.port }} -j REJECT --reject-with tcp-reset
+  if v6; then ip6tables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} --syn -m hashlimit --hashlimit-above {{ rule.rate }} --hashlimit-burst {{ rule.burst | default(rule.rate.split('/')[0] | int * 2) }} --hashlimit-mode srcip --hashlimit-name gost6{{ rule.port }} -j REJECT --reject-with tcp-reset; fi
+{% endif %}
+{% if rule.src is defined %}
 {% for src in rule.src %}
 {% if ':' in src %}
   if v6; then ip6tables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} -s {{ src }} -j ACCEPT; fi
@@ -42,6 +51,7 @@ up() {
 {% endfor %}
   iptables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} -j DROP
   if v6; then ip6tables -w -A GOST-INGRESS -p tcp --dport {{ rule.port }} -j DROP; fi
+{% endif %}
 {% endfor %}
 {% endif %}
   :

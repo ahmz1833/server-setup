@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **node**: `node_gost_ingress_allow` rules accept `connlimit` / `rate` (per-source, kernel); `src` optional.
+
 ## [1.4.14] - 2026-10-02
 
 ### Fixed
