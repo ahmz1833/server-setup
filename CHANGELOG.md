@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.17] - 2026-10-09
+
+### Fixed
+- **acme**: Cloudflare zone is derived per record, so multi-zone certs validate.
+
 ## [1.4.16] - 2026-10-09
 
 ### Fixed
