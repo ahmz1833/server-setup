@@ -30,7 +30,7 @@
     - name: Remove stale Cloudflare TXT records
       community.general.cloudflare_dns:
         api_token: "{{ acme_cloudflare_api_token }}"
-        zone: "{{ acme_cert_item.zone | default(acme_cloudflare_zone, true) | default(acme_current_cn.split('.')[-2:] | join('.'), true) }}"
+        zone: "{{ acme_cert_item.zone | default(acme_cloudflare_zone, true) | default((item.record | default(item)).split('.')[-2:] | join('.'), true) }}"
         record: "{{ item }}"
         type: TXT
         state: absent
@@ -43,7 +43,7 @@
     - name: Add Cloudflare TXT records
       community.general.cloudflare_dns:
         api_token: "{{ acme_cloudflare_api_token }}"
-        zone: "{{ acme_cert_item.zone | default(acme_cloudflare_zone, true) | default(acme_current_cn.split('.')[-2:] | join('.'), true) }}"
+        zone: "{{ acme_cert_item.zone | default(acme_cloudflare_zone, true) | default((item.record | default(item)).split('.')[-2:] | join('.'), true) }}"
         record: "{{ item.record }}"
         type: TXT
         value: "{{ item.resource_value }}"
@@ -134,7 +134,7 @@
     - name: Remove Cloudflare TXT records
       community.general.cloudflare_dns:
         api_token: "{{ acme_cloudflare_api_token }}"
-        zone: "{{ acme_cert_item.zone | default(acme_cloudflare_zone, true) | default(acme_current_cn.split('.')[-2:] | join('.'), true) }}"
+        zone: "{{ acme_cert_item.zone | default(acme_cloudflare_zone, true) | default((item.record | default(item)).split('.')[-2:] | join('.'), true) }}"
         record: "{{ item.record }}"
         type: TXT
         value: "{{ item.resource_value }}"
