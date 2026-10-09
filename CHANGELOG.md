@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.16] - 2026-10-09
+
+### Fixed
+- **acme**: renew when the cert's domains change, not only on expiry.
+
 ## [1.4.15] - 2026-10-09
 
 ### Added
