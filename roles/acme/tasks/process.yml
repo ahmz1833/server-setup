@@ -54,7 +54,9 @@
     acme_needs_renewal: >-
       {{
         not acme_remote_cert_stat.stat.exists or
-        (acme_remote_cert_stat.stat.exists and not acme_remote_cert_info.valid_at.point_in_time | default(false))
+        (acme_remote_cert_stat.stat.exists and not acme_remote_cert_info.valid_at.point_in_time | default(false)) or
+        (acme_remote_cert_info.subject_alt_name | default([]) | map('regex_replace', '^DNS:', '') | unique | sort
+          != acme_current_all_domains | unique | sort)
       }}
 
 - name: Execute ACME process if renewal is needed
