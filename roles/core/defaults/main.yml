@@ -243,6 +243,8 @@ core_firewall_ssh_src_v6: "::/0"
 core_firewall_block_scans: true
 core_firewall_allow_ping: true
 core_firewall_enforce_interval: 300
+# Chains evaluated before HOST-FIREWALL when they exist (e.g. GOST-INGRESS rate limits)
+core_firewall_pre_chains: []
 
 # Example:
 # core_firewall_rules:

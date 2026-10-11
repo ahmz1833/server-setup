@@ -3,25 +3,31 @@
 set -euo pipefail
 
 INTERVAL="${HOST_FIREWALL_INTERVAL:-{{ core_firewall_enforce_interval | default(300) }}}"
+# Chains kept ahead of HOST-FIREWALL when present
+PRE_CHAINS="{{ core_firewall_pre_chains | default([]) | join(' ') }}"
 
-enforce_v4() {
-  if ! iptables -L INPUT 1 -n 2>/dev/null | grep -q "HOST-FIREWALL"; then
-    iptables -D INPUT -j HOST-FIREWALL 2>/dev/null || true
-    iptables -I INPUT 1 -j HOST-FIREWALL
-  fi
-}
-
-enforce_v6() {
-  if ! ip6tables -L INPUT 1 -n 2>/dev/null | grep -q "HOST-FIREWALL"; then
-    ip6tables -D INPUT -j HOST-FIREWALL 2>/dev/null || true
-    ip6tables -I INPUT 1 -j HOST-FIREWALL
-  fi
+enforce() { # $1=iptables|ip6tables
+  local ipt=$1 want="" c i=2
+  for c in $PRE_CHAINS; do
+    if $ipt -w -S "$c" >/dev/null 2>&1; then want="$want $c"; fi
+  done
+  want="$want HOST-FIREWALL"
+  # INPUT rule N is line N+1 of -S (line 1 is the policy)
+  for c in $want; do
+    if ! $ipt -w -S INPUT | sed -n "${i}p" | grep -qx -- "-A INPUT -j $c"; then
+      for c in $want; do while $ipt -w -D INPUT -j "$c" 2>/dev/null; do :; done; done
+      i=1
+      for c in $want; do $ipt -w -I INPUT "$i" -j "$c"; i=$((i + 1)); done
+      return
+    fi
+    i=$((i + 1))
+  done
 }
 
 while true; do
-  enforce_v4 || true
+  enforce iptables || true
 {% if core_enable_ipv6 | default(false) | bool %}
-  enforce_v6 || true
+  enforce ip6tables || true
 {% endif %}
   sleep "$INTERVAL"
 done

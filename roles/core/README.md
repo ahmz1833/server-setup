@@ -120,6 +120,7 @@ If `core_manage_nameservers` is true, the role may **remove a symlink** and writ
 - **Continuous Enforcement Daemon (`host-firewall-enforce`)**:
   Deploys a lightweight background systemd service (`host-firewall-enforce.service` / `/usr/local/bin/host-firewall-enforce.sh`) that continuously monitors and enforces `-I INPUT 1 -j HOST-FIREWALL` at index 1 of `INPUT`.
   - `core_firewall_enforce_interval`: Loop check interval in seconds (default: `300` / 5 minutes).
+  - `core_firewall_pre_chains`: Chains kept ahead of `HOST-FIREWALL` when they exist (default: `[]`).
 - **Rule Persistence**:
   Saving rules via `/etc/iptables/rules.v4` persists **ONLY** `HOST-FIREWALL` definitions and jump rules, excluding dynamic ephemeral container chains (`KUBE-*`, `CNI-*`, `FLANNEL-*`, `DOCKER-*`).
 
