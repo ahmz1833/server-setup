@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.18] - 2026-10-12
+
+### Added
+- **node**: `node_exporter_textfile_scripts` run scripts on timers for the textfile collector.
+
+### Fixed
+- **core**: `core_firewall_pre_chains` stay ahead of HOST-FIREWALL in INPUT.
+
 ## [1.4.17] - 2026-10-09
 
 ### Fixed
