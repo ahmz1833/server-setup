@@ -119,6 +119,7 @@ Unmapped CPU families fall back to the raw architecture string (downloads may **
 
 - Binds to **`node_exporter_listen_address`** (default localhost).
 - Collectors: **`node_exporter_enabled_collectors`** / **`node_exporter_disabled_collectors`** / **`node_exporter_extra_args`**.
+- Textfile metrics: **`node_exporter_textfile_scripts`** (`name`, `content`, `interval`) run as root by systemd timers; stdout lands in `node_exporter_textfile_dir/<name>.prom`.
 
 ---
 

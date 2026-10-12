@@ -21,6 +21,75 @@
     asset_download_locally: "{{ node_download_locally | default(false) }}"
     asset_register_path_var: "node_exporter_bin_path"
 
+- name: Configure node_exporter textfile scripts
+  when: node_exporter_textfile_scripts | length > 0
+  block:
+    - name: Create textfile directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "{{ node_exporter_textfile_dir }}", mode: "0755" }
+        - { path: /usr/local/libexec/node_exporter, mode: "0755" }
+
+    - name: Install textfile scripts
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "/usr/local/libexec/node_exporter/{{ item.name }}"
+        mode: "0750"
+      loop: "{{ node_exporter_textfile_scripts }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Install textfile script units
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/node-exporter-textfile-{{ item.0.name }}.{{ item.1 }}"
+        mode: "0644"
+        content: |
+          {% if item.1 == 'service' %}
+          [Unit]
+          Description=node_exporter textfile: {{ item.0.name }}
+
+          [Service]
+          Type=oneshot
+          Environment=F={{ node_exporter_textfile_dir }}/{{ item.0.name }}.prom
+          ExecStart=/bin/sh -c '/usr/local/libexec/node_exporter/{{ item.0.name }} > "$$F.tmp" && chmod 0644 "$$F.tmp" && mv "$$F.tmp" "$$F"'
+          {% else %}
+          [Unit]
+          Description=node_exporter textfile timer: {{ item.0.name }}
+
+          [Timer]
+          OnBootSec=1min
+          OnUnitActiveSec={{ item.0.interval | default('5min') }}
+
+          [Install]
+          WantedBy=timers.target
+          {% endif %}
+      loop: "{{ node_exporter_textfile_scripts | product(['service', 'timer']) | list }}"
+      loop_control:
+        label: "{{ item.0.name }}.{{ item.1 }}"
+      register: _node_exporter_textfile_units
+
+    - name: Enable textfile script timers
+      ansible.builtin.systemd:
+        name: "node-exporter-textfile-{{ item.name }}.timer"
+        state: started
+        enabled: true
+        daemon_reload: "{{ _node_exporter_textfile_units is changed }}"
+      loop: "{{ node_exporter_textfile_scripts }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Run textfile scripts once
+      ansible.builtin.systemd:
+        name: "node-exporter-textfile-{{ item.name }}.service"
+        state: started
+      loop: "{{ node_exporter_textfile_scripts }}"
+      loop_control:
+        label: "{{ item.name }}"
+      changed_when: false
+
 - name: Configure node_exporter systemd service
   ansible.builtin.template:
     src: node_exporter.service.j2

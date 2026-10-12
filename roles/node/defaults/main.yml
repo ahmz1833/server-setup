@@ -536,6 +536,17 @@ node_exporter_disabled_collectors: []
 
 # Additional command-line arguments
 node_exporter_extra_args: []
+
+# Textfile collector scripts, run as root by systemd timers; stdout -> <dir>/<name>.prom
+# The textfile directory flag is only added when this list is non-empty.
+node_exporter_textfile_dir: /var/lib/node_exporter/textfile
+node_exporter_textfile_scripts: []
+# Example:
+#   - name: certs
+#     content: |
+#       #!/bin/sh
+#       echo "my_metric 1"
+#     interval: 5min        # optional, default 5min
 # Examples:
 #   - "--collector.systemd.unit-include=docker.service|nginx.service"
 #   - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev)($|/)"
