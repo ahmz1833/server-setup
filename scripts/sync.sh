@@ -2,6 +2,7 @@
 # sync.sh — propagate single-source files into their copies.
 #
 #   docs/*.md                          -> skills/infra-iac/references/
+#   docs/debugging.md                  -> skills/server-diagnostics/references/
 #   scripts/ensure-toolchain.sh        -> examples/*/scripts/, skills/infra-iac/scripts/
 #   examples/starter/<shared files>    -> examples/<other>/   (Makefile, configs, ops playbooks)
 #   examples/starter/                  -> skills/infra-bootstrap/assets/starter/
@@ -44,6 +45,7 @@ fi
 
 # 2. docs -> infra-iac references
 for f in docs/*.md; do put "$f" "skills/infra-iac/references/$(basename "$f")"; done
+put docs/debugging.md skills/server-diagnostics/references/debugging.md
 put scripts/ensure-toolchain.sh skills/infra-iac/scripts/ensure-toolchain.sh
 
 # 3. starter shared files -> other examples
