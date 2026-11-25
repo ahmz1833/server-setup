@@ -24,10 +24,10 @@ This project is operated with the `infra-iac` skill (plus `server-diagnostics`,
 - **Assume this repo is public.** IPs, non-standard ports, internal hostnames,
   privileged usernames, tokens and topology hints go in `vault.yml` files. Do an
   exposure review of your diff and run `make vault-check` before committing.
-- **Agents never see secret values**: no vault viewing/decrypting, never read
-  `.vault_pass*`/`.become_pass*`; wire `vault_*`
-  references with placeholders and ask the human to fill them (`make vault-edit`), or use
-  `make vault-gen` for random ones.
+- **Agents never see credentials**: identifiers (IPs, ports, domains, users) may be read
+  from the vault (`make host`); credentials never — no vault viewing/decrypting, never read
+  `.vault_pass*`/`.become_pass*`. Wire `vault_*` references with placeholders and ask the
+  human to fill them (`make vault-edit`), or `make vault-gen` for random ones.
 - **Collection first**: anything `ahmz1833.server_setup` can manage is managed through its
   roles — never re-implemented locally or by hand.
 - Read-only investigation is fine; state-changing one-off jobs use `playbooks/ops/` or are

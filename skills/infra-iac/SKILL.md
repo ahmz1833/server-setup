@@ -113,29 +113,27 @@ Lockout-prone changes (SSH port/users/keys, firewall, `core_firewall_ssh_src`, n
 follow security.md §11 — keep a session open, add the new access before removing the old,
 canary host first.
 
-## Secrets: you never see them
+## Secrets: identifiers yes, credentials never
 
-Minimal exposure of secrets to the AI session (`references/security.md` §5a):
+Two classes of vault values (`references/security.md` §5a):
 
-- Never ask for secrets or real IPs/ports/internal names in chat. Never run
-  `make vault-view`, `ansible-vault view/decrypt/edit`, `make host … SHOW_VAULT=1`, or read
-  `.vault_pass*`, `.become_pass*`/`.become-pass*`, kubeconfigs, private keys, state files,
-  rendered configs with credentials.
-- sudo asks for a password ("Missing sudo password")? Ask the human to create
-  `.become_pass` (or `.become_pass.<env>`) with mode 600 — the Makefile then uses it for every
-  ansible command. Don't use `BECOME_ASK=1` yourself (you can't answer prompts) and never
-  take the password in chat.
-- Wire secrets by reference: `x: "{{ vault_x }}"` + placeholder `vault_x: CHANGEME` in the
-  matching `vault.yml.example`.
-- Random secrets: `make vault-gen KEY=vault_x FILE=<vault.yml>` (never printed).
-- Secrets the user must bring/create: stop and give an explicit hand-off — the exact
-  command (`make vault-edit FILE=<path>`), the exact key line to add, and where/how to
-  obtain the value (console path, required scope/permissions, or a generation command they
-  run themselves). Wait for confirmation, then verify only with `make vault-keys`.
-- Use placeholders in everything you write until the user has filled the vault; never
-  invent real-looking secrets.
-- If the user pastes a secret anyway: don't repeat it, ask them to put it in the vault
-  themselves, suggest rotation if it is sensitive.
+- **Identifiers** (IPs, ports, domains, usernames, CIDRs): you may read them from the vault
+  when the task needs them — `make host H=<h>` shows them, `make var H=<h> V=vault_x_ip` too.
+  Keep them out of plaintext repo files and commit messages.
+- **Credentials** (passwords, tokens, keys, secret paths, seeds, kubeconfigs,
+  `.vault_pass*`, `.become_pass*`): never read, print or put on a command line. Don't run
+  `make vault-view`, `ansible-vault view/decrypt/edit` or `SHOW_VAULT=1`.
+- Wire credentials by reference: `x: "{{ vault_x }}"` + placeholder in `vault.yml.example`.
+  Random ones: `make vault-gen KEY=vault_x FILE=<vault.yml>` (never printed). Ones the user
+  must bring: explicit hand-off (exact `make vault-edit FILE=<path>` command, key line, where
+  to obtain it), wait, verify with `make vault-keys`. One that already exists in another
+  vault: move it by pipe without printing.
+- sudo asks for a password? Ask the human to create `.become_pass` (mode 600) — the
+  Makefile uses it for every ansible command.
+- If the user pastes a credential anyway: don't repeat it; ask them to put it in the vault;
+  suggest rotation if sensitive.
+- Hosts added/removed/changed → run `make ssh-config` so `ssh <host>` keeps working (if the
+  project has the target; its AGENTS.md says whether it's mandatory).
 
 ## Security behaviour (always on)
 

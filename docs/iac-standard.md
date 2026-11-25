@@ -142,7 +142,8 @@ Standard targets:
 | `make docker-logs H=<h> [C=<c>]` | container list / logs on a host (read-only) |
 | `make shell H=<h>` / `make shell H=<pattern> -- <cmd>` | SSH session on a host / run a command on one or many hosts (sudo; `SUDO=0`; `CMD='…'` when it contains `=` or quotes) |
 | `make module H=<pattern> M=<module> A='<args>'` | run any Ansible module on hosts |
-| `make var H=<h> V=<var>` | templated value of a variable on a host (`vault_*` refused) |
+| `make var H=<h> V=<var>` | templated value of a variable on a host (credentials refused) |
+| `make ssh-config [REPLACE=1]` | write/refresh this project's hosts in `~/.ssh/config` (managed block) |
 | `make validate` | check vars against the roles' argument specs, offline |
 | `make check` | `site.yml --check --diff` (dry-run) |
 | `make apply` | `site.yml` for real |
@@ -150,7 +151,7 @@ Standard targets:
 | `make ping` / `make graph` | connectivity / groups and hosts |
 | `make vault-init/edit/view/check` | manage vault files |
 | `make vault-keys` / `make vault-gen KEY=…` | list vault key names only / add a random secret without printing it |
-| `make host H=<h>` | resolved vars of a host (`vault_*` values hidden unless `SHOW_VAULT=1`) |
+| `make host H=<h>` | resolved vars of a host (vault identifiers shown, credentials hidden) |
 | `make lint` | `ansible-lint` + `yamllint` |
 
 Every playbook target honours `ENV=<env> LIMIT=<pattern> TAGS=<t> EXTRA="<args>"`. A sudo

@@ -71,6 +71,16 @@ make docker-logs H=web-1 C=app SINCE=10m     # container logs (no C = list conta
   is safe.
 - Extra Ansible options (async, verbosity, forks): `EXTRA='-B 300 -P 0'`, `EXTRA=-vvv`.
 
+## `make ssh-config`
+
+Writes this project's hosts into `~/.ssh/config` as a managed block (alias = inventory
+name; `HostName`, `Port`, `User` resolved from inventory and vault; `IdentityFile` from
+`ansible_ssh_private_key_file` or `ssh_config_identity_file`; extra options from
+`ssh_config_extra`; `ssh_config_skip: true` leaves a host out). Re-run after adding,
+removing or changing hosts — it replaces only its own block and keeps a timestamped backup
+when it changes the file. Hand-written entries with the same alias are reported; `REPLACE=1`
+removes them. Then `ssh <host>` works everywhere, independent of Ansible.
+
 ## Without Python: Docker runner
 
 ```bash

@@ -27,10 +27,12 @@ Ask in one message, offering sensible defaults:
    the user.)
 6. **Where the repo lives** (path) and whether it will be on a shared/public git host.
 
-Never ask the user to paste secrets — or real IPs, SSH ports, internal hostnames, admin
-usernames — into the chat. You write placeholders (`*.example`, `vault_*` references);
-the user types real values via `make vault-edit`; random secrets come from
-`make vault-gen KEY=…`. See `infra-iac` → "Secrets: you never see them".
+Never ask the user to paste credentials into the chat. Identifiers (IPs, SSH ports, domains,
+usernames) may be given to you — put them straight into the vault, never into plaintext
+files. Credentials: you write placeholders (`*.example`, `vault_*` references), the user
+types real values via `make vault-edit`, random ones come from `make vault-gen KEY=…`.
+After hosts exist, run `make ssh-config`. See `infra-iac` → "Secrets: identifiers yes,
+credentials never".
 
 ## 2. Scaffold
 
