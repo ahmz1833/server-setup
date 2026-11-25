@@ -37,6 +37,7 @@ Run these checks (read-only) and pick the branch:
 | You find | Context | Do |
 |---|---|---|
 | `galaxy.yml` with `name: server_setup` | the collection repo itself | switch to the **server-setup-dev** skill |
+| the request is "why is X down/slow/unstable", benchmark, bandwidth, IP reputation | diagnostics | use the **server-diagnostics** skill (in whatever project context applies) |
 | `ansible.cfg` / `inventories/` / playbooks (with or without `ahmz1833.server_setup`), `terraform/`/`*.tf`, k8s manifests/Helm values | an existing IaC project | continue below |
 | nothing infra-related, or the user wants a new infra | no project yet | switch to the **infra-bootstrap** skill |
 
@@ -140,11 +141,14 @@ Minimal exposure of secrets to the AI session (`references/security.md` §5a):
 - Never print secrets (vault contents, tokens) into the chat, logs, commit messages or
   files outside vaults. `no_log: true` on tasks handling them.
 
-## Debugging
+## Debugging, performance and measurement
 
-Investigate read-only, layer by layer (DNS → network → firewall → TLS → proxy → app →
-data); one hypothesis that explains all evidence; fix in code. Command cookbook and common
-failure patterns: `references/debugging.md`.
+Availability/performance problems (down, slow, flapping, saturated), benchmarks, network
+tests and IP reputation checks: use the **server-diagnostics** skill — it discovers the
+available metrics/logs, analyzes, measures ephemerally and hands durable fixes back here.
+Without it: investigate read-only, layer by layer (DNS → network → firewall → TLS → proxy →
+app → data), one hypothesis that explains all evidence, fix in code
+(`references/debugging.md`).
 
 ## Reference files (read when relevant)
 

@@ -5,8 +5,8 @@ Built on the Ansible collection [`ahmz1833.server_setup`](https://github.com/ahm
 
 ## Agent skills (install if missing)
 
-This project is operated with the `infra-iac` skill (plus `infra-bootstrap`,
-`server-setup-dev`) from [`ahmz1833/server-setup`](https://github.com/ahmz1833/server-setup).
+This project is operated with the `infra-iac` skill (plus `server-diagnostics`,
+`infra-bootstrap`, `server-setup-dev`) from [`ahmz1833/server-setup`](https://github.com/ahmz1833/server-setup).
 **Agents: before doing any infra work, check that `infra-iac` is available to you. If not:**
 
 1. Run `make skills` (= `npx -y skills add ahmz1833/server-setup -g -y --skill '*'`, installs

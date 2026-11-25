@@ -16,7 +16,7 @@ and `docs/`; developing the collection by the `server-setup-dev` skill in `skill
 | `examples/{multi-env-cluster,fleet}/` | yes, except the files `scripts/sync.sh` copies in |
 | `scripts/ensure-toolchain.sh` | yes — copied into examples and skills |
 | `skills/*/SKILL.md` | yes |
-| `skills/infra-iac/references/`, `skills/*/scripts/`, `skills/infra-bootstrap/assets/starter/` | **generated copies** — never edit; run `scripts/sync.sh` |
+| `skills/infra-iac/references/`, `skills/server-diagnostics/references/`, `skills/*/scripts/`, `skills/infra-bootstrap/assets/starter/` | **generated copies** — never edit; run `scripts/sync.sh` |
 
 ---
 
