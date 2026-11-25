@@ -1,7 +1,7 @@
 ---
 namespace: ahmz1833
 name: server_setup
-version: 1.5.0
+version: 1.5.1
 readme: README.md
 authors:
   - AHMZ <ahmz.ut@gmail.com>
@@ -38,7 +38,6 @@ tags:
   - k3s
   - kubernetes
   - iac
-  - ai
 
 repository: https://github.com/ahmz1833/server-setup
 documentation: https://github.com/ahmz1833/server-setup/blob/master/README.md

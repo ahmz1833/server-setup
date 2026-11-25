@@ -9,7 +9,7 @@
       "name": "server-setup",
       "source": "./",
       "description": "Skills: infra-iac (operate/change/debug servers via IaC), infra-bootstrap (new infra project), server-setup-dev (develop the collection).",
-      "version": "1.5.0"
+      "version": "1.5.1"
     }
   ]
 }
