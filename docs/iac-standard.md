@@ -40,7 +40,7 @@ my-infra/
 ├── ansible.cfg
 ├── requirements.yml          # collections (server_setup + deps)
 ├── requirements.txt          # python deps (ansible-core, passlib, …)
-├── .gitignore                # .venv/, collections/, .vault_pass*, *.retry
+├── .gitignore                # .venv/, collections/, .vault_pass*, .become_pass*, *.retry
 ├── inventories/
 │   └── <env>/                # prod, staging, lab … (one is fine)
 │       ├── hosts.yml         # hosts and groups only – no variables
@@ -140,7 +140,9 @@ Standard targets:
 | `make setup` | install/upgrade toolchain + latest collection (see [toolchain.md](toolchain.md)) |
 | `make skills` | (re)install the AI agent skills user-wide (`setup` does it when missing) |
 | `make docker-logs H=<h> [C=<c>]` | container list / logs on a host (read-only) |
-| `make shell` / `make shell -- <cmd>` | subshell or one command with the project toolchain, inventory and vault ids set (`CMD='…'` when args contain `=` or quotes) |
+| `make shell H=<h>` / `make shell H=<pattern> -- <cmd>` | SSH session on a host / run a command on one or many hosts (sudo; `SUDO=0`; `CMD='…'` when it contains `=` or quotes) |
+| `make module H=<pattern> M=<module> A='<args>'` | run any Ansible module on hosts |
+| `make var H=<h> V=<var>` | templated value of a variable on a host (`vault_*` refused) |
 | `make validate` | check vars against the roles' argument specs, offline |
 | `make check` | `site.yml --check --diff` (dry-run) |
 | `make apply` | `site.yml` for real |
@@ -151,7 +153,10 @@ Standard targets:
 | `make host H=<h>` | resolved vars of a host (`vault_*` values hidden unless `SHOW_VAULT=1`) |
 | `make lint` | `ansible-lint` + `yamllint` |
 
-Every playbook target honours `ENV=<env> LIMIT=<pattern> TAGS=<t> EXTRA="<args>"`.
+Every playbook target honours `ENV=<env> LIMIT=<pattern> TAGS=<t> EXTRA="<args>"`. A sudo
+password, if needed, comes from a gitignored `.become_pass` / `.become-pass` file (optionally
+`.<env>`-suffixed) and is used by every ansible command; `BECOME_ASK=1` prompts instead
+([toolchain.md](toolchain.md)).
 
 ### `ansible.cfg`
 

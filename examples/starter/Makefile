@@ -1,10 +1,13 @@
 # Infra Makefile — standard from ahmz1833/server-setup (examples/starter).
 # Run `make help`. Every playbook target accepts:
 #   ENV=<env>  LIMIT=<host|group>  TAGS=<t1,t2>  SKIP=<tags>  EXTRA="<more ansible args>"
-# Run any command inside the project toolchain:
-#   make shell                          interactive subshell
-#   make shell -- ansible all -m ping   one command (words after --)
-#   make shell CMD='ansible web -b -a "df -h"'   use CMD when args contain '=' or quotes
+# Work on the servers (inventory + vault resolve addresses, ports, users for you):
+#   make shell H=web-1                         interactive SSH session on one host
+#   make shell H=web -- df -h                  run a command on one or many hosts (sudo)
+#   make shell H=web CMD='grep -c "a=b" /f'    use CMD= when the command has '=' or quotes
+#   make shell H=web-1 SUDO=0 -- id            run as the login user instead of root
+#   make module H=web-1 M=ansible.builtin.setup A='filter=ansible_mem*'   any Ansible module
+#   make var H=web-1 V=nginx_sites             a variable's templated value on a host
 .DEFAULT_GOAL := help
 
 ENV       ?= prod
@@ -21,6 +24,10 @@ N         ?= 200
 SINCE     ?=
 LEN       ?=
 SHOW_VAULT ?= 0
+SUDO      ?= 1
+M         ?=
+A         ?=
+V         ?=
 FILE      ?= $(INV)/group_vars/all/vault.yml
 IMAGE     ?= ghcr.io/ahmz1833/server-setup:latest
 # Vault password, resolved in this order:
@@ -31,11 +38,15 @@ IMAGE     ?= ghcr.io/ahmz1833/server-setup:latest
 # VAULT_PER_ENV=1 makes `vault-init` create .vault_pass.$(ENV) instead of .vault_pass.
 VAULT_IDS     ?=
 VAULT_PER_ENV ?= 0
-# BECOME_ASK=1 to be prompted for the sudo password.
+# sudo password: a local file is used automatically (never prompts), first found of
+#   .become_pass.$(ENV)  .become-pass.$(ENV)  .become_pass  .become-pass   (gitignored, mode 600)
+# otherwise BECOME_ASK=1 prompts; with neither, passwordless sudo is assumed.
 BECOME_ASK ?= 0
+BECOME_FILE ?= $(firstword $(wildcard .become_pass.$(ENV) .become-pass.$(ENV) .become_pass .become-pass))
+BECOME_ARGS := $(if $(BECOME_FILE),--become-password-file $(BECOME_FILE),$(if $(filter 1,$(BECOME_ASK)),--ask-become-pass))
 
 comma := ,
-# `make shell -- <cmd>`: the words after `shell` are the command, not make targets.
+# `make shell H=… -- <cmd>`: the words after `shell` are the command, not make targets.
 ifeq (shell,$(firstword $(MAKECMDGOALS)))
   SHELL_MODE := 1
   SHELL_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
@@ -60,18 +71,31 @@ endif
 INIT_FILE := $(if $(filter 1,$(VAULT_PER_ENV)),.vault_pass.$(ENV),.vault_pass)
 INIT_ID   := $(if $(strip $(VAULT_IDS)),$(firstword $(VAULT_IDS)),$(if $(filter 1,$(VAULT_PER_ENV)),$(ENV),default)@$(INIT_FILE))
 
+# ad-hoc commands on hosts
+HOSTARGS := -i $(INV) $(VAULT_ARGS) $(BECOME_ARGS) $(EXTRA)
+BECOME   := $(if $(filter 1,$(SUDO)),-b)
+squote    = $(subst ','\'',$(1))
+
 ARGS := -i $(INV) $(VAULT_ARGS) \
   $(if $(LIMIT),--limit '$(LIMIT)') $(if $(TAGS),--tags '$(TAGS)') \
-  $(if $(SKIP),--skip-tags '$(SKIP)') $(if $(filter 1,$(BECOME_ASK)),--ask-become-pass) $(EXTRA)
+  $(if $(SKIP),--skip-tags '$(SKIP)') $(BECOME_ARGS) $(EXTRA)
 
-.PHONY: help setup skills shell validate check apply run ping host docker-logs graph vault-init vault-edit vault-view vault-keys vault-gen vault-check lint docker-shell
+.PHONY: help setup skills shell module var validate check apply run ping host docker-logs graph vault-init vault-edit vault-view vault-keys vault-gen vault-check lint docker-shell
 
-shell: ## Toolchain shell: `make shell`, `make shell -- <cmd>`, or CMD='<cmd>'
-	@$(if $(CMD),,echo ">> infra shell: ENV=$(ENV) inventory=$(INV) vault=$(if $(VAULT_ARGS),$(VAULT_ID),none) (exit to leave)")
-	@env PATH="$(if $(BIN),$(CURDIR)/.venv/bin:)$$PATH" \
-	  ANSIBLE_INVENTORY="$(CURDIR)/$(INV)" \
-	  ANSIBLE_VAULT_IDENTITY_LIST="$(if $(strip $(VAULT_IDS)),$(subst $(eval) ,$(comma),$(strip $(VAULT_IDS))),$(if $(VAULT_ARGS),$(VAULT_ID)))" \
-	  INFRA_ENV="$(ENV)" $(if $(CMD),sh -c '$(subst ','\'',$(CMD))',$${SHELL:-bash})
+shell: ## On servers: `make shell H=<host>` = SSH session; `make shell H=<host|group> -- <cmd>` or CMD='<cmd>' [SUDO=0]
+	@test -n "$(H)" || { echo "usage: make shell H=<host|group> [-- <cmd> | CMD='<cmd>'] [SUDO=0]"; exit 1; }
+ifneq ($(strip $(CMD)),)
+	@$(BIN)ansible '$(H)' $(HOSTARGS) $(BECOME) -m ansible.builtin.shell -a '$(call squote,$(CMD))'
+else
+	@conn=$$($(BIN)ansible '$(H)' $(HOSTARGS) -m ansible.builtin.debug \
+	  -a 'msg={{ ansible_user | default("") }}|{{ ansible_host | default(inventory_hostname) }}|{{ ansible_port | default(22) }}|{{ ansible_ssh_private_key_file | default("") }}|{{ ansible_ssh_common_args | default("") }}' \
+	  | sed -n 's/^.*"msg": "\([^"]*\)".*$$/\1/p'); \
+	[ "$$(printf '%s\n' "$$conn" | grep -c .)" = 1 ] || { echo "H must match exactly one host for an interactive session (got: $$(printf '%s\n' "$$conn" | grep -c .))"; exit 1; }; \
+	u=$$(echo "$$conn" | cut -d'|' -f1); h=$$(echo "$$conn" | cut -d'|' -f2); p=$$(echo "$$conn" | cut -d'|' -f3); \
+	k=$$(echo "$$conn" | cut -d'|' -f4); x=$$(echo "$$conn" | cut -d'|' -f5-); \
+	echo ">> ssh to $(H) (exit to leave)"; \
+	exec ssh $$x $${k:+-i "$$k"} -p "$$p" "$${u:+$$u@}$$h"
+endif
 
 ifeq ($(SHELL_MODE),1)
 # shell mode: only `shell` exists; command words become no-op goals (never real targets)
@@ -81,7 +105,7 @@ else
 
 help: ## Show targets
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z_-]+:.*## /{printf "  \033[36m%-12s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
-	@echo "  vars: ENV=$(ENV) LIMIT= TAGS= SKIP= EXTRA= PLAY=$(PLAY) H= FILE= VAULT_IDS="
+	@echo "  vars: ENV=$(ENV) LIMIT= TAGS= SKIP= EXTRA= PLAY=$(PLAY) H= SUDO=1 FILE= VAULT_IDS= BECOME_ASK=0 (sudo pass: $(or $(BECOME_FILE),none))"
 
 setup: ## Install/upgrade ansible + latest collections (./.venv, ./collections) + agent skills if missing
 	@scripts/ensure-toolchain.sh .
@@ -104,7 +128,7 @@ run: ## Run any playbook: make run PLAY=ops/restart EXTRA="-e service=nginx" LIM
 	$(BIN)ansible-playbook playbooks/$(PLAY).yml $(ARGS)
 
 ping: ## Connectivity check (LIMIT to narrow)
-	$(BIN)ansible $(or $(LIMIT),all) -i $(INV) $(VAULT_ARGS) -m ansible.builtin.ping
+	$(BIN)ansible '$(or $(LIMIT),all)' $(HOSTARGS) -m ansible.builtin.ping
 
 host: ## Resolved vars of a host (vault_* values hidden; SHOW_VAULT=1 shows them): make host H=web-1
 	@test -n "$(H)" || { echo "usage: make host H=<host>"; exit 1; }
@@ -113,8 +137,17 @@ host: ## Resolved vars of a host (vault_* values hidden; SHOW_VAULT=1 shows them
 
 docker-logs: ## Container logs (read-only): make docker-logs H=web-1 C=app [N=200] [SINCE=10m]; no C = list containers
 	@test -n "$(H)" || { echo "usage: make docker-logs H=<host> [C=<container>] [N=200] [SINCE=10m]"; exit 1; }
-	@$(BIN)ansible $(H) -i $(INV) $(VAULT_ARGS) -b -m ansible.builtin.command \
+	@$(BIN)ansible '$(H)' $(HOSTARGS) -b -m ansible.builtin.command \
 	  -a "$(if $(C),docker logs --tail $(N) $(if $(SINCE),--since $(SINCE) )--timestamps $(C),docker ps -a)"
+
+module: ## Any Ansible module on servers: make module H=<pattern> M=<module> [A='<args>'] [SUDO=0]
+	@test -n "$(H)" -a -n "$(M)" || { echo "usage: make module H=<host|group> M=<module> [A='<args>'] [SUDO=0]"; exit 1; }
+	@$(BIN)ansible '$(H)' $(HOSTARGS) $(BECOME) -m $(M) $(if $(A),-a '$(call squote,$(A))')
+
+var: ## Templated value of a variable on a host: make var H=web-1 V=nginx_sites (vault_* refused)
+	@test -n "$(H)" -a -n "$(V)" || { echo "usage: make var H=<host> V=<variable>"; exit 1; }
+	@case "$(V)" in vault_*) [ "$(SHOW_VAULT)" = 1 ] || { echo "refusing to print $(V) (vault value); SHOW_VAULT=1 to override"; exit 1; };; esac
+	@$(BIN)ansible '$(H)' $(HOSTARGS) -m ansible.builtin.debug -a 'var=$(V)'
 
 graph: ## Show groups and hosts
 	$(BIN)ansible-inventory -i $(INV) $(VAULT_ARGS) --graph

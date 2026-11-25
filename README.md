@@ -20,13 +20,14 @@ Beyond roles, this repo ships an **infrastructure-as-code standard**, **full exa
 
 ## Using with AI agents
 
-Three skills (in [`skills/`](skills)) teach an agent to work this way:
+Four skills (in [`skills/`](skills)) teach an agent to work this way:
 
 | Skill | For |
 |---|---|
 | **`infra-iac`** | any request touching servers or an infra repo: inspect/debug, one-off jobs, persistent changes through IaC, security review |
 | **`infra-bootstrap`** | creating a new IaC project from an interview |
 | **`server-setup-dev`** | developing this collection, or upstreaming a local role |
+| **`server-diagnostics`** | availability & performance debugging using all available metrics/logs; benchmarks, network tests (iperf3), IP reputation — ephemeral, no trace |
 
 Install (no clone of this repo needed):
 
@@ -309,7 +310,7 @@ Exact wiring is in each role’s `defaults/main.yml`.
 | `roles/` | `core`, `node`, `nginx`, `acme`, `apps`, `sandbox`, `k3s`, `mail`, `asset` (each with README, defaults, argument specs, optional `examples/`) |
 | `docs/` | IaC standard, security, operations, debugging, toolchain, generated roles index |
 | `examples/` | complete example projects (`starter`, `multi-env-cluster`, `fleet`) |
-| `skills/` | AI agent skills (`infra-iac`, `infra-bootstrap`, `server-setup-dev`) |
+| `skills/` | AI agent skills (`infra-iac`, `infra-bootstrap`, `server-setup-dev`, `server-diagnostics`) |
 | `scripts/` | `ensure-toolchain.sh` (project setup), `gen-roles-index.py`, `sync.sh` (propagates docs/starter into skills and examples) |
 | `.claude-plugin/` | Claude Code plugin + marketplace manifests |
 | `Dockerfile` | runner image `ghcr.io/ahmz1833/server-setup` (ansible + this collection) |

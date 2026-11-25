@@ -6,8 +6,8 @@ sandboxes and a monitoring host. Built on
 
 ## Agent skills (install if missing)
 
-This project is operated with the `infra-iac` skill (plus `infra-bootstrap`,
-`server-setup-dev`) from [`ahmz1833/server-setup`](https://github.com/ahmz1833/server-setup).
+This project is operated with the `infra-iac` skill (plus `server-diagnostics`,
+`infra-bootstrap`, `server-setup-dev`) from [`ahmz1833/server-setup`](https://github.com/ahmz1833/server-setup).
 **Agents: before doing any infra work, check that `infra-iac` is available to you. If not:**
 
 1. Run `make skills` (= `npx -y skills add ahmz1833/server-setup -g -y --skill '*'`, installs
@@ -26,7 +26,8 @@ This project is operated with the `infra-iac` skill (plus `infra-bootstrap`,
 - Always `LIMIT` applies in this fleet — hosts are unrelated to each other.
 
 
-- **Agents never see secret values**: no vault viewing/decrypting; wire `vault_*`
+- **Agents never see secret values**: no vault viewing/decrypting, never read
+  `.vault_pass*`/`.become_pass*`; wire `vault_*`
   references with placeholders and ask the human to fill them (`make vault-edit`), or use
   `make vault-gen` for random ones.
 - **Collection first**: anything `ahmz1833.server_setup` can manage is managed through its

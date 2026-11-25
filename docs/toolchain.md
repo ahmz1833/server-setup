@@ -35,21 +35,41 @@ Idempotent; run it whenever you start working (it is cheap when everything is pr
 The Makefile then uses `.venv/bin/*` when present and sets
 `ANSIBLE_COLLECTIONS_PATH=./collections:~/.ansible/collections:/usr/share/ansible/collections`.
 
-## `make shell`
+## sudo password
 
-Runs with the project's environment: `.venv/bin` on `PATH`, `ANSIBLE_INVENTORY` = the
-current `ENV`'s inventory, `ANSIBLE_VAULT_IDENTITY_LIST` = the resolved vault ids, plus the
-project's `ANSIBLE_CONFIG`/collections path. Plain `ansible*` commands then just work:
+If the admin user needs a password for sudo, put it in a local file — every ansible command
+of the Makefile then passes it with `--become-password-file` and never prompts. First found
+wins: `.become_pass.<env>`, `.become-pass.<env>`, `.become_pass`, `.become-pass` (or
+`BECOME_FILE=<path>`). Keep it `chmod 600`; it is gitignored. Without a file, `BECOME_ASK=1`
+prompts; with neither, passwordless sudo is assumed.
 
 ```bash
-make shell                                   # interactive; `exit` to leave
-make shell -- ansible-inventory --graph      # one command
-make shell -- ansible web -m ping
-make shell CMD='ansible web-1 -b -a "df -h"' # use CMD= when args contain '=' or quotes
-make shell ENV=staging -- ansible all -m ping
+umask 077; read -rs -p 'sudo password: ' p && printf '%s\n' "$p" > .become_pass; unset p
 ```
 
-In shell mode the words after `shell` are never treated as make targets.
+## Working on servers: `make shell`, `make module`, `make var`
+
+Addresses, ports, users and keys are resolved from the inventory and vault — you never type
+(or see) them.
+
+```bash
+make shell H=web-1                           # interactive SSH session on one host
+make shell H=web -- df -h                    # run a command on one or many hosts (sudo)
+make shell H=web-1 CMD='grep -c "a=b" /etc/x' # use CMD= when the command contains '=' or quotes
+make shell H=web-1 SUDO=0 -- id              # as the login user instead of root
+make shell H=web ENV=staging -- uptime       # another environment
+make module H=web-1 M=ansible.builtin.setup A='filter=ansible_mem*'   # any Ansible module
+make var H=web-1 V=nginx_sites               # templated value of a variable (vault_* refused)
+make docker-logs H=web-1 C=app SINCE=10m     # container logs (no C = list containers)
+```
+
+- `H` is any Ansible host pattern (`web-1`, `web`, `web:&loc_iran`, `all`). The interactive
+  form needs exactly one host.
+- Commands run through `ansible.builtin.shell`, so pipes and redirects work. They run as
+  root unless `SUDO=0`.
+- Words after `--` are the command and never make targets — `make shell H=x -- echo apply`
+  is safe.
+- Extra Ansible options (async, verbosity, forks): `EXTRA='-B 300 -P 0'`, `EXTRA=-vvv`.
 
 ## Without Python: Docker runner
 

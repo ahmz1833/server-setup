@@ -27,11 +27,11 @@ but write down the cause or open question.
 | What vars does a host end up with? | `make host H=web-1` (vault values shown as `<hidden>`) |
 | Where is a var defined? | `grep -rn 'core_ssh_port' inventories/ playbooks/` ; vault keys: `make vault-keys` (names only — values stay with the human, see security.md §5a) |
 | Which group is a host in? | `make graph` |
-| Value after templating | `make shell CMD='ansible web-1 -m ansible.builtin.debug -a var=nginx_sites'` (never for `vault_*`-derived values — security.md §5a) |
+| Value after templating | `make var H=web-1 V=nginx_sites` (never for `vault_*`-derived values — security.md §5a) |
 | Role default / meaning of a var | [roles-index.md](roles-index.md), `ansible-doc -t role ahmz1833.server_setup.<role>`, or `collections/ansible_collections/ahmz1833/server_setup/roles/<role>/defaults/main.yml` |
 | Why did a task do X? | rerun the play with `-vvv` on `LIMIT=<host> TAGS=<tag>`; read the role's task file |
 | Start mid-play | `EXTRA="--start-at-task 'Task name'"` or `--step` |
-| Connection problems | `make shell -- ansible web-1 -m ansible.builtin.ping -vvvv`; check `ssh -G <alias>` |
+| Connection problems | `make ping LIMIT=web-1 EXTRA=-vvvv`; check `ssh -G <alias>` |
 | Check-mode differs from real run | some tasks depend on earlier changes; look for `when: not ansible_check_mode` and registered results |
 
 Variable precedence surprises are the #1 cause of "my change does nothing": extra-vars
@@ -40,17 +40,15 @@ role defaults. Check that the var is not overridden at a higher level.
 
 ## 3. Host-side read-only diagnostics
 
-Run them through the project toolchain (inventory, vault and collections preset):
+Run them on the servers with `make shell` (inventory and vault resolve the connection):
 
 ```bash
-make shell CMD='ansible web-1 -b -a "systemctl --failed"'   # one host, sudo
-make shell CMD='ansible web -b -a "df -h"'                  # a whole group
-make docker-logs H=web-1 C=app SINCE=30m                    # container logs
-make shell                                                  # interactive, then plain ansible …
+make shell H=web-1 -- systemctl --failed          # one host (sudo)
+make shell H=web -- df -h                         # a whole group
+make shell H=web-1 CMD='ss -ltnp | grep -v 127.0.0.1'   # pipes / quotes / '=' → CMD=
+make docker-logs H=web-1 C=app SINCE=30m          # container logs
+make shell H=web-1                                # interactive SSH session for digging
 ```
-
-(`-a` without `-m` uses `ansible.builtin.command`; use `-m ansible.builtin.shell` only when you
-need pipes.) Plain `ssh <host>` is fine for interactive digging.
 
 | Area | Commands |
 |---|---|

@@ -16,7 +16,7 @@ and say it out loud (in the PR, the ticket, or the chat with the agent).
 
 | Kind | Examples | How | Repo changes? |
 |---|---|---|---|
-| **1. Inspect / answer** | "is X up?", "why is the site slow?", "disk usage?", "which k3s version?", "who can sudo?" | read-only commands (`make shell -- ansible …`, `make docker-logs`, ssh, `kubectl get`) | no |
+| **1. Inspect / answer** | "is X up?", "why is the site slow?", "disk usage?", "which k3s version?", "who can sudo?" | read-only commands (`make shell H=<host> -- <cmd>`, `make docker-logs`, `kubectl get`) | no |
 | **2. One-off operation** | restart/reload a service, reboot, drain/uncordon a node, fetch kubeconfig, run a backup, prune images, re-pull & redeploy same image, renew a cert now | an existing ops playbook / role entry point, or an ad-hoc module call | no — unless the job will recur → add `playbooks/ops/<job>.yml` |
 | **3. Persistent change** | add a user/key, open a port, add a site/app/domain, change any config, add/remove a host, upgrade a version | **IaC only**: edit repo → check → confirm → apply → verify | yes, always |
 | **4. Emergency** | prod is down, active attack, locked out | break-glass fix by hand, then codify or revert in the same session | yes, right after |
@@ -54,7 +54,7 @@ Prefer, in this order:
 1. An ops playbook already in the repo: `make run PLAY=ops/restart EXTRA="-e service=nginx" LIMIT=web-1`.
 2. A collection role entry point that does it (e.g. k3s `k3s_state: drain|uncordon|fetch-kubeconfig`).
 3. An ad-hoc module call:
-   `make shell CMD='ansible web-1 -b -m ansible.builtin.systemd_service -a "name=nginx state=restarted"'`.
+   `make module H=web-1 M=ansible.builtin.systemd_service A='name=nginx state=restarted'`.
 4. A raw shell command — only when nothing above fits; keep it read-only or explicitly
    ephemeral.
 
