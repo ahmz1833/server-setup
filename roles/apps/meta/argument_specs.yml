@@ -1,0 +1,167 @@
+---
+argument_specs:
+  main:
+    short_description: Declarative Docker container lifecycle (deploy, health-gate, prune) via community.docker.
+    description:
+      - Validates C(apps_list), logs in to C(apps_registries), creates C(apps_networks) (plus auto-created bridge
+        networks referenced by apps), deploys containers in C(depends_on) order with community.docker.docker_container,
+        optionally waits for Docker health checks, and optionally prunes containers/networks not managed by the role.
+      - Requires Docker Engine on the target and the community.docker collection.
+      - "Tags: C(apps) (everything), C(ci-cd) and C(deploy) (prepare, networks, deploy; no prune),
+        C(apps-prune) (prune only; still gated by C(apps_prune.enabled))."
+    author: AHMZ
+    options:
+      apps_base_path:
+        type: str
+        default: /opt/apps
+        description:
+          - Base directory on the host for application data.
+          - Each app gets C(<apps_base_path>/<name>/), and bind sources starting with C(./) in an app's
+            C(volumes) are resolved under that directory.
+
+      apps_default_restart_policy:
+        type: str
+        default: unless-stopped
+        description:
+          - Restart policy used when an app sets no C(restart_policy) (and preserve mode has no existing value).
+          - One of C(no), C(always), C(on-failure), C(unless-stopped).
+
+      apps_default_pull_policy:
+        type: raw
+        default: missing
+        description:
+          - Pull policy used when an app sets no C(pull).
+          - C(always) (or boolean C(true)), C(missing) or C(never); any other value is treated as C(missing).
+
+      apps_management_labels_enabled:
+        type: bool
+        default: true
+        description:
+          - Add management labels C(apps.ansible.managed=true) and C(apps.ansible.name=<name>) to every container.
+
+      apps_preserve_mode:
+        type: bool
+        default: false
+        description:
+          - Global preserve mode. When true and a container already exists, keys omitted from the app definition are
+            filled from the live container (ports, networks, volumes, env merged, healthcheck, resources, ...).
+          - Intended for CI/CD partial updates that only ship C(name) + C(image). Overridable per app with C(preserve_mode).
+
+      apps_default_log_driver:
+        type: str
+        default: json-file
+        description:
+          - Docker log driver used when an app sets no C(log_driver).
+
+      apps_default_log_options:
+        type: dict
+        default:
+          max-size: 50m
+          max-file: "3"
+        description:
+          - Log driver options used when an app sets no C(log_options).
+
+      apps_registries:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Private registries to log in to (community.docker.docker_login) before deploying.
+        options:
+          registry:
+            type: str
+            required: true
+            description:
+              - Registry URL/host, e.g. C(ghcr.io).
+          username:
+            type: str
+            required: true
+            description:
+              - Registry username.
+          password:
+            type: str
+            required: true
+            no_log: true
+            description:
+              - Registry password or token (use vault).
+          reauthorize:
+            type: bool
+            default: false
+            description:
+              - Force re-authentication even if credentials are already stored.
+
+      apps_networks:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Docker networks to create explicitly (community.docker.docker_network).
+          - "Keys read: C(name) (required), C(driver) (default C(bridge)), C(internal) (default false),
+            C(ipam.subnet) and optional C(ipam.gateway)."
+          - Networks referenced by apps but not listed here are auto-created as C(bridge) networks.
+
+      apps_list:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Containers to manage. Each item is a dict; items are not schema-validated here (the role asserts
+            C(name)/C(image)/C(state) itself), and only the keys below are read.
+          - "Role keys: C(name) (required, must match C(^[a-zA-Z0-9][a-zA-Z0-9_.-]*$), unique);
+            C(image) (required unless C(state) is C(stopped)/C(absent));
+            C(state) (C(started) default, C(stopped), C(absent));
+            C(preserve_mode) (overrides C(apps_preserve_mode));
+            C(depends_on) (list of other app names started first; cycles rejected);
+            C(healthcheck_wait) (default true; wait until container is healthy) and
+            C(healthcheck_wait_timeout) (seconds, default 300, polled every 5s);
+            C(dir_owner)/C(dir_group)/C(dir_mode) (for C(<apps_base_path>/<name>), defaults root/root/0755);
+            C(directories) (list of C({path, owner, group, mode}) host dirs to create before deploy);
+            C(dns) (mapped to docker_container C(dns_servers));
+            C(pull) (C(always)/C(true), C(missing), C(never))."
+          - "Passed to community.docker.docker_container: C(command), C(entrypoint), C(user), C(working_dir),
+            C(hostname), C(network_mode), C(ports), C(networks), C(volumes) (C(./) sources rewritten under the app dir),
+            C(tmpfs), C(env) (merged over live env in preserve mode), C(memory), C(memory_swap),
+            C(memory_reservation), C(cpus), C(healthcheck), C(privileged), C(read_only), C(capabilities) (list of
+            caps to add), C(cap_drop), C(security_opts), C(log_driver), C(log_options), C(restart_policy),
+            C(recreate), C(restart), C(labels) (merged with management labels). Other keys are ignored."
+          - See roles/apps/README.md and roles/apps/examples/apps.yml for examples.
+
+      apps_prune:
+        type: dict
+        description:
+          - Pruning of resources not managed by this role. Dangerous when enabled.
+          - "Default is C({enabled: false, containers: true, networks: false, whitelist_patterns: [\"^sandbox-.*$\"],
+            whitelist_labels: []}). Setting this var replaces the whole dict; missing keys fall back to the
+            per-key defaults below."
+        options:
+          enabled:
+            type: bool
+            default: false
+            description:
+              - Master switch; prune tasks run only when true.
+          containers:
+            type: bool
+            default: true
+            description:
+              - Remove containers whose name is not in C(apps_list) (after whitelist filters).
+          networks:
+            type: bool
+            default: false
+            description:
+              - Remove Docker networks not defined/referenced by the role (C(bridge), C(host), C(none) are kept).
+                Removal failures (busy networks) are ignored.
+          whitelist_patterns:
+            type: list
+            elements: str
+            default:
+              - ^sandbox-.*$
+            description:
+              - Regexes on container name; matching containers are never removed.
+              - The prune task always prepends C(^sandbox-.*$), C(^runner-.*$) and C(^worker-.*$) regardless of this list.
+          whitelist_labels:
+            type: list
+            elements: raw
+            default: []
+            description:
+              - Protect containers by label. Each item is either a label key string (protected if the key exists)
+                or a dict C({key, value}) (protected on exact value match).
