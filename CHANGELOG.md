@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.2] - 2026-11-26
+
+### Fixed
+- **core**: read-only safety checks (SSH keys/non-root user, swap, cron listing, IPv6 lookup)
+  run in check mode, so `--check` no longer fails on them.
+- **core**: installs cron when it manages cron jobs (minimal images lack `crontab`).
+
 ## [1.6.1] - 2026-11-25
 
 ### Fixed
