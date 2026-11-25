@@ -107,7 +107,7 @@ example_log_syslog:
   node_docker_log_opts:
     syslog-address: "udp://localhost:514"
     syslog-facility: "daemon"
-    tag: "docker/{{.Name}}"
+    tag: !unsafe "docker/{{.Name}}"   # Go template for Docker, not Jinja
 
 # -----------------------------------------------------------------------------
 # Example 8: Journald
@@ -115,7 +115,7 @@ example_log_syslog:
 example_log_journald:
   node_docker_log_driver: "journald"
   node_docker_log_opts:
-    tag: "docker/{{.Name}}"
+    tag: !unsafe "docker/{{.Name}}"   # Go template for Docker, not Jinja
 
 # -----------------------------------------------------------------------------
 # Example 9: Local (Optimized)
