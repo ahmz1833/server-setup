@@ -1,0 +1,104 @@
+---
+argument_specs:
+  main:
+    short_description: Idempotent download/extract/install of upstream release artifacts (binary, file or package tree).
+    description:
+      - Helper role included (C(include_role) with C(vars)) by node, nginx, k3s and others to install a pinned upstream artifact.
+      - Installs only when the destination is missing or its version does not satisfy C(asset_version) (C(==) or C(>=));
+        binaries report their version via C(asset_version_cmd)/C(asset_version_regex), file/package types via a sidecar version file.
+      - Supports controller-side download and cache (C(asset_download_locally)), mirrors and HTTP/SOCKS proxies.
+      - "Tags: none (wrap the include to tag it)."
+    author: AHMZ
+    options:
+      asset_name:
+        type: str
+        required: true
+        description: Logical asset name; used for temp dirs, the default destination C(/usr/local/bin/<name>) and the file-type version sidecar.
+      asset_type:
+        type: str
+        choices: [binary, file, package]
+        description:
+          - "C(binary): single executable (version from CLI); C(file): single file; C(package): directory tree in C(asset_dest)."
+          - "Default: C(binary) (inline task default; not in defaults/main.yml)."
+      asset_version:
+        type: str
+        required: true
+        description: Version constraint - plain C(1.2.3) (treated as C(>=)), C(>=1.2.3) or C(==1.2.3); the bare version replaces C(%v).
+      asset_url:
+        type: str
+        required: true
+        description:
+          - Download URL or scheme-less suffix (C(asset_origin_scheme) is prepended); C(%v) is replaced with the resolved version.
+          - "Example: C(github.com/org/app/releases/download/v%v/app-%v-linux-amd64.tar.gz)."
+      asset_dest:
+        type: str
+        description:
+          - Absolute destination on the target (file path for binary/file, directory for package).
+          - "Default (binary): current C(which <asset_name>) location, else C(/usr/local/bin/<asset_name>)."
+      asset_extract:
+        type: bool
+        default: true
+        description: Treat the download as an archive and extract it; false = single raw file.
+      asset_extract_src:
+        type: str
+        description:
+          - Path inside the extracted archive (or staging filename); C(%v) is replaced. For C(package), a trailing C(/) copies directory contents.
+          - "Default: C(asset_name)."
+      asset_version_cmd:
+        type: str
+        description:
+          - Arguments passed to the installed binary to print its version (C(binary) type, used when the destination exists).
+          - No default; without it the installed version is not compared.
+      asset_version_regex:
+        type: str
+        description: Regex with one capture group extracting the version from the version command output (with C(asset_version_cmd)). No default.
+      asset_download_locally:
+        type: bool
+        default: false
+        description: Download (and cache) on the controller, then push a gzip payload to the target (restricted-egress targets).
+      asset_service_stop:
+        type: str
+        description: systemd unit stopped (best-effort) before installing an update. No default (nothing is stopped).
+      asset_register_path_var:
+        type: str
+        description: Name of a fact set to the final installed path after the role runs. No default (no fact is set).
+      asset_origin_scheme:
+        type: str
+        default: https://
+        description: Scheme prepended when C(asset_url) has none.
+      asset_use_mirror:
+        type: bool
+        default: false
+        description: Fetch from C(asset_mirror_base_url) + URL suffix instead of the origin.
+      asset_mirror_base_url:
+        type: str
+        default: ""
+        description: Mirror base URL (trailing slashes normalised); used only when C(asset_use_mirror) is true.
+      asset_cache_enabled:
+        type: bool
+        default: true
+        description: Reuse the controller cache in C(asset_cache_dir); only applies when C(asset_download_locally) is true.
+      asset_cache_dir:
+        type: str
+        description:
+          - Controller cache root (mirrors the URL suffix layout).
+          - "Default: C($HOME/.cache/ahmz/server_setup/assets) (HOME of the controller user)."
+      asset_cache_force_refresh:
+        type: bool
+        default: false
+        description: Re-download into the cache even if the cached file exists.
+      asset_proxy:
+        type: str
+        default: ""
+        description:
+          - HTTP/HTTPS/SOCKS5 proxy URL for downloads (e.g. C(socks5://127.0.0.1:1080)).
+          - Applies on the controller when C(asset_download_locally), otherwise on the target.
+      asset_proxy_username:
+        type: str
+        default: ""
+        description: Proxy username (injected into the proxy URL).
+      asset_proxy_password:
+        type: str
+        default: ""
+        no_log: true
+        description: Proxy password.
