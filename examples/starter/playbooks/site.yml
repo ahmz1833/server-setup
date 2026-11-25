@@ -1,0 +1,10 @@
+---
+# Converge everything. Order matters: base → certificates → services → apps.
+- name: Base system
+  ansible.builtin.import_playbook: base.yml
+
+- name: Web stack
+  ansible.builtin.import_playbook: web.yml
+
+- name: Applications
+  ansible.builtin.import_playbook: apps.yml

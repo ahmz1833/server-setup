@@ -1,0 +1,3 @@
+---
+vault_ansible_host: 198.51.100.10     # documentation range — replace in the real vault
+vault_ssh_port: 22

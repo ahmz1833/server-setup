@@ -1,0 +1,6 @@
+---
+exclude_paths:
+  - .venv/
+  - collections/
+skip_list:
+  - var-naming[no-role-prefix]   # inventories set collection role vars directly
