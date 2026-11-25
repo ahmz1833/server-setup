@@ -1,0 +1,6 @@
+---
+# Connection details come from the vault (the repo is assumed public).
+ansible_host: "{{ vault_ansible_host }}"
+ansible_port: "{{ vault_ssh_port }}"
+ansible_user: "{{ vault_admin_user }}"
+core_ssh_port: "{{ vault_ssh_port }}"

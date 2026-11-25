@@ -1,0 +1,11 @@
+---
+# Reboot hosts one at a time and wait for them to come back.
+#   make run PLAY=ops/reboot LIMIT=web-1
+- name: Rolling reboot
+  hosts: all
+  become: true
+  serial: 1
+  tasks:
+    - name: Reboot
+      ansible.builtin.reboot:
+        reboot_timeout: 900

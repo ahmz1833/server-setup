@@ -1,0 +1,40 @@
+---
+# Web/app servers: TLS via acme → nginx reverse proxy → docker apps on loopback.
+
+# --- firewall: public web ports only --------------------------------------------
+core_firewall_rules:
+  - {port: 80, comment: "HTTP (ACME + redirect)"}
+  - {port: 443, comment: "HTTPS"}
+
+# --- acme: certificates (public domains are fine in plaintext) -----------------
+acme_account_email: "ops@example.com"     # role address, not a person
+acme_certificates:
+  - domains: ["app.example.com"]
+    challenge: http-01
+# DNS-01 with Cloudflare (wildcards):
+# acme_dns_provider: cloudflare
+# acme_cloudflare_api_token: "{{ vault_cloudflare_api_token }}"
+# acme_certificates:
+#   - domains: ["example.com", "*.example.com"]
+
+# --- nginx: reverse proxy -----------------------------------------------------
+nginx_managed: true               # role default is false (does nothing)
+nginx_waf_install: true           # ModSecurity + CRS
+nginx_sites:
+  - domain: app.example.com
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:8080"
+    waf_enabled: true
+
+# --- apps: containers (bind to loopback; nginx is the only public entry) -------
+apps_list:
+  - name: app
+    image: traefik/whoami:v1.10
+    ports:
+      - "127.0.0.1:8080:80"
+    restart_policy: unless-stopped
+# Private registry:
+# apps_registries:
+#   - registry: registry.example.com
+#     username: "{{ vault_registry_user }}"
+#     password: "{{ vault_registry_password }}"

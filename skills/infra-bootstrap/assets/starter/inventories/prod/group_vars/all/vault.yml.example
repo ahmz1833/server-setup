@@ -1,0 +1,4 @@
+---
+# Copy of the keys in vault.yml with FAKE values. `make vault-init` turns this
+# into an encrypted vault.yml; then `make vault-edit` to set real values.
+vault_admin_user: opsadmin

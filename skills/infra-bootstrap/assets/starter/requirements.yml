@@ -1,0 +1,5 @@
+---
+# `make setup` installs/UPGRADES these into ./collections (latest by default).
+# Reproducible builds: pin with `version: "==1.5.0"` or run `SERVER_SETUP_VERSION=1.5.0 make setup`.
+collections:
+  - name: ahmz1833.server_setup   # pulls community.general/crypto/docker, ansible.posix/utils
