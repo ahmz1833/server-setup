@@ -43,6 +43,11 @@ jobs:
               raise SystemExit(
                   f"Tag {tag} does not match galaxy.yml version {version}"
               )
+
+          import json
+          plugin = json.loads(Path(".claude-plugin/plugin.json").read_text())
+          if plugin["version"] != version:
+              raise SystemExit("plugin.json version does not match galaxy.yml")
           PY
 
       - name: Build collection artifact
