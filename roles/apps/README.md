@@ -63,8 +63,8 @@ Defaults are in `defaults/main.yml`. Commonly used:
 | `enabled` | `false` | Master switch. |
 | `containers` | `true` | Remove unmanaged containers (after filters). |
 | `networks` | `false` | Remove Docker networks not referenced by role + not `bridge`/`host`/`none`. |
-| `whitelist_patterns` | includes `^sandbox-.*$` in defaults | Regex on container **name**; matches are **never** removed. **Prune logic also always prepends** `^sandbox-.*$` so clearing this list in YAML does not drop that safety net. |
-| `whitelist_labels` | `[]` | Skip removal if label **key** exists (string entry) or **key/value** match (`{ key:, value: }`). |
+| `whitelist_patterns` | includes `^sandbox-.*$` in defaults | Regex on container **name**; matches are **never** removed. **Prune logic always adds** `^sandbox-.*$`, `^runner-.*$` and `^worker-.*$`, so clearing this list does not drop that safety net. |
+| `whitelist_labels` | `[]` | Skip removal if label **key** exists (string entry) or **key/value** match (`{ key:, value: }`). **Always protected (built in):** containers labelled `apps.ansible.prune.whitelist=true` — the `mail` role sets it on its containers. |
 
 Network pruning uses **`failed_when: false`** on removal (busy networks may fail).
 

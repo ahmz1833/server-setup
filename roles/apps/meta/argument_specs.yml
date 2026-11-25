@@ -138,6 +138,7 @@ argument_specs:
             type: bool
             default: false
             description:
+              - Containers labelled C(apps.ansible.prune.whitelist=true) are always protected (built in; set by the mail role).
               - Master switch; prune tasks run only when true.
           containers:
             type: bool
@@ -157,7 +158,7 @@ argument_specs:
               - ^sandbox-.*$
             description:
               - Regexes on container name; matching containers are never removed.
-              - The prune task always prepends C(^sandbox-.*$), C(^runner-.*$) and C(^worker-.*$) regardless of this list.
+              - The prune task always adds C(^sandbox-.*$), C(^runner-.*$) and C(^worker-.*$) regardless of this list.
           whitelist_labels:
             type: list
             elements: raw
