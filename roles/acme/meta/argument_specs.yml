@@ -1,0 +1,135 @@
+---
+argument_specs:
+  main:
+    short_description: Let's Encrypt (ACME v2) certificate issuance and renewal with controller-side crypto (DNS-01 / HTTP-01).
+    description:
+      - >-
+        Creates/registers an ACME account and, for each item in C(acme_certificates), generates key and CSR on the controller,
+        completes a DNS-01 (manual prompt or Cloudflare API) or HTTP-01 (existing webroot, else standalone python server on port 80)
+        challenge, and deploys C(privkey.pem)/C(fullchain.pem) to the target. Issues only when the remote certificate is missing or
+        expires within the renewal window, then notifies the C(reload certificates) handler.
+      - Empty C(acme_certificates) only sets up the workspace and account.
+      - "Tags: none (the role's tasks are untagged)."
+    author: AHMZ
+    options:
+      # -----------------------------------------------------------------------
+      # Directory & account
+      # -----------------------------------------------------------------------
+      acme_directory_url:
+        type: str
+        default: https://acme-v02.api.letsencrypt.org/directory
+        description: ACME directory URL (use C(https://acme-staging-v02.api.letsencrypt.org/directory) for staging).
+      acme_account_email:
+        type: str
+        default: admin@example.com
+        description: ACME account contact email (C(mailto:)).
+      acme_local_workspace:
+        type: str
+        default: /tmp/ansible_acme_workspace
+        description: Controller directory for the account key, CSRs and issued files (one subdirectory per CN).
+      acme_noninteractive:
+        type: bool
+        default: false
+        description:
+          - Never pause for prompts (CI). Manual DNS-01 fails fast; HTTP-01 fails if port 80 is busy and the webroot test failed.
+
+      # -----------------------------------------------------------------------
+      # Certificate defaults
+      # -----------------------------------------------------------------------
+      acme_renew_days:
+        type: int
+        default: 30
+        description: Renew when the remote certificate expires within this many days (per-cert C(renew_days) overrides).
+      acme_default_cert_dir:
+        type: str
+        default: /etc/ssl/certs
+        description: Remote parent directory; default cert dir is C(<acme_default_cert_dir>/<CN>).
+
+      # -----------------------------------------------------------------------
+      # HTTP-01
+      # -----------------------------------------------------------------------
+      acme_webroot_path:
+        type: str
+        default: /var/www/acme
+        description: Remote webroot for HTTP-01 challenge files (C(.well-known/acme-challenge) is created under it).
+      acme_webroot_test_timeout:
+        type: int
+        default: 5
+        description: Timeout in seconds for the controller's webroot reachability probe.
+      acme_webroot_owner:
+        type: str
+        description: Owner of webroot challenge dirs/files. Not set in defaults; tasks fall back to C(www-data).
+      acme_webroot_group:
+        type: str
+        description: Group of webroot challenge dirs/files. Not set in defaults; tasks fall back to C(www-data).
+
+      # -----------------------------------------------------------------------
+      # Post-renewal hooks
+      # -----------------------------------------------------------------------
+      acme_reload_service:
+        type: str
+        default: nginx
+        description: Service reloaded after deployment when C(acme_reload_command) is empty; empty string disables.
+      acme_reload_command:
+        type: str
+        default: ""
+        description: Command run (with become) after deployment; takes precedence over C(acme_reload_service).
+
+      # -----------------------------------------------------------------------
+      # DNS-01 automation
+      # -----------------------------------------------------------------------
+      acme_dns_provider:
+        type: str
+        default: ""
+        choices: ["", cloudflare]
+        description: DNS-01 automation; C("") prompts for manual TXT records, C(cloudflare) uses the Cloudflare API. Per-cert C(dns_provider) overrides.
+      acme_cloudflare_api_token:
+        type: raw
+        default: ""
+        description: Cloudflare API token with Zone:DNS:Edit (typically a vault reference).
+      acme_cloudflare_zone:
+        type: str
+        default: ""
+        description: Cloudflare zone; per-cert C(zone) overrides, and when both are empty the last two labels of the record are used.
+      acme_dns_propagation_delay:
+        type: int
+        default: 15
+        description: Seconds to wait after creating Cloudflare TXT records.
+
+      # -----------------------------------------------------------------------
+      # Certificates
+      # -----------------------------------------------------------------------
+      acme_certificates:
+        type: list
+        elements: dict
+        default: []
+        description: Certificates to issue/renew, one item per certificate.
+        options:
+          domains:
+            type: list
+            elements: str
+            required: true
+            description: Names on the certificate; the first is the CN, the rest are SANs. Wildcards require C(dns-01).
+          challenge:
+            type: str
+            choices: [dns-01, http-01]
+            description: Challenge type. Default C(dns-01).
+          cert_dir:
+            type: str
+            description: Remote directory for this certificate. Default C(<acme_default_cert_dir>/<CN>).
+          fullchain_path:
+            type: str
+            description: Remote full chain path. Default C(<cert_dir>/fullchain.pem).
+          privkey_path:
+            type: str
+            description: Remote private key path. Default C(<cert_dir>/privkey.pem).
+          renew_days:
+            type: int
+            description: Per-certificate override of C(acme_renew_days).
+          dns_provider:
+            type: str
+            choices: ["", cloudflare]
+            description: Per-certificate override of C(acme_dns_provider).
+          zone:
+            type: str
+            description: Per-certificate Cloudflare zone (overrides C(acme_cloudflare_zone)).
