@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.1] - 2026-11-25
+
+### Fixed
+- **galaxy.yml**: at most 20 tags (Galaxy rejected the 1.5.0 import with 21 tags, so 1.5.0
+  was never published to Galaxy; the 1.5.0 runner image on GHCR has the same content).
+- **CI**: checks the Galaxy tag limit so metadata errors fail before release.
+
 ## [1.5.0] - 2026-11-25
 
 ### Added

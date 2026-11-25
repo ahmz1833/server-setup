@@ -60,7 +60,10 @@ jobs:
                   errors.append(f"{skill}: name must equal directory name")
               if not meta.get("description") or len(meta["description"]) > 1024:
                   errors.append(f"{skill}: description missing or > 1024 chars")
-          version = yaml.safe_load(Path("galaxy.yml").read_text())["version"]
+          galaxy = yaml.safe_load(Path("galaxy.yml").read_text())
+          version = galaxy["version"]
+          if len(galaxy.get("tags", [])) > 20:
+              errors.append(f"galaxy.yml has {len(galaxy['tags'])} tags; Galaxy allows at most 20")
           plugin = json.loads(Path(".claude-plugin/plugin.json").read_text())
           market = json.loads(Path(".claude-plugin/marketplace.json").read_text())
           if plugin["version"] != version:
