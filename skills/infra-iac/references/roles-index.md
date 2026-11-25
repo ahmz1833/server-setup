@@ -68,10 +68,10 @@ Roles: [acme](#acme) · [apps](#apps) · [asset](#asset) · [core](#core) · [k3
 | `apps_preserve_mode` | bool | `false` | Global preserve mode. When true and a container already exists, keys omitted from the app definition are filled from the live container (ports, networks, volumes, env merged, healthcheck, resources, ...). Intended for CI/CD partial updates that only ship `name` + `image`. Overridable per app with `preserve_mode`. |
 | `apps_prune` | dict |  | Pruning of resources not managed by this role. Dangerous when enabled. Default is `{enabled: false, containers: true, networks: false, whitelist_patterns: ["^sandbox-.*$"], whitelist_labels: []}`. Setting this var replaces the whole dict; missing keys fall back to the per-key defaults below. |
 | `apps_prune.containers` | bool | `true` | Remove containers whose name is not in `apps_list` (after whitelist filters). |
-| `apps_prune.enabled` | bool | `false` | Master switch; prune tasks run only when true. |
+| `apps_prune.enabled` | bool | `false` | Containers labelled `apps.ansible.prune.whitelist=true` are always protected (built in; set by the mail role). Master switch; prune tasks run only when true. |
 | `apps_prune.networks` | bool | `false` | Remove Docker networks not defined/referenced by the role (`bridge`, `host`, `none` are kept). Removal failures (busy networks) are ignored. |
 | `apps_prune.whitelist_labels` | list[raw] | `[]` | Protect containers by label. Each item is either a label key string (protected if the key exists) or a dict `{key, value}` (protected on exact value match). |
-| `apps_prune.whitelist_patterns` | list[str] | `["^sandbox-.*$"]` | Regexes on container name; matching containers are never removed. The prune task always prepends `^sandbox-.*$`, `^runner-.*$` and `^worker-.*$` regardless of this list. |
+| `apps_prune.whitelist_patterns` | list[str] | `["^sandbox-.*$"]` | Regexes on container name; matching containers are never removed. The prune task always adds `^sandbox-.*$`, `^runner-.*$` and `^worker-.*$` regardless of this list. |
 | `apps_registries` | list[dict] | `[]` | Private registries to log in to (community.docker.docker_login) before deploying. |
 | `apps_registries[].password` | str **req** |  | Registry password or token (use vault). |
 | `apps_registries[].reauthorize` | bool | `false` | Force re-authentication even if credentials are already stored. |
@@ -124,8 +124,8 @@ Roles: [acme](#acme) · [apps](#apps) · [asset](#asset) · [core](#core) · [k3
 |---|---|---|---|
 | `core_apt_cache_valid_time` | int | `3600` | Seconds an apt cache is considered fresh (0 = always update). Ignored right after a mirror rewrite. |
 | `core_apt_mirrors` | dict |  | Map of APT suite codename (e.g. `noble`, `bookworm-security`) to mirror URI; unmatched suites fall back to the base suite name. Default: every Ubuntu (xenial..resolute) and Debian (bullseye..trixie) suite mapped to the base mirrors; see defaults/main.yml. |
-| `core_apt_update_retries` | int |  | Retries for `apt update` against flaky mirrors. Default: 3 (inline task default; not in defaults/main.yml). |
-| `core_apt_update_retry_delay` | int |  | Seconds between `apt update` retries. Default: 5 (inline task default; not in defaults/main.yml). |
+| `core_apt_update_retries` | int | `3` | Retries for `apt update` against flaky mirrors. |
+| `core_apt_update_retry_delay` | int | `5` | Seconds between `apt update` retries. |
 | `core_base_mirror_debian` | str | `"https://mirror.cdn.ir/repository/debian"` | Base Debian mirror URL referenced by the default `core_apt_mirrors` (`-security` appended for security suites). |
 | `core_base_mirror_ubuntu` | str | `"https://mirror.cdn.ir/repository/ubuntu"` | Base Ubuntu mirror URL referenced by the default `core_apt_mirrors`. |
 | `core_cron_auto_ipset` | bool | `true` | Auto-create update cron jobs for `core_ipsets` entries that have both `url` and `cron`. |
@@ -190,7 +190,7 @@ Roles: [acme](#acme) · [apps](#apps) · [asset](#asset) · [core](#core) · [k3
 | `core_timezone` | raw |  | System timezone. Default: `Asia/Tehran` if `core_is_iran` else `Etc/UTC`. |
 | `core_users` | list[dict] | `[]` | Users to create/manage (exclusive, see `core_manage_users`). |
 | `core_users[].append` | raw |  | Keep existing group memberships (bool). Default: true. |
-| `core_users[].group` | str |  | Group name ensured to exist (note - not assigned as the user's primary group). |
+| `core_users[].group` | str |  | Primary group of the user; created if missing. Omit to keep the system default (usually a group named like the user). |
 | `core_users[].groups` | raw |  | Supplementary groups (list or comma-separated string). |
 | `core_users[].name` | str **req** |  | Username. |
 | `core_users[].password` | str |  | Password hash (e.g. from mkpasswd); required when creating a user that should have a password. |

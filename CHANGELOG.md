@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.1] - 2026-11-25
+
+### Fixed
+- **mail**: the SnappyMail admin password is passed to `php` through an environment variable
+  instead of being spliced into the command line (it was visible in logs/process list and
+  broke on quotes); password, hash and secret admin path tasks are `no_log`.
+- **mail**: printed DNS instructions use `mail_hostname` (were hard-coded to
+  `mail.<mail_domain>`); role meta declares `community.general` (used by `ini_file`).
+- **apps**: prune always protects containers labelled `apps.ansible.prune.whitelist=true`
+  (set by the mail role), even when `apps_prune.whitelist_labels` is customised — mail
+  containers could be removed by `apps_prune`.
+- **apps**: defaults comment documented `capabilities: {add, drop}`, which fails; corrected
+  to `capabilities: [...]` (add) and `cap_drop: [...]`. Prune comments corrected (master
+  switch default, built-in name patterns).
+- **core**: `core_users[].group` is now the user's primary group (it was only created, never
+  assigned); `core_apt_update_retries` / `core_apt_update_retry_delay` declared in defaults.
+
+### Changed
+- **mail** README documents paths, network, webmail port and the prune-protection label.
+
 ## [1.6.0] - 2026-11-25
 
 ### Added
