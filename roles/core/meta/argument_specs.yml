@@ -1,0 +1,477 @@
+---
+argument_specs:
+  main:
+    short_description: Baseline Linux server provisioning (identity, packages, users, SSH, sysctl, ipset, firewall, fail2ban, cron).
+    description:
+      - Baseline provisioning for systemd hosts (best on Debian/Ubuntu and Red Hat family).
+      - Runs in order system, packages, ntp, swap, users, ssh, sysctl, ipv6, ipset, firewall (HOST-FIREWALL iptables chain), fail2ban, cron;
+        each block has a C(core_manage_*) / C(core_fail2ban_enabled) toggle.
+      - Reads playbook-level globals C(is_iran), C(enable_ipv6), C(download_locally), C(primary_user) through derived defaults.
+      - "Tags: core, core-system, core-packages, core-ntp, core-swap, core-users, core-ssh, core-sysctl, core-ipv6, core-ipset,
+        core-firewall, core-iptables, core-fail2ban, core-cron."
+    author: AHMZ
+    options:
+      # -----------------------------------------------------------------------
+      # Meta variables
+      # -----------------------------------------------------------------------
+      core_is_iran:
+        type: raw
+        description:
+          - Iran-specific behaviour (Asia/Tehran timezone, APT mirror rewrite).
+          - "Default: derived from global C(is_iran) (false when unset)."
+      core_enable_ipv6:
+        type: raw
+        description:
+          - Enable IPv6 (sysctl disable_ipv6=0, ip6tables HOST-FIREWALL, C(core_ipv6_interfaces) drop-ins).
+          - "Default: derived from global C(enable_ipv6) (false when unset)."
+      core_download_locally:
+        type: raw
+        description:
+          - Pass-through of the global download-locally flag; not used by core tasks.
+          - "Default: derived from global C(download_locally) (false when unset)."
+      core_primary_user:
+        type: raw
+        description:
+          - Primary login user; never removed by user purge and checked for SSH keys before disabling password auth.
+          - "Default: derived from global C(primary_user) (C(root) when unset)."
+
+      # -----------------------------------------------------------------------
+      # System
+      # -----------------------------------------------------------------------
+      core_timezone:
+        type: raw
+        description:
+          - System timezone.
+          - "Default: C(Asia/Tehran) if C(core_is_iran) else C(Etc/UTC)."
+      core_hostname:
+        type: raw
+        description:
+          - System hostname; also written as 127.0.0.1/::1 entries in the managed /etc/hosts block.
+          - "Default: C(inventory_hostname)."
+      core_manage_nameservers:
+        type: raw
+        description:
+          - Write a static /etc/resolv.conf (removes a symlink first, e.g. systemd-resolved stub).
+          - "Default: true when C(core_nameservers) is non-empty."
+      core_nameservers:
+        type: list
+        elements: str
+        default: []
+        description: Nameserver IPs written to /etc/resolv.conf when C(core_manage_nameservers) is true.
+      core_hosts_list:
+        type: list
+        elements: str
+        default: []
+        description: Raw /etc/hosts lines (e.g. C(10.0.0.5 db1)) written inside the role-managed block.
+
+      # -----------------------------------------------------------------------
+      # Packages
+      # -----------------------------------------------------------------------
+      core_set_apt_mirrors:
+        type: raw
+        description:
+          - Rewrite Debian/Ubuntu APT sources to the mirrors in C(core_apt_mirrors) (Debian family only).
+          - "Default: C(core_is_iran)."
+      core_base_mirror_ubuntu:
+        type: str
+        default: https://mirror.cdn.ir/repository/ubuntu
+        description: Base Ubuntu mirror URL referenced by the default C(core_apt_mirrors).
+      core_base_mirror_debian:
+        type: str
+        default: https://mirror.cdn.ir/repository/debian
+        description: Base Debian mirror URL referenced by the default C(core_apt_mirrors) (C(-security) appended for security suites).
+      core_apt_mirrors:
+        type: dict
+        description:
+          - Map of APT suite codename (e.g. C(noble), C(bookworm-security)) to mirror URI; unmatched suites fall back to the base suite name.
+          - "Default: every Ubuntu (xenial..resolute) and Debian (bullseye..trixie) suite mapped to the base mirrors; see defaults/main.yml."
+      core_apt_cache_valid_time:
+        type: int
+        default: 3600
+        description: Seconds an apt cache is considered fresh (0 = always update). Ignored right after a mirror rewrite.
+      core_apt_update_retries:
+        type: int
+        description:
+          - Retries for C(apt update) against flaky mirrors.
+          - "Default: 3 (inline task default; not in defaults/main.yml)."
+      core_apt_update_retry_delay:
+        type: int
+        description:
+          - Seconds between C(apt update) retries.
+          - "Default: 5 (inline task default; not in defaults/main.yml)."
+      core_packages:
+        type: list
+        elements: str
+        description:
+          - Base packages installed on every host (Debian-style names; override on RHEL/Alpine).
+          - "Default: curl, wget, git, tar, unzip, jq, htop, ca-certificates, net-tools, ipset, vim, iotop, iftop, rsync, tzdata."
+      core_extra_packages:
+        type: list
+        elements: str
+        default: []
+        description: Additional packages installed alongside C(core_packages).
+
+      # -----------------------------------------------------------------------
+      # NTP
+      # -----------------------------------------------------------------------
+      core_manage_ntp:
+        type: bool
+        default: true
+        description: Configure systemd-timesyncd (Debian) or chrony (RedHat/SUSE/Arch).
+      core_ntp_servers:
+        type: list
+        elements: str
+        default:
+          - 0.pool.ntp.org
+          - 1.pool.ntp.org
+          - 2.pool.ntp.org
+          - 3.pool.ntp.org
+        description: Primary NTP servers.
+      core_ntp_fallback_servers:
+        type: list
+        elements: str
+        default:
+          - time.cloudflare.com
+          - time.google.com
+        description: Fallback NTP servers.
+
+      # -----------------------------------------------------------------------
+      # Swap
+      # -----------------------------------------------------------------------
+      core_manage_swap:
+        type: bool
+        default: true
+        description: Manage swap at all.
+      core_swap_enabled:
+        type: bool
+        default: false
+        description:
+          - When true create/enable C(core_swap_file); when false run C(swapoff -a) (ALL swap) and remove the managed file.
+      core_swap_file:
+        type: str
+        default: /swapfile
+        description: Path of the managed swap file.
+      core_swap_size_mb:
+        type: int
+        default: 2048
+        description: Swap file size in MiB (only used when the file is created).
+
+      # -----------------------------------------------------------------------
+      # Users
+      # -----------------------------------------------------------------------
+      core_manage_users:
+        type: bool
+        default: true
+        description:
+          - Manage users from C(core_users). Human users (UID 1000-59999) not in C(core_users), C(core_users_whitelist)
+            or C(core_primary_user) are REMOVED.
+      core_users:
+        type: list
+        elements: dict
+        default: []
+        description: Users to create/manage (exclusive, see C(core_manage_users)).
+        options:
+          name:
+            type: str
+            required: true
+            description: Username.
+          password:
+            type: str
+            no_log: true
+            description: Password hash (e.g. from mkpasswd); required when creating a user that should have a password.
+          update_password:
+            type: str
+            description: "C(always) or C(on_create). Default: C(always) if C(password) is set, else C(on_create)."
+          groups:
+            type: raw
+            description: Supplementary groups (list or comma-separated string).
+          group:
+            type: str
+            description: Group name ensured to exist (note - not assigned as the user's primary group).
+          append:
+            type: raw
+            description: "Keep existing group memberships (bool). Default: true."
+          shell:
+            type: str
+            description: "Login shell. Default: C(/bin/bash)."
+          ssh_keys:
+            type: list
+            elements: str
+            description: Controller paths of public key files; written exclusively to authorized_keys.
+          ssh_key:
+            type: str
+            description: Inline public key(s) added to authorized_keys (combined with C(ssh_keys)).
+          sudoer:
+            type: raw
+            description: "Create /etc/sudoers.d/<name> (bool, independent of the sudo group). Default: false."
+          sudoer_no_pass:
+            type: raw
+            description: "NOPASSWD sudo (bool, requires C(sudoer)). Default: false."
+      core_users_whitelist:
+        type: list
+        elements: str
+        default: []
+        description: Usernames never removed by the user purge.
+
+      # -----------------------------------------------------------------------
+      # SSH
+      # -----------------------------------------------------------------------
+      core_manage_ssh:
+        type: bool
+        default: true
+        description: Harden sshd (managed block in sshd_config, disables sshd_config.d includes and ssh.socket activation).
+      core_ssh_port:
+        type: raw
+        description:
+          - SSH port written to sshd_config, the firewall allow rule and the fail2ban sshd jail.
+          - "Default: C(ansible_facts.port) / C(ansible_facts.ssh_port), then C(ssh -G <inventory_hostname>), then 22."
+      core_ssh_ensure_pub_key_user:
+        type: raw
+        description:
+          - User that must have an authorized key before password auth is disabled (empty string skips the check).
+          - "Default: C(core_primary_user)."
+      core_ssh_password_auth:
+        type: bool
+        default: false
+        description: PasswordAuthentication.
+      core_ssh_permit_root_login:
+        type: bool
+        default: false
+        description: PermitRootLogin (when false, a non-root login user must exist).
+      core_ssh_x11_forwarding:
+        type: bool
+        default: false
+        description: X11Forwarding.
+      core_ssh_port_forwarding:
+        type: bool
+        default: true
+        description: AllowTcpForwarding.
+      core_ssh_max_auth_tries:
+        type: int
+        default: 3
+        description: MaxAuthTries.
+      core_ssh_login_grace_time:
+        type: raw
+        default: 30
+        description: LoginGraceTime (seconds or sshd time format).
+      core_ssh_allow_users:
+        type: list
+        elements: str
+        default: []
+        description: AllowUsers list (empty = no restriction); must include C(core_ssh_ensure_pub_key_user) or the role aborts.
+
+      # -----------------------------------------------------------------------
+      # Sysctl / IPv6
+      # -----------------------------------------------------------------------
+      core_manage_sysctl:
+        type: bool
+        default: true
+        description: Write /etc/sysctl.d/99-ansible-core.conf from base + extra + derived IPv6/forwarding keys.
+      core_sysctl_enable_bbr:
+        type: bool
+        default: true
+        description: Keep the BBR/fq keys of C(core_sysctl_base); set false on kernels without tcp_bbr.
+      core_sysctl_base:
+        type: dict
+        description:
+          - Base sysctl key/value map (security, TCP tuning incl. BBR, swappiness).
+          - "Default: see defaults/main.yml."
+      core_sysctl_extra:
+        type: dict
+        default: {}
+        description: Extra sysctl keys merged over C(core_sysctl_base).
+      core_sysctl_ip_forward:
+        type: bool
+        default: false
+        description: Enable IPv4 forwarding (and IPv6 forwarding when C(core_enable_ipv6)).
+      core_ipv6_interfaces:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Per-interface IPv6 via systemd-networkd drop-ins (requires C(core_enable_ipv6)); stale drop-ins are removed.
+          - "Keys: C(interface) (required), C(mode) (C(auto) RA/DHCPv6 default | C(static)), C(addresses) (list, required for static), C(gateway)."
+
+      # -----------------------------------------------------------------------
+      # IPSet
+      # -----------------------------------------------------------------------
+      core_manage_ipset:
+        type: bool
+        default: true
+        description: Manage ipsets (only runs when C(core_ipsets) is non-empty); restored at boot by ipset-restore.service.
+      core_ipset_data_dir:
+        type: str
+        default: /var/lib/ipset
+        description: Directory for ipset save files and update scripts.
+      core_ipsets:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - IPSets to create.
+          - "Keys: C(name) (required), C(type) (default C(hash:net)), C(family) (C(inet) default | C(inet6)),
+            C(entries) (static list) or C(url) (fetched list) with optional C(cron) (5-field schedule for auto-update)."
+
+      # -----------------------------------------------------------------------
+      # Firewall
+      # -----------------------------------------------------------------------
+      core_manage_firewall:
+        type: bool
+        default: true
+        description: Manage the HOST-FIREWALL iptables chain (jumped from INPUT position 1) plus the host-firewall-enforce daemon.
+      core_firewall_default_policy:
+        type: str
+        default: DROP
+        description: Final jump target at the bottom of HOST-FIREWALL (e.g. C(DROP), C(REJECT)).
+      core_firewall_ssh_src:
+        type: str
+        default: "0.0.0.0/0"
+        description: IPv4 source CIDR allowed to reach SSH.
+      core_firewall_ssh_src_v6:
+        type: str
+        default: "::/0"
+        description: IPv6 source CIDR allowed to reach SSH.
+      core_firewall_block_scans:
+        type: bool
+        default: true
+        description: Drop INVALID packets and TCP NULL/XMAS/SYN-FIN scans.
+      core_firewall_allow_ping:
+        type: bool
+        default: true
+        description: Allow rate-limited ICMP echo-request (IPv4).
+      core_firewall_enforce_interval:
+        type: int
+        default: 300
+        description: Seconds between host-firewall-enforce checks that HOST-FIREWALL sits at the top of INPUT.
+      core_firewall_pre_chains:
+        type: list
+        elements: str
+        default: []
+        description: Chains kept ahead of HOST-FIREWALL in INPUT when they exist (e.g. C(GOST-INGRESS)).
+      core_firewall_rules:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Allow rules in HOST-FIREWALL (merged with K3s rules from local facts).
+          - "Keys: C(port) (int or C(a:b) range), C(proto) (default tcp when port set), C(src) (v4 CIDR), C(src_v6),
+            C(in_interface), C(ipset) (match source set), C(v4_only), C(v6_only), C(comment)."
+
+      # -----------------------------------------------------------------------
+      # Fail2ban
+      # -----------------------------------------------------------------------
+      core_fail2ban_enabled:
+        type: bool
+        default: true
+        description: Install and configure fail2ban (sshd jail + extra jails).
+      core_fail2ban_bantime:
+        type: raw
+        default: 3600
+        description: Default bantime (seconds or fail2ban time string).
+      core_fail2ban_findtime:
+        type: raw
+        default: 600
+        description: Default findtime (seconds or fail2ban time string).
+      core_fail2ban_maxretry:
+        type: int
+        default: 5
+        description: Default maxretry.
+      core_fail2ban_ignoreip:
+        type: list
+        elements: str
+        default:
+          - 127.0.0.1/8
+          - "::1"
+        description: Addresses/CIDRs never banned.
+      core_fail2ban_ssh_maxretry:
+        type: int
+        default: 3
+        description: maxretry for the sshd jail.
+      core_fail2ban_extra_jails:
+        type: dict
+        default: {}
+        description: Map of jail name to a dict of jail settings, each written to /etc/fail2ban/jail.d/<name>.conf.
+
+      # -----------------------------------------------------------------------
+      # Cron
+      # -----------------------------------------------------------------------
+      core_manage_cron:
+        type: bool
+        default: true
+        description: Manage prefixed cron jobs.
+      core_cron_exclusive:
+        type: bool
+        default: true
+        description: Remove cron jobs carrying C(core_cron_prefix) that are not in the managed list.
+      core_cron_prefix:
+        type: str
+        default: ansible-
+        description: Name prefix of all managed cron jobs.
+      core_cron_jobs:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Cron jobs (root crontab by default).
+          - "Keys: C(name), C(job) (required), C(user), C(minute), C(hour), C(day), C(month), C(weekday), C(special_time),
+            C(state), C(disabled)."
+      core_cron_auto_ipset:
+        type: bool
+        default: true
+        description: Auto-create update cron jobs for C(core_ipsets) entries that have both C(url) and C(cron).
+
+  firewall:
+    short_description: Apply only the core HOST-FIREWALL iptables chain (used by the k3s role).
+    description:
+      - Entry point for C(include_role tasks_from=firewall); builds HOST-FIREWALL from C(core_firewall_rules) plus K3s rules in
+        C(ansible_local.k3s.firewall_rules), saves only HOST-FIREWALL rules and deploys host-firewall-enforce.
+      - "Tags: inherited from the caller (k3s applies k3s, firewall)."
+    author: AHMZ
+    options:
+      core_enable_ipv6:
+        type: raw
+        description:
+          - Also build the ip6tables HOST-FIREWALL chain.
+          - "Default: derived from global C(enable_ipv6) (false when unset)."
+      core_ssh_port:
+        type: raw
+        description:
+          - SSH port always allowed (custom rules on the same port are skipped).
+          - "Default: C(ansible_facts.port) / C(ansible_facts.ssh_port), then C(ssh -G <inventory_hostname>), then 22."
+      core_firewall_default_policy:
+        type: str
+        default: DROP
+        description: Final jump target at the bottom of HOST-FIREWALL (e.g. C(DROP), C(REJECT)).
+      core_firewall_ssh_src:
+        type: str
+        default: "0.0.0.0/0"
+        description: IPv4 source CIDR allowed to reach SSH.
+      core_firewall_ssh_src_v6:
+        type: str
+        default: "::/0"
+        description: IPv6 source CIDR allowed to reach SSH.
+      core_firewall_block_scans:
+        type: bool
+        default: true
+        description: Drop INVALID packets and TCP NULL/XMAS/SYN-FIN scans.
+      core_firewall_allow_ping:
+        type: bool
+        default: true
+        description: Allow rate-limited ICMP echo-request (IPv4).
+      core_firewall_enforce_interval:
+        type: int
+        default: 300
+        description: Seconds between host-firewall-enforce checks that HOST-FIREWALL sits at the top of INPUT.
+      core_firewall_pre_chains:
+        type: list
+        elements: str
+        default: []
+        description: Chains kept ahead of HOST-FIREWALL in INPUT when they exist (e.g. C(GOST-INGRESS)).
+      core_firewall_rules:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Allow rules in HOST-FIREWALL (merged with K3s rules from local facts).
+          - "Keys: C(port) (int or C(a:b) range), C(proto) (default tcp when port set), C(src) (v4 CIDR), C(src_v6),
+            C(in_interface), C(ipset) (match source set), C(v4_only), C(v6_only), C(comment)."
