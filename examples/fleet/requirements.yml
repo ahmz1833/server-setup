@@ -1,0 +1,4 @@
+---
+# `make setup` installs/UPGRADES these into ./collections (latest by default).
+collections:
+  - name: ahmz1833.server_setup

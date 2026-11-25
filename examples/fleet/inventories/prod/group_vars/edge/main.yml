@@ -1,0 +1,10 @@
+---
+core_firewall_rules:
+  - {port: 80, comment: "HTTP (ACME + redirect)"}
+  - {port: 443, comment: "HTTPS"}
+  - {port: 9100, src: "{{ vault_monitoring_ip }}", comment: "node_exporter ← mon-1 only"}
+
+nginx_managed: true
+nginx_waf_install: true
+acme_account_email: "ops@example.com"
+# Sites differ per host → host_vars/<host>/main.yml (nginx_sites, acme_certificates, apps_list)

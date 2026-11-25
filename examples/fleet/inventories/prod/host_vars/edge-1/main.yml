@@ -1,0 +1,15 @@
+---
+acme_certificates:
+  - domains: ["www.example.com", "example.com"]
+    challenge: http-01
+nginx_sites:
+  - domain: www.example.com
+    aliases: ["example.com"]
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:3000"
+    waf_enabled: true
+apps_list:
+  - name: website
+    image: ghcr.io/example/website:1.4.2      # pinned; CI bumps it (ci/gitlab-deploy.yml)
+    ports: ["127.0.0.1:3000:3000"]
+    restart_policy: unless-stopped

@@ -1,0 +1,7 @@
+---
+- name: Sandboxes
+  hosts: sandbox
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.sandbox
+      tags: [sandbox]

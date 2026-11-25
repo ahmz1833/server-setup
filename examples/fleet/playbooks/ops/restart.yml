@@ -1,0 +1,19 @@
+---
+# Restart (or reload) a systemd service.
+#   make run PLAY=ops/restart LIMIT=web-1 EXTRA="-e service=nginx [-e state=reloaded]"
+- name: Restart a service
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    state: restarted
+  tasks:
+    - name: Require service name
+      ansible.builtin.assert:
+        that: service is defined and service | length > 0
+        fail_msg: "pass -e service=<name>"
+
+    - name: "Set service state: {{ service }}"
+      ansible.builtin.systemd_service:
+        name: "{{ service }}"
+        state: "{{ state }}"

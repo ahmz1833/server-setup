@@ -1,0 +1,18 @@
+---
+acme_certificates:
+  - domains: ["shop.example.com"]
+    challenge: http-01
+nginx_sites:
+  - domain: shop.example.com
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:8080"
+    waf_enabled: true
+    locations:
+      - path: /login
+        upstream: "http://127.0.0.1:8080"
+        rate_limit: {zone: global_limit, burst: 5, nodelay: true}   # brute-force guard
+apps_list:
+  - name: shop
+    image: ghcr.io/example/shop:2.0.1
+    ports: ["127.0.0.1:8080:8080"]
+    restart_policy: unless-stopped

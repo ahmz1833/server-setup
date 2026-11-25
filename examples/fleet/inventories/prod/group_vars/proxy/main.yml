@@ -1,0 +1,19 @@
+---
+# Authenticated relay on a vaulted port. Admins/clients only; no open proxy.
+node_gost_install: true
+node_gost_enabled: true
+node_gost_config:
+  services:
+    - name: relay
+      addr: ":{{ vault_relay_port }}"
+      handler:
+        type: socks5
+        auths:
+          - username: "{{ vault_relay_user }}"
+            password: "{{ vault_relay_password }}"
+      listener:
+        type: tcp
+
+core_firewall_rules:
+  - {port: "{{ vault_relay_port }}", comment: "relay (authenticated)"}
+  - {port: 9100, src: "{{ vault_monitoring_ip }}", comment: "node_exporter ← mon-1 only"}

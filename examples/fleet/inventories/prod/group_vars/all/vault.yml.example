@@ -1,0 +1,15 @@
+---
+# FAKE values. `make vault-init` → encrypted vault.yml, then `make vault-edit`.
+vault_admin_user: opsadmin
+vault_monitoring_ip: "203.0.113.60/32"       # mon-1, the only scraper
+vault_hosts:
+  edge-1:  {address: 198.51.100.41, ssh_port: 22}
+  edge-2:  {address: 198.51.100.42, ssh_port: 22}
+  relay-1: {address: 198.51.100.51, ssh_port: 22}
+  lab-1:   {address: 198.51.100.61, ssh_port: 22}
+  mon-1:   {address: 203.0.113.60, ssh_port: 22}
+vault_relay_port: 8443                        # relay listener (non-standard → secret)
+vault_relay_user: CHANGEME
+vault_relay_password: CHANGEME
+vault_sandbox_ssh_port: 2222
+vault_grafana_admin_password: CHANGEME

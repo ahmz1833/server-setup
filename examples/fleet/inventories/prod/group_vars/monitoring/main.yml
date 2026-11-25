@@ -1,0 +1,45 @@
+---
+# Prometheus + Grafana as containers. Grafana is public (behind nginx/WAF);
+# Prometheus stays on loopback — reach it with an SSH tunnel.
+nginx_managed: true
+nginx_waf_install: true
+acme_account_email: "ops@example.com"
+acme_certificates:
+  - domains: ["grafana.example.com"]
+    challenge: http-01
+nginx_sites:
+  - domain: grafana.example.com
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:3000"
+    waf_enabled: true
+
+apps_networks:
+  - name: monitoring
+    internal: false
+apps_list:
+  - name: prometheus
+    image: prom/prometheus:v3.5.0
+    ports: ["127.0.0.1:9090:9090"]
+    volumes:
+      - "./config:/etc/prometheus:ro"
+      - "./data:/prometheus"
+    directories:      # created by the apps role, owned by the container user (nobody)
+      - {path: /opt/apps/prometheus/data, owner: "65534", mode: "0750"}
+    networks: [{name: monitoring}]
+    restart_policy: unless-stopped
+  - name: grafana
+    image: grafana/grafana:12.1.0
+    ports: ["127.0.0.1:3000:3000"]
+    env:
+      GF_SECURITY_ADMIN_PASSWORD: "{{ vault_grafana_admin_password }}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes: ["./data:/var/lib/grafana"]
+    directories:
+      - {path: /opt/apps/grafana/data, owner: "472", mode: "0750"}
+    networks: [{name: monitoring}]
+    depends_on: [prometheus]
+    restart_policy: unless-stopped
+
+core_firewall_rules:
+  - {port: 80, comment: "HTTP (ACME + redirect)"}
+  - {port: 443, comment: "HTTPS grafana"}
