@@ -33,7 +33,7 @@ put() {
 }
 
 SHARED=(Makefile ansible.cfg requirements.txt .gitignore .yamllint .ansible-lint
-        files/ssh_keys/README.md playbooks/ops/restart.yml playbooks/ops/reboot.yml
+        scripts/infra-tools.py files/ssh_keys/README.md playbooks/ops/restart.yml playbooks/ops/reboot.yml
         playbooks/ops/upgrade.yml)
 
 # 1. roles index
