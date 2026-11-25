@@ -9,7 +9,7 @@ galaxy_info:
     is refused on Alpine/musl; override node_tools_packages on RPM-based distros
     where Debian package names differ.
   license: MIT
-  min_ansible_version: "2.14"
+  min_ansible_version: "2.15"
   platforms:
     - name: Ubuntu
       versions:

@@ -10,7 +10,7 @@ galaxy_info:
     and SnappyMail. Features include DKIM/DMARC/SPF setup, automated user
     management with SSoT, and admin spoofing capabilities.
   license: MIT
-  min_ansible_version: "2.14"
+  min_ansible_version: "2.15"
   platforms:
     - name: Ubuntu
       versions:

@@ -11,7 +11,7 @@ galaxy_info:
     preserve-mode merges for CI/CD, automatic networks and host bind paths,
     registry login, and optional pruning of unmanaged containers/networks.
   license: MIT
-  min_ansible_version: "2.14"
+  min_ansible_version: "2.15"
   platforms:
     - name: Ubuntu
       versions:
