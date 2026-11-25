@@ -1,0 +1,624 @@
+---
+argument_specs:
+  main:
+    short_description: Optional host services - sing-box, CLI tools/bootstrap, GOST, X-UI, Docker, node_exporter, GitLab Runner.
+    description:
+      - Installs upstream binaries through the C(ahmz1833.server_setup.asset) role and manages their systemd units.
+      - Each block has an install toggle (C(*_install), or C(node_docker_enabled)) and, where relevant, a service toggle (C(*_enabled)).
+      - Reads playbook-level globals C(primary_user), C(download_locally), C(is_iran), C(enable_ipv6) through derived defaults.
+      - Architecture tokens for downloads come from C(node_arch_*) / C(node_docker_*_arch) maps keyed by C(ansible_facts.architecture).
+      - "Tags: node, node-singbox, node-tools, node-bootstrap, node-gost, node-xui, node-docker, node-exporter, node-gitlab-runner."
+    author: AHMZ
+    options:
+      # -----------------------------------------------------------------------
+      # Meta variables
+      # -----------------------------------------------------------------------
+      node_primary_user:
+        type: raw
+        description:
+          - Non-root user added to the docker group and used for the shell bootstrap.
+          - "Default: derived from global C(primary_user) (C(root) when unset)."
+      node_download_locally:
+        type: raw
+        description:
+          - Passed to the asset role as C(asset_download_locally) (download on the controller, push to target).
+          - "Default: derived from global C(download_locally) (false when unset)."
+      node_internet_restricted:
+        type: raw
+        description:
+          - Restricted-egress host; drives C(node_singbox_install) and the bootstrap mirror URL.
+          - "Default: derived from global C(is_iran) (false when unset)."
+      node_enable_ipv6:
+        type: raw
+        description:
+          - IPv6 in sing-box (DNS AAAA, TUN v6 address).
+          - "Default: derived from global C(enable_ipv6) (false when unset)."
+
+      # -----------------------------------------------------------------------
+      # Architecture maps (override for unusual CPUs)
+      # -----------------------------------------------------------------------
+      node_arch_go_platform_suffix_map:
+        type: dict
+        description:
+          - "Architecture fact -> Go-style token (amd64, arm64, armv7, ...)."
+          - "Used by node_exporter, sing-box, x-ui, fzf, gost, wgcf, gitlab-runner. Default: see defaults/main.yml."
+      node_arch_go_platform_suffix:
+        type: raw
+        description: "Resolved Go-style token. Default: lookup of C(ansible_facts.architecture) in C(node_arch_go_platform_suffix_map) (raw fact if unmapped)."
+      node_arch_docker_static_tarball_map:
+        type: dict
+        description: "Architecture fact -> download.docker.com static tarball dir (x86_64, aarch64, armhf, ...). Default: see defaults/main.yml."
+      node_arch_docker_static_tarball:
+        type: raw
+        description: "Resolved Docker static tarball arch. Default: lookup in C(node_arch_docker_static_tarball_map)."
+      node_docker_asset_arch:
+        type: raw
+        description: "Arch segment of the Docker static engine URL. Default: C(node_arch_docker_static_tarball)."
+      node_docker_buildx_arch_map:
+        type: dict
+        description: "Architecture fact -> buildx release token (amd64, arm64, arm-v7, ...). Default: see defaults/main.yml."
+      node_docker_buildx_arch:
+        type: raw
+        description: "Resolved buildx token. Default: lookup in C(node_docker_buildx_arch_map)."
+      node_docker_compose_arch_map:
+        type: dict
+        description: "Architecture fact -> docker compose release token (x86_64, aarch64, armv7, ...). Default: see defaults/main.yml."
+      node_docker_compose_arch:
+        type: raw
+        description: "Resolved compose token. Default: lookup in C(node_docker_compose_arch_map)."
+      node_arch_dust_triple_map:
+        type: dict
+        description: "Architecture fact -> dust Rust target triple. Default: see defaults/main.yml."
+      node_arch_dust_triple:
+        type: raw
+        description: "Resolved dust triple. Default: lookup in C(node_arch_dust_triple_map)."
+      node_arch_eza_triple_map:
+        type: dict
+        description: "Architecture fact -> eza Rust target triple. Default: see defaults/main.yml."
+      node_arch_eza_triple:
+        type: raw
+        description: "Resolved eza triple. Default: lookup in C(node_arch_eza_triple_map)."
+      node_arch_zoxide_triple_map:
+        type: dict
+        description: "Architecture fact -> zoxide Rust target triple. Default: see defaults/main.yml."
+      node_arch_zoxide_triple:
+        type: raw
+        description: "Resolved zoxide triple. Default: lookup in C(node_arch_zoxide_triple_map)."
+      node_arch_starship_triple_map:
+        type: dict
+        description: "Architecture fact -> starship Rust target triple. Default: see defaults/main.yml."
+      node_arch_starship_triple:
+        type: raw
+        description: "Resolved starship triple. Default: lookup in C(node_arch_starship_triple_map)."
+      node_arch_lazydocker_map:
+        type: dict
+        description: "Architecture fact -> lazydocker release token. Default: see defaults/main.yml."
+      node_arch_lazydocker:
+        type: raw
+        description: "Resolved lazydocker token. Default: lookup in C(node_arch_lazydocker_map)."
+      node_arch_yazi_linux_map:
+        type: dict
+        description: "Architecture fact -> yazi release triple. Default: see defaults/main.yml."
+      node_arch_yazi_linux:
+        type: raw
+        description: "Resolved yazi triple. Default: lookup in C(node_arch_yazi_linux_map)."
+      node_arch_gitui_linux_map:
+        type: dict
+        description: "Architecture fact -> gitui release token. Default: see defaults/main.yml."
+      node_arch_gitui_linux:
+        type: raw
+        description: "Resolved gitui token. Default: lookup in C(node_arch_gitui_linux_map)."
+      node_arch_lazyjournal_linux_map:
+        type: dict
+        description: "Architecture fact -> lazyjournal release token. Default: see defaults/main.yml."
+      node_arch_lazyjournal_linux:
+        type: raw
+        description: "Resolved lazyjournal token. Default: lookup in C(node_arch_lazyjournal_linux_map)."
+
+      # -----------------------------------------------------------------------
+      # sing-box
+      # -----------------------------------------------------------------------
+      node_singbox_install:
+        type: raw
+        description:
+          - Install sing-box and render /etc/sing-box/config.json.
+          - "Default: C(node_internet_restricted)."
+      node_singbox_enabled:
+        type: bool
+        default: false
+        description: Start and enable the sing-box service.
+      node_singbox_version:
+        type: str
+        default: "1.14.2"
+        description: sing-box version.
+      node_singbox_libc:
+        type: str
+        choices: [auto, glibc, musl]
+        default: auto
+        description: Release tarball libc variant; C(auto) picks musl on Alpine.
+      node_singbox_mixed_listen:
+        type: str
+        default: 127.0.0.1
+        description: Listen address of the mixed (SOCKS5 + HTTP) inbound.
+      node_singbox_mixed_port:
+        type: raw
+        default: 10808
+        description: Port of the mixed inbound.
+      node_singbox_tun_enabled:
+        type: bool
+        default: false
+        description: Add a TUN inbound (transparent proxy).
+      node_singbox_tun_interface:
+        type: str
+        default: tun-sb
+        description: TUN interface name.
+      node_singbox_tun_stack:
+        type: str
+        default: system
+        description: TUN stack (C(system), C(gvisor), C(mixed)).
+      node_singbox_tun_mtu:
+        type: int
+        default: 1500
+        description: TUN MTU.
+      node_singbox_tun_auto_route:
+        type: bool
+        default: true
+        description: TUN auto_route.
+      node_singbox_tun_auto_redirect:
+        type: raw
+        description:
+          - TUN auto_redirect (bool).
+          - "Default: C(node_singbox_tun_auto_route)."
+      node_singbox_tun_strict_route:
+        type: bool
+        default: true
+        description: TUN strict_route.
+      node_singbox_tun_inet4_address:
+        type: str
+        default: 172.19.0.1/30
+        description: TUN IPv4 address.
+      node_singbox_tun_inet6_address:
+        type: str
+        default: fdfe:dcba:9876::1/126
+        description: TUN IPv6 address (used when C(node_enable_ipv6)).
+      node_singbox_tun_route_exclude_address:
+        type: list
+        elements: str
+        default:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+          - 169.254.0.0/16
+          - 100.64.0.0/10
+        description: CIDRs that bypass the TUN (default all private, link-local and CGNAT ranges).
+      node_singbox_dns:
+        type: dict
+        default:
+          remote: tls://8.8.8.8
+          direct: local
+          final: dns-remote
+          fakeip: true
+          strategy: ipv4_only
+          rules: []
+        description:
+          - "DNS settings. Keys: C(remote) / C(direct) (C(local), C(tls://), C(https://), C(quic://) or plain UDP server),
+            C(final) (C(dns-remote)|C(dns-direct)), C(fakeip) (bool), C(strategy), C(rules) (sing-box DNS rules; C(server) gets a C(dns-) prefix)."
+      node_singbox_dns_default_rules:
+        type: list
+        elements: dict
+        description:
+          - DNS rules appended after C(node_singbox_dns.rules) (localhost answer, geosite-ir and C(.ir) via direct DNS).
+          - "Default: see defaults/main.yml."
+      node_singbox_outbounds:
+        type: dict
+        default:
+          links: []
+          configs: []
+          selectors: []
+        description:
+          - "Outbounds. Keys: C(links) (share links parsed on the controller by C(vpnparser); tag from C(#fragment)),
+            C(configs) (raw sing-box outbound dicts, may use C(detour)),
+            C(selectors) (urltest/selector/fallback dicts; C(use_all_links: true) adds all link tags)."
+      node_singbox_final_outbound:
+        type: str
+        default: proxy
+        description: Route final outbound tag for unmatched traffic (also the remote DNS detour).
+      node_singbox_ruleset_base_url:
+        type: str
+        default: https://s3.ahmz.ir/rule-set/Iran-sing-box-rules/Chocolate4U
+        description: Base URL of the default direct rule-set (.srs) files.
+      node_singbox_direct_rulesets:
+        type: list
+        elements: dict
+        description:
+          - Remote rule sets routed direct; items have C(tag) and C(url). Empty list disables rule-set routing.
+          - "Default: C(geoip-ir) and C(geosite-ir) under C(node_singbox_ruleset_base_url)."
+      node_singbox_direct_domain_suffix:
+        type: list
+        elements: str
+        default:
+          - .ir
+        description: Domain suffixes routed direct.
+      node_singbox_direct_ip_cidr:
+        type: list
+        elements: str
+        default: []
+        description: IP CIDRs routed direct.
+
+      # -----------------------------------------------------------------------
+      # Tools & bootstrap
+      # -----------------------------------------------------------------------
+      node_tools_packages:
+        type: list
+        elements: str
+        description:
+          - OS packages installed by the tools block (Debian names; replace on RHEL/Alpine).
+          - "Default: zsh, tmux, ripgrep, git, curl, ca-certificates, btop, iotop, iftop, ncdu, duf, nmap, mtr, iperf3, tcpdump, jq, netcat-openbsd."
+      node_bootstrap_enabled:
+        type: bool
+        default: true
+        description:
+          - Install CLI tools (dust, fzf, yazi, gitui, lazyjournal, eza, zoxide, starship).
+          - Run the dotfiles bootstrap script and set zsh as the primary user's shell.
+      node_dust_version:
+        type: str
+        default: "1.2.6"
+        description: dust version (empty string skips).
+      node_fzf_version:
+        type: str
+        default: "0.74.4"
+        description: fzf version (empty string skips).
+      node_eza_version:
+        type: str
+        default: "0.23.5"
+        description: eza version (empty string skips).
+      node_yazi_version:
+        type: str
+        default: "26.9.1"
+        description: yazi version (empty string skips).
+      node_gitui_version:
+        type: str
+        default: "0.28.1"
+        description: gitui version (empty string skips).
+      node_lazyjournal_version:
+        type: str
+        default: "0.8.6"
+        description: lazyjournal version (empty string skips).
+      node_zoxide_version:
+        type: str
+        default: "0.10.0"
+        description: zoxide version (empty string skips).
+      node_starship_version:
+        type: str
+        default: "1.26.0"
+        description: starship version (empty string skips).
+      node_wgcf_install:
+        type: bool
+        default: false
+        description: Install wgcf (Cloudflare WARP profile generator).
+      node_wgcf_version:
+        type: str
+        default: "2.3.0"
+        description: wgcf version.
+      node_bootstrap_script_url:
+        type: raw
+        description:
+          - Dotfiles bootstrap script piped to bash as C(node_primary_user).
+          - "Default: s3.ahmz.ir mirror if C(node_internet_restricted), else raw.githubusercontent.com/ahmz1833/dots."
+      node_bootstrap_extra_args:
+        type: str
+        default: ""
+        description: Extra arguments appended to the bootstrap script command line.
+      node_lazydocker_install:
+        type: raw
+        description:
+          - Install lazydocker.
+          - "Default: C(node_docker_enabled)."
+      node_lazydocker_version:
+        type: str
+        default: "0.25.2"
+        description: lazydocker version.
+
+      # -----------------------------------------------------------------------
+      # GOST
+      # -----------------------------------------------------------------------
+      node_gost_install:
+        type: bool
+        default: true
+        description: Install GOST and its systemd unit.
+      node_gost_enabled:
+        type: bool
+        default: false
+        description: Start and enable the gost service.
+      node_gost_version:
+        type: str
+        default: "3.3.0"
+        description: GOST version.
+      node_gost_config:
+        type: dict
+        default: {}
+        description: GOST configuration written verbatim as YAML to /etc/gost/config.yml (empty removes the file).
+      node_gost_limit_nofile:
+        type: raw
+        default: 65535
+        description: LimitNOFILE of the gost unit.
+      node_gost_environment:
+        type: dict
+        default: {}
+        description: Extra environment variables for the gost unit (e.g. C(GOGC)).
+      node_gost_tls_dir:
+        type: str
+        default: /etc/gost/tls
+        description: Directory for key.pem, cert.pem and ca.pem.
+      node_gost_tls_selfsigned:
+        type: bool
+        default: false
+        description: Generate a self-signed ECDSA key/cert (avoids GOST's fingerprintable built-in cert).
+      node_gost_tls_common_name:
+        type: raw
+        description:
+          - Common name of the self-signed certificate.
+          - "Default: C(inventory_hostname)."
+      node_gost_tls_sans:
+        type: list
+        elements: str
+        default: []
+        description: Subject alt names (e.g. C(DNS:example.com)); empty means C(DNS:<common_name>).
+      node_gost_tls_valid_days:
+        type: int
+        default: 3650
+        description: Self-signed certificate validity in days.
+      node_gost_tls_trust_hosts:
+        type: list
+        elements: str
+        default: []
+        description: Inventory hosts whose GOST self-signed certs are pinned into ca.pem.
+      node_gost_egress_guard:
+        type: dict
+        default: {}
+        description:
+          - "Kernel egress guard rejecting traffic of sockets marked C(mark) (gost C(sockopts.mark)). Keys: C(mark), C(deny) (v4 CIDRs), C(deny6) (v6 CIDRs)."
+      node_gost_ingress_allow:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - "Kernel ingress rules for gost ports (GOST-INGRESS chain). Keys: C(port), C(src) (allowlist, others dropped),
+            C(connlimit) (per-source), C(rate) (e.g. C(20/sec)), C(burst)."
+
+      # -----------------------------------------------------------------------
+      # X-UI
+      # -----------------------------------------------------------------------
+      node_xui_install:
+        type: bool
+        default: false
+        description: Install and configure the 3x-ui panel.
+      node_xui_enabled:
+        type: bool
+        default: false
+        description: Start and enable the x-ui service.
+      node_xui_repo:
+        type: str
+        default: MHSanaei/3x-ui
+        description: GitHub repo (owner/name) of the X-UI release.
+      node_xui_version:
+        type: str
+        default: "3.8.5"
+        description: X-UI version.
+      node_xui_port:
+        type: raw
+        default: 2053
+        description: Panel port.
+      node_xui_web_base_path:
+        type: str
+        default: /secret-panel/
+        description: Panel web base path (include leading and trailing slashes).
+      node_xui_username:
+        type: str
+        default: admin
+        description: Panel username.
+      node_xui_password:
+        type: str
+        default: admin
+        no_log: true
+        description: Panel password.
+      node_xui_cert_path:
+        type: str
+        default: ""
+        description: TLS certificate path for the panel (empty when behind NGINX).
+      node_xui_key_path:
+        type: str
+        default: ""
+        description: TLS key path for the panel.
+      node_xui_db_type:
+        type: str
+        default: sqlite
+        description: Database backend - C(sqlite) or C(postgres) (C(postgresql)/C(pg) accepted); postgres requires C(node_xui_db_dsn).
+      node_xui_db_dsn:
+        type: str
+        default: ""
+        no_log: true
+        description: PostgreSQL DSN (e.g. C(postgres://xui:secret@127.0.0.1:5432/xui?sslmode=disable)).
+      node_xui_skip_hsts:
+        type: bool
+        default: false
+        description: Disable the HSTS header (panel behind a TLS-terminating proxy).
+      node_xui_env:
+        type: dict
+        default: {}
+        description: Extra variables for the x-ui EnvironmentFile (service and CLI), e.g. C(XUI_LOG_LEVEL).
+      node_xui_settings:
+        type: dict
+        default: {}
+        description: "Panel DB settings without a CLI flag (sqlite only), e.g. C({subEnable: false, subPort: 2097})."
+      node_xui_db_path:
+        type: str
+        default: /etc/x-ui/x-ui.db
+        description: SQLite database path.
+      node_xui_cred_marker:
+        type: str
+        default: /etc/x-ui/.ansible-credentials
+        description: File storing the hash of applied credentials (for idempotency).
+      node_xui_get_api_token:
+        type: bool
+        default: false
+        description: Read the panel API token into the C(node_xui_api_token) fact.
+      node_xui_distro_map:
+        type: dict
+        description:
+          - Per OS family C(env_file) and C(service_file) paths (Debian, RedHat, Archlinux).
+          - "Default: see defaults/main.yml."
+      node_xui_distro:
+        type: raw
+        description: "Selected distro entry. Default: C(node_xui_distro_map[ansible_facts.os_family]) falling back to Debian."
+
+      # -----------------------------------------------------------------------
+      # Docker
+      # -----------------------------------------------------------------------
+      node_docker_enabled:
+        type: bool
+        default: true
+        description: Install Docker (static engine, containerd/docker units, buildx/compose plugins) and run it.
+      node_docker_min_version:
+        type: str
+        default: "29.2.0"
+        description: If the installed engine is at least this version the engine install is skipped.
+      node_docker_version:
+        type: str
+        default: "29.8.2"
+        description: Docker static engine version to install.
+      node_docker_package_dir:
+        type: str
+        default: /usr/local/lib/docker
+        description: Directory holding the extracted engine binaries (symlinked into /usr/local/bin).
+      node_docker_cli_plugin_dir:
+        type: str
+        default: /usr/local/libexec/docker/cli-plugins
+        description: Docker CLI plugin directory.
+      node_docker_binaries:
+        type: list
+        elements: str
+        description:
+          - Engine binaries symlinked into /usr/local/bin.
+          - "Default: docker, dockerd, containerd, containerd-shim-runc-v2, ctr, docker-init, docker-proxy, runc."
+      node_docker_bip:
+        type: str
+        default: 172.29.0.1/16
+        description: daemon.json C(bip).
+      node_docker_default_address_pools:
+        type: list
+        elements: dict
+        default:
+          - base: 172.30.0.0/16
+            size: 24
+        description: daemon.json C(default-address-pools) (items with C(base) and C(size)).
+      node_docker_log_driver:
+        type: str
+        default: json-file
+        description: daemon.json C(log-driver).
+      node_docker_log_opts:
+        type: dict
+        default:
+          max-size: 50m
+          max-file: "3"
+        description: daemon.json C(log-opts).
+      node_docker_live_restore:
+        type: bool
+        default: true
+        description: daemon.json C(live-restore).
+      node_docker_experimental:
+        type: bool
+        default: false
+        description: daemon.json C(experimental).
+      node_docker_metrics_enabled:
+        type: bool
+        default: true
+        description: Expose Prometheus metrics at C(node_docker_metrics_addr).
+      node_docker_metrics_addr:
+        type: str
+        default: 127.0.0.1:9323
+        description: daemon.json C(metrics-addr).
+      node_docker_buildx_install:
+        type: bool
+        default: true
+        description: Install the buildx CLI plugin.
+      node_docker_buildx_version:
+        type: str
+        default: "0.37.2"
+        description: buildx version.
+      node_docker_compose_install:
+        type: bool
+        default: true
+        description: Install the compose CLI plugin.
+      node_docker_compose_version:
+        type: str
+        default: "5.6.0"
+        description: docker compose version.
+
+      # -----------------------------------------------------------------------
+      # GitLab Runner
+      # -----------------------------------------------------------------------
+      node_gitlab_runner_install:
+        type: bool
+        default: false
+        description: Install the gitlab-runner binary (no registration or service).
+      node_gitlab_runner_version:
+        type: str
+        default: "19.4.1"
+        description: gitlab-runner version.
+
+      # -----------------------------------------------------------------------
+      # node_exporter
+      # -----------------------------------------------------------------------
+      node_exporter_install:
+        type: bool
+        default: true
+        description: Install Prometheus node_exporter and its unit.
+      node_exporter_enabled:
+        type: bool
+        default: false
+        description: Start and enable the node_exporter service.
+      node_exporter_version:
+        type: str
+        default: "1.12.1"
+        description: node_exporter version.
+      node_exporter_listen_address:
+        type: str
+        default: 127.0.0.1:9100
+        description: C(--web.listen-address).
+      node_exporter_enabled_collectors:
+        type: list
+        elements: str
+        default: []
+        description: Collectors to enable (C(--collector.<name>)).
+      node_exporter_disabled_collectors:
+        type: list
+        elements: str
+        default: []
+        description: Collectors to disable (C(--no-collector.<name>)).
+      node_exporter_extra_args:
+        type: list
+        elements: str
+        default: []
+        description: Extra command-line arguments.
+      node_exporter_textfile_dir:
+        type: str
+        default: /var/lib/node_exporter/textfile
+        description: Textfile collector directory (flag added only when scripts are defined).
+      node_exporter_textfile_scripts:
+        type: list
+        elements: dict
+        default: []
+        description: Textfile collector scripts run as root by systemd timers; stdout goes to C(<textfile_dir>/<name>.prom).
+        options:
+          name:
+            type: str
+            required: true
+            description: Script name (also used for unit and .prom names).
+          content:
+            type: str
+            required: true
+            description: Script content (include a shebang).
+          interval:
+            type: str
+            description: "Timer OnUnitActiveSec. Default: C(5min)."
