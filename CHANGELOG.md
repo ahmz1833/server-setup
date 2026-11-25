@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-11-25
+
+### Added
+- **all roles**: `meta/argument_specs.yml` — every user-settable variable is validated at
+  runtime and documented via `ansible-doc -t role ahmz1833.server_setup.<role>` (core also
+  has a `firewall` entry point). Specs are permissive (`raw` for templated values).
+- **docs/**: IaC project standard (`iac-standard.md`, incl. collection-first rule and other
+  IaC tools), security guide with two threat models — public repository and runtime attack
+  surface (`security.md`), operations (task-intake model, change loop, drift, day-2),
+  debugging cookbook, toolchain, generated `roles-index.md`.
+- **examples/**: complete projects — `starter` (single server), `multi-env-cluster`
+  (staging/prod, per-env vault ids, k3s HA, mail, local role), `fleet` (heterogeneous
+  servers, function + location groups, CI app deploys). Standard Makefile with `setup`,
+  `shell` (`make shell -- <cmd>`), `validate` (offline argument-spec check), `check`,
+  `apply`, `run`, `vault-*`, `lint`, `docker-shell`.
+- **skills/**: AI agent skills `infra-iac`, `infra-bootstrap`, `server-setup-dev`;
+  installable as a Claude Code plugin (`.claude-plugin/`) or with `npx skills add
+  ahmz1833/server-setup`, and shipped inside the collection tarball.
+- **scripts/**: `ensure-toolchain.sh` (installs ansible if needed and the latest collection
+  into the project), `gen-roles-index.py`, `sync.sh` (single-source copies),
+  `check-consistency.py` (defaults ⇄ argument specs), `test-examples.sh`.
+- Root `requirements.yml`, `CLAUDE.md`, `.dockerignore`.
+
+### Changed
+- **Dockerfile**: pinned base image; installs the collection from the build context (image
+  tag = collection version); includes `make`, `bash`, passlib, jmespath and all dependencies.
+- **CI**: consistency, sync drift, skills/manifest checks, `ansible-doc` for all roles,
+  example projects (vault, syntax, argument specs, lint), runner image smoke test. Release
+  checks the plugin version.
+- **AGENTS.md**: source-of-truth map and a mandatory doc-impact checklist for role changes.
+- `min_ansible_version` 2.15 in all roles (matches `meta/runtime.yml`).
+- **README**: AI agents, starting a project, examples, accurate role/asset descriptions and
+  repository layout.
+
+### Fixed
+- **acme** README: Cloudflare DNS-01 automation documented (was described as unsupported);
+  `acme_cloudflare_zone`, per-cert `dns_provider`/`zone` added.
+- **k3s** README: removed non-existent `k3s-*` tags; corrected task order.
+- **mail** README: example no longer uses a real domain or plaintext passwords.
+- **node** `examples/docker.yml`: Docker `{{.Name}}` log tag marked `!unsafe` (broke templating).
+
 ## [1.4.18] - 2026-10-12
 
 ### Added
