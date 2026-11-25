@@ -1,10 +1,15 @@
 ---
+# The password reaches php through an environment variable: it never appears in the
+# command line (process list, logs) and any characters (quotes, $, \) are safe.
 - name: Generate bcrypt hash for webmail admin password
   community.docker.docker_container_exec:
     container: webmail
-    command: php -r "echo password_hash('{{ mail_webmail_admin_password }}', PASSWORD_BCRYPT);"
+    command: php -r 'echo password_hash(getenv("SNAPPYMAIL_ADMIN_PASSWORD"), PASSWORD_BCRYPT);'
+    env:
+      SNAPPYMAIL_ADMIN_PASSWORD: "{{ mail_webmail_admin_password | string }}"
   register: mail_webmail_admin_hash
   changed_when: false
+  no_log: true
 
 - name: Check current SnappyMail admin password
   ansible.builtin.shell: |
@@ -15,6 +20,7 @@
   register: _mail_webmail_current_admin_hash
   changed_when: false
   failed_when: false
+  no_log: true
 
 - name: Configure SnappyMail admin password
   community.general.ini_file:
@@ -23,6 +29,7 @@
     option: admin_password
     value: '"{{ mail_webmail_admin_hash.stdout }}"'
     mode: '0600'
+  no_log: true
   when: >
     mail_snappymail_force_reset_admin or
     (_mail_webmail_current_admin_hash.stdout == "") or
@@ -35,3 +42,4 @@
     option: admin_panel_key
     value: '"{{ mail_webmail_admin_path }}"'
     mode: '0600'
+  no_log: true   # the admin path is a secret URL
