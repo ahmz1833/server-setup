@@ -1,0 +1,2 @@
+---
+k3s_datastore_role: cluster-init    # first server initialises embedded etcd

@@ -1,0 +1,5 @@
+---
+# Cap journald disk usage and keep logs across reboots.
+journald_max_use: 1G
+journald_max_retention: 1month
+journald_storage: persistent

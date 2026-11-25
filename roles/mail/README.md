@@ -81,15 +81,15 @@ The role enforces a Single Source of Truth (SSoT) for mail users. Passwords are 
   hosts: all
   become: true
   vars:
-    mail_domain: "neda-event.ir"
-    mail_hostname: "mail.neda-event.ir"
+    mail_domain: "example.com"
+    mail_hostname: "mail.example.com"
     mail_admin_username: "admin"
-    mail_admin_password: "SecureAdminPassword123"
+    mail_admin_password: "{{ vault_mail_admin_password }}"      # keep passwords in ansible-vault
     mail_noreply_sender: "noreply"
-    mail_noreply_password: "SecureNoReplyPassword456"
+    mail_noreply_password: "{{ vault_mail_noreply_password }}"
     mail_users:
       - username: "user1"
-        password: "user1pass"
+        password: "{{ vault_mail_user1_password }}"
   roles:
     - role: ahmz1833.server_setup.mail
 ```

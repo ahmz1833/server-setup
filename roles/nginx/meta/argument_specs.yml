@@ -1,0 +1,370 @@
+---
+argument_specs:
+  main:
+    short_description: Debian/Ubuntu Nginx edge stack with declarative vhosts, ModSecurity WAF, real-IP and observability.
+    description:
+      - >-
+        Installs and configures Nginx on Debian/Ubuntu: global tuning snippets (gzip, rate limit zone, security, real IP),
+        declarative virtual hosts from C(nginx_sites), optional ModSecurity + OWASP CRS, JSON access logs, custom error pages,
+        rolling config backups, optional nginx-prometheus-exporter and Promtail.
+      - Nothing runs unless C(nginx_managed=true). C(nginx_sites) is the full desired set; unlisted C(sites-enabled) links are removed.
+      - >-
+        Tags: nginx, nginx-install, nginx-waf, nginx-config, nginx-realip, nginx-sites, nginx-monitoring,
+        nginx-promtail, nginx-error-pages.
+    author: AHMZ
+    options:
+      # -----------------------------------------------------------------------
+      # Meta / playbook-level derived
+      # -----------------------------------------------------------------------
+      nginx_enable_ipv6:
+        type: raw
+        description:
+          - Add C(listen [::]:port) directives to every site. Default derived from playbook var C(enable_ipv6) (false when undefined).
+      nginx_download_locally:
+        type: raw
+        description:
+          - Passed to the C(asset) role as C(asset_download_locally) (stage downloads on the controller for restricted egress).
+          - Default derived from playbook var C(is_iran) (false when undefined).
+
+      # -----------------------------------------------------------------------
+      # Role control
+      # -----------------------------------------------------------------------
+      nginx_managed:
+        type: bool
+        default: false
+        description: Master switch; the role does nothing unless true.
+      nginx_remove_default_site:
+        type: bool
+        default: true
+        description: Remove the distro C(default) site; when false the C(default) link is kept during unmanaged-site cleanup.
+      nginx_web_user:
+        type: raw
+        description:
+          - Owner of the ACME webroot directory. Default derived from facts (C(nginx) on RedHat family, otherwise C(www-data)).
+      nginx_web_group:
+        type: raw
+        description: Group of the ACME webroot directory. Default derived from C(nginx_web_user).
+
+      # -----------------------------------------------------------------------
+      # Backup
+      # -----------------------------------------------------------------------
+      nginx_backup_enabled:
+        type: bool
+        default: true
+        description: Back up C(nginx.conf) (keep 10) and C(sites-available/*.conf) (keep 5 per site) before modification.
+      nginx_backup_dir:
+        type: str
+        default: /etc/nginx/backups
+        description: Directory for configuration backups (site backups go to the C(sites/) subdirectory).
+
+      # -----------------------------------------------------------------------
+      # Global tuning
+      # -----------------------------------------------------------------------
+      nginx_worker_connections:
+        type: int
+        default: 65535
+        description: C(worker_connections) value written into C(nginx.conf).
+      nginx_logrotate_days:
+        type: int
+        default: 14
+        description: Number of rotated log files to keep (daily rotation).
+      nginx_enable_gzip:
+        type: bool
+        default: true
+        description: Render the gzip compression snippet.
+      nginx_gzip_comp_level:
+        type: int
+        default: 5
+        description: gzip compression level (1-9).
+      nginx_gzip_min_length:
+        type: int
+        default: 256
+        description: Minimum response size in bytes to compress.
+      nginx_gzip_types:
+        type: list
+        elements: str
+        description: MIME types to compress in addition to C(text/html). See defaults/main.yml for the default list.
+
+      # -----------------------------------------------------------------------
+      # Rate limiting
+      # -----------------------------------------------------------------------
+      nginx_enable_rate_limit:
+        type: bool
+        default: true
+        description: Define the global C(limit_req_zone) (referenced by per-location C(rate_limit)).
+      nginx_rate_limit_zone_name:
+        type: str
+        default: global_limit
+        description: Name of the global rate limit zone; default zone for location C(rate_limit.zone).
+      nginx_rate_limit_zone_size:
+        type: str
+        default: 10m
+        description: Shared memory size of the rate limit zone.
+      nginx_rate_limit_rate:
+        type: str
+        default: 10r/s
+        description: Request rate of the global zone (C(<n>r/s) or C(<n>r/m)).
+      nginx_rate_limit_burst:
+        type: int
+        default: 20
+        description: Default C(burst) for location C(rate_limit) when not set per location.
+      nginx_rate_limit_nodelay:
+        type: bool
+        default: true
+        description: Default C(nodelay) for location C(rate_limit) when not set per location.
+
+      # -----------------------------------------------------------------------
+      # Real IP / trusted proxies
+      # -----------------------------------------------------------------------
+      nginx_real_ip_header:
+        type: str
+        default: X-Forwarded-For
+        description: Header carrying the real client IP (C(real_ip_header)).
+      nginx_trusted_proxies:
+        type: list
+        elements: raw
+        default:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+        description:
+          - >-
+            Trusted proxy sources for C(set_real_ip_from). Items are CIDR strings, C({ipset: name}) (reads
+            C(nginx_ipset_data_dir/name.save) on the host) or C({url: https://...}) (plain CIDR list fetched once on the controller).
+      nginx_trusted_proxies_extra:
+        type: list
+        elements: raw
+        default: []
+        description: Additional trusted proxy sources merged with C(nginx_trusted_proxies); same item formats.
+      nginx_ipset_data_dir:
+        type: str
+        default: /var/lib/ipset
+        description: Directory holding ipset C(.save) files used by C({ipset:}) trusted proxy entries.
+
+      # -----------------------------------------------------------------------
+      # Global security
+      # -----------------------------------------------------------------------
+      nginx_server_tokens:
+        type: str
+        default: "off"
+        description: Default C(server_tokens) value (C(on), C(off), C(build)); overridable per site via C(server_tokens).
+      nginx_proxy_intercept_errors:
+        type: str
+        default: "off"
+        description: Default C(proxy_intercept_errors) (C(on)/C(off)); overridable per site and per location.
+      nginx_hide_server_header:
+        type: bool
+        default: true
+        description: Remove the C(Server) header entirely (requires headers-more module).
+
+      # -----------------------------------------------------------------------
+      # Default security / cache headers (per-site header_* overrides)
+      # -----------------------------------------------------------------------
+      nginx_header_x_frame_options:
+        type: str
+        default: SAMEORIGIN
+        description: Default C(X-Frame-Options); empty string disables. Site override key C(header_x_frame_options).
+      nginx_header_x_content_type_options:
+        type: str
+        default: nosniff
+        description: Default C(X-Content-Type-Options); empty string disables. Site override key C(header_x_content_type_options).
+      nginx_header_x_xss_protection:
+        type: str
+        default: 1; mode=block
+        description: Default C(X-XSS-Protection); empty string disables. Site override key C(header_x_xss_protection).
+      nginx_header_referrer_policy:
+        type: str
+        default: strict-origin-when-cross-origin
+        description: Default C(Referrer-Policy); empty string disables. Site override key C(header_referrer_policy).
+      nginx_header_permissions_policy:
+        type: str
+        default: ""
+        description: Default C(Permissions-Policy); empty string disables. Site override key C(header_permissions_policy).
+      nginx_header_csp:
+        type: str
+        default: ""
+        description: Default C(Content-Security-Policy); empty string disables. Site override key C(header_csp).
+      nginx_header_hsts:
+        type: str
+        default: ""
+        description: Default C(Strict-Transport-Security), only emitted on SSL sites; empty string disables. Site override key C(header_hsts).
+      nginx_header_cache_control:
+        type: str
+        default: ""
+        description: Default C(Cache-Control) header; empty string disables. Site/location override key C(cache_control).
+      nginx_show_cache_status:
+        type: bool
+        default: false
+        description: Add an C(X-Cache-Status) header with C($upstream_cache_status).
+
+      # -----------------------------------------------------------------------
+      # Default proxy settings (per-site overrides with the same key minus nginx_)
+      # -----------------------------------------------------------------------
+      nginx_proxy_connect_timeout:
+        type: str
+        default: 60s
+        description: Default C(proxy_connect_timeout); site override key C(proxy_connect_timeout).
+      nginx_proxy_send_timeout:
+        type: str
+        default: 60s
+        description: Default C(proxy_send_timeout); site override key C(proxy_send_timeout).
+      nginx_proxy_read_timeout:
+        type: str
+        default: 60s
+        description: Default C(proxy_read_timeout); site override key C(proxy_read_timeout).
+      nginx_proxy_buffering:
+        type: str
+        default: "on"
+        description: Default C(proxy_buffering) (C(on)/C(off)); site override key C(proxy_buffering).
+      nginx_proxy_buffer_size:
+        type: str
+        default: 4k
+        description: Default C(proxy_buffer_size); site override key C(proxy_buffer_size).
+      nginx_proxy_buffers:
+        type: str
+        default: 8 4k
+        description: Default C(proxy_buffers); site override key C(proxy_buffers).
+
+      # -----------------------------------------------------------------------
+      # SSL / TLS
+      # -----------------------------------------------------------------------
+      nginx_ssl_cert_dir:
+        type: str
+        default: /etc/ssl/certs
+        description: Base directory for site certificates; default site paths are C(<dir>/<domain>/fullchain.pem) and C(privkey.pem).
+      nginx_acme_challenge_enabled:
+        type: bool
+        default: false
+        description: Serve C(/.well-known/acme-challenge/) from C(nginx_default_acme_dir) on all sites (per-site key C(acme_challenge_enabled)).
+      nginx_default_acme_dir:
+        type: str
+        default: /var/www/acme
+        description: ACME HTTP-01 webroot; challenges are expected under C(<dir>/.well-known/acme-challenge/).
+      nginx_ssl_protocols:
+        type: str
+        default: TLSv1.2 TLSv1.3
+        description: Default C(ssl_protocols); site override key C(ssl_protocols).
+      nginx_ssl_ciphers:
+        type: str
+        description: Default C(ssl_ciphers) (modern ECDHE/DHE AEAD suites, see defaults/main.yml); site override key C(ssl_ciphers).
+      nginx_ssl_prefer_server_ciphers:
+        type: str
+        default: "on"
+        description: Default C(ssl_prefer_server_ciphers) (C(on)/C(off)); site override key C(ssl_prefer_server_ciphers).
+      nginx_ssl_session_cache:
+        type: str
+        default: shared:SSL:10m
+        description: Default C(ssl_session_cache); site override key C(ssl_session_cache).
+      nginx_ssl_session_timeout:
+        type: str
+        default: 1d
+        description: Default C(ssl_session_timeout); site override key C(ssl_session_timeout).
+      nginx_ssl_session_tickets:
+        type: str
+        default: "off"
+        description: Default C(ssl_session_tickets) (C(on)/C(off)); site override key C(ssl_session_tickets).
+      nginx_ssl_stapling:
+        type: bool
+        default: false
+        description: Enable OCSP stapling by default; site override key C(ssl_stapling).
+      nginx_ssl_stapling_verify:
+        type: bool
+        default: false
+        description: Enable C(ssl_stapling_verify) when stapling is on; site override key C(ssl_stapling_verify).
+      nginx_ssl_trusted_certificate:
+        type: str
+        default: ""
+        description: CA bundle for OCSP stapling (C(ssl_trusted_certificate)); empty omits it. Site override key C(ssl_trusted_certificate).
+
+      # -----------------------------------------------------------------------
+      # WAF
+      # -----------------------------------------------------------------------
+      nginx_waf_install:
+        type: bool
+        default: true
+        description: Install ModSecurity + OWASP CRS and render C(/etc/nginx/modsec/main.conf). Per-site activation via C(waf_enabled).
+      nginx_waf_global_settings:
+        type: dict
+        description:
+          - ModSecurity directives (C(Directive=value) map) written into C(/etc/modsecurity/modsecurity.conf) for all WAF-enabled sites.
+          - Default sets SecRuleEngine, SecRequestBodyAccess/Limit/NoFilesLimit and SecResponseBodyAccess/Limit; see defaults/main.yml.
+
+      # -----------------------------------------------------------------------
+      # Prometheus exporter
+      # -----------------------------------------------------------------------
+      nginx_exporter_install:
+        type: bool
+        default: true
+        description: Install nginx-prometheus-exporter (linux amd64) and the localhost C(stub_status) endpoint.
+      nginx_exporter_enabled:
+        type: bool
+        default: false
+        description: Enable and start the exporter service (stopped/disabled when false).
+      nginx_exporter_version:
+        type: str
+        default: 1.5.1
+        description: nginx-prometheus-exporter release version.
+      nginx_exporter_listen_address:
+        type: str
+        default: 127.0.0.1:9113
+        description: Exporter metrics listen address (C(host:port)).
+      nginx_dummy_metric_port:
+        type: raw
+        default: 29182
+        description: Localhost port of the internal C(stub_status) server scraped by the exporter.
+
+      # -----------------------------------------------------------------------
+      # Promtail
+      # -----------------------------------------------------------------------
+      nginx_promtail_install:
+        type: bool
+        default: false
+        description: Install Promtail (linux amd64) with config and systemd unit for shipping nginx logs.
+      nginx_promtail_enabled:
+        type: bool
+        default: false
+        description: Enable and start the Promtail service.
+      nginx_promtail_version:
+        type: str
+        default: 3.6.11
+        description: Promtail release version (3.6.x is the last line shipping Promtail binaries).
+      nginx_promtail_port:
+        type: raw
+        default: 9080
+        description: Promtail HTTP server port (C(/ready), C(/metrics)).
+      nginx_promtail_loki_url:
+        type: str
+        default: ""
+        description: Loki push API URL; when empty logs go to a local blackhole endpoint.
+      nginx_promtail_extra_labels:
+        type: dict
+        default: {}
+        description: Extra static labels added to all Promtail log entries.
+
+      # -----------------------------------------------------------------------
+      # Error pages
+      # -----------------------------------------------------------------------
+      nginx_standard_error_codes:
+        type: dict
+        description:
+          - Map of HTTP status code to reason phrase; drives generated global error pages and C(custom_errors) regex matching.
+          - Default covers 400, 401, 403, 404, 405, 408, 413, 429, 500, 502, 503, 504; see defaults/main.yml.
+
+      # -----------------------------------------------------------------------
+      # Sites
+      # -----------------------------------------------------------------------
+      nginx_sites:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - >-
+            Virtual hosts, one dict per server_name group, rendered to C(/etc/nginx/sites-available/<domain>.conf).
+            Required key C(domain); common keys C(aliases), C(enabled) (default true), C(ssl_enabled) (default false),
+            C(ssl_cert)/C(ssl_key), C(acme_challenge_enabled), C(upstream), C(redirect_to), C(waf_enabled), C(waf_config),
+            C(waf_extra_rules), C(header_*), C(cache_control), C(server_tokens), C(proxy_*) and C(ssl_*) overrides,
+            C(nginx_config) (dict of directives), C(extra_config) (raw text), C(locations), C(custom_errors).
+          - >-
+            C(locations) items take C(path), C(upstream), C(rate_limit) (C(zone)/C(burst)/C(nodelay)), C(log_prefix),
+            C(cache_control), C(nginx_config), C(extra_config), C(proxy_intercept_errors). C(custom_errors) items take
+            C(match) (regex on C(nginx_standard_error_codes) keys) and C(template). See README and examples/sites.yml.

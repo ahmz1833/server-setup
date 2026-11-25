@@ -1,0 +1,11 @@
+---
+- name: Mail server (certificates → nginx for webmail → mailserver)
+  hosts: mail
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.acme
+      tags: [acme]
+    - role: ahmz1833.server_setup.nginx
+      tags: [nginx]
+    - role: ahmz1833.server_setup.mail
+      tags: [mail]

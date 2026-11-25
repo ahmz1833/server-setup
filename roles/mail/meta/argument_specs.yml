@@ -1,0 +1,136 @@
+---
+argument_specs:
+  main:
+    short_description: Mail server (docker-mailserver + SnappyMail webmail) with DKIM and declarative users.
+    description:
+      - Creates data directories and a Docker network, deploys the C(mailserver) (docker-mailserver) and C(webmail)
+        (SnappyMail) containers, generates DKIM keys, syncs mail accounts from variables (unlisted accounts are
+        deleted unless whitelisted), lets the admin account spoof any sender, sets the SnappyMail admin password and
+        panel path, and prints the DNS records (A, MX, SPF, DMARC, DKIM) to create.
+      - Requires Docker and community.docker / community.general. TLS files C(/etc/ssl/certs/<mail_domain>/{fullchain,privkey}.pem)
+        must exist beforehand (e.g. from the acme role). Firewall ports 25/465/587/993 are not managed.
+      - "Tags: none (the role's tasks are untagged)."
+    author: AHMZ
+    options:
+      mail_domain:
+        type: str
+        default: example.com
+        description:
+          - Primary mail domain (DOMAINNAME/DKIM domain, user addresses C(<user>@<mail_domain>), TLS cert directory).
+
+      mail_hostname:
+        type: raw
+        description:
+          - FQDN of the mail server (container hostname and network alias).
+          - Defaults to C(mail.<mail_domain>) (Jinja-derived from C(mail_domain)).
+
+      mail_network_name:
+        type: str
+        default: mail-net
+        description:
+          - Docker network shared by the mailserver and webmail containers.
+
+      mail_data_dir:
+        type: str
+        default: /opt/apps/dms
+        description:
+          - Host directory for docker-mailserver config, mail data, state and logs.
+
+      mail_snappymail_data_dir:
+        type: str
+        default: /opt/apps/snappymail
+        description:
+          - Host directory for SnappyMail data (mounted at C(/var/lib/snappymail)).
+
+      mail_whitelist_label_key:
+        type: str
+        default: apps.ansible.prune.whitelist
+        description:
+          - Label key set on both containers (intended to protect them from the apps role's prune via
+            C(apps_prune.whitelist_labels)).
+
+      mail_whitelist_label_value:
+        type: str
+        default: "true"
+        description:
+          - Value of the C(mail_whitelist_label_key) label.
+
+      mail_webmail_port:
+        type: raw
+        default: "8888"
+        description:
+          - Host port for SnappyMail, published on C(127.0.0.1) only (put a reverse proxy in front).
+
+      mail_noreply_sender:
+        type: str
+        default: noreply
+        description:
+          - Local part of the no-reply account (C(<sender>@<mail_domain>)), meant as an SMTP credential for applications.
+
+      mail_noreply_password:
+        type: str
+        default: CHANGEME
+        no_log: true
+        description:
+          - Password of the no-reply account. Must be overridden (vault).
+
+      mail_admin_username:
+        type: str
+        default: admin
+        description:
+          - Local part of the admin account; this account may send as any address.
+
+      mail_admin_password:
+        type: str
+        default: CHANGEME
+        no_log: true
+        description:
+          - Password of the admin account. Must be overridden (vault).
+
+      mail_users:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Additional mail accounts. Together with the admin and no-reply accounts this is the single source of truth;
+            existing accounts not listed are deleted unless they match C(mail_users_whitelist_regex).
+        options:
+          username:
+            type: str
+            required: true
+            description:
+              - Local part; the address becomes C(<username>@<mail_domain>).
+          password:
+            type: str
+            required: true
+            no_log: true
+            description:
+              - Account password (use vault).
+
+      mail_users_whitelist_regex:
+        type: str
+        default: ^$
+        description:
+          - Extended regex (grep -E) matched against full addresses of unmanaged accounts; matches are kept instead
+            of deleted. Example C(^(postmaster|hostmaster)@).
+
+      mail_webmail_admin_password:
+        type: str
+        default: CHANGEME
+        no_log: true
+        description:
+          - SnappyMail admin panel password. Must be overridden (vault).
+          - Only written when no password is set yet, when it is the SnappyMail default, or when
+            C(mail_snappymail_force_reset_admin) is true.
+
+      mail_webmail_admin_path:
+        type: str
+        default: admin
+        description:
+          - Secret SnappyMail admin panel key (C(admin_panel_key)), i.e. the URL path of the admin panel.
+
+      mail_snappymail_force_reset_admin:
+        type: bool
+        default: false
+        description:
+          - Overwrite the SnappyMail admin password with C(mail_webmail_admin_password) even if it was changed in the UI.

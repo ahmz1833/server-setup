@@ -1,0 +1,39 @@
+---
+# ---------------------------------------------------------------------------
+# Environment-wide settings (plain). Secrets/exposure-sensitive values: vault.yml
+# Variable reference: docs/roles-index.md in ahmz1833/server-setup
+# ---------------------------------------------------------------------------
+
+# Cross-role switches read by several collection roles
+is_iran: false            # true → Iranian mirrors/timezone, restricted-internet helpers
+enable_ipv6: false
+primary_user: "{{ vault_admin_user }}"   # privileged username is kept out of the repo
+
+# --- core: users & SSH -------------------------------------------------------
+core_users:
+  - name: "{{ vault_admin_user }}"
+    groups: ["sudo"]
+    sudoer: true
+    sudoer_no_pass: true          # automation account; access is key-only
+    ssh_keys:
+      - "{{ playbook_dir }}/../files/ssh_keys/admin.pub"
+
+core_ssh_allow_users: ["{{ vault_admin_user }}"]
+core_ssh_password_auth: false
+core_ssh_permit_root_login: false
+
+# --- core: firewall (SSH port is opened by the role itself) -------------------
+core_manage_firewall: true
+core_fail2ban_enabled: true
+
+# --- node: base tooling ------------------------------------------------------
+node_docker_enabled: true
+node_gost_install: false          # proxy/tunnel tooling not needed here
+node_exporter_install: true
+node_exporter_enabled: true       # listens on 127.0.0.1:9100 by default
+
+# --- Optional toggles (uncomment what you need) ------------------------------
+# core_manage_swap: true
+# core_swap_enabled: true
+# core_extra_packages: [tmux]
+# node_singbox_install: true      # outbound proxy for restricted networks

@@ -1,0 +1,36 @@
+---
+# Mail host: docker-mailserver + SnappyMail behind nginx. Mail domains are public (MX).
+mail_domain: example.com
+mail_hostname: mail.example.com
+mail_admin_username: postmaster
+mail_admin_password: "{{ vault_mail_admin_password }}"
+mail_noreply_password: "{{ vault_mail_noreply_password }}"
+mail_webmail_admin_password: "{{ vault_mail_webmail_admin_password }}"
+mail_webmail_admin_path: "{{ vault_mail_webmail_admin_path }}"   # secret URL path
+
+# The mail role expects its cert under /etc/ssl/certs/<mail_domain>/
+acme_account_email: "postmaster@example.com"
+acme_certificates:
+  - domains: ["mail.example.com"]
+    challenge: http-01
+    cert_dir: /etc/ssl/certs/example.com
+  - domains: ["webmail.example.com"]
+    challenge: http-01
+
+# Webmail listens on 127.0.0.1 only; nginx is its public entry.
+nginx_managed: true
+nginx_waf_install: true
+nginx_sites:
+  - domain: webmail.example.com
+    ssl_enabled: true
+    upstream: "http://127.0.0.1:8888"
+    waf_enabled: true
+
+core_firewall_rules:
+  - {port: 25, comment: "SMTP (MX)"}
+  - {port: 465, comment: "SMTPS submission"}
+  - {port: 587, comment: "submission"}
+  - {port: 993, comment: "IMAPS"}
+  - {port: 80, comment: "HTTP (ACME + redirect)"}
+  - {port: 443, comment: "HTTPS webmail"}
+  - {port: 9100, src: "{{ vault_monitoring_cidr }}", comment: "node_exporter from monitoring only"}

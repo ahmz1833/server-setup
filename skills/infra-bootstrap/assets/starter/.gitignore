@@ -1,0 +1,9 @@
+.venv/
+collections/
+.vault_pass*
+!.vault_pass*.example
+*.retry
+.ansible/
+__pycache__/
+# never commit decrypted copies
+*.decrypted

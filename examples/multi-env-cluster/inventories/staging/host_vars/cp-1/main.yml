@@ -1,0 +1,2 @@
+---
+k3s_datastore_role: standalone      # single server, SQLite — staging only

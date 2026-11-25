@@ -1,0 +1,11 @@
+---
+- name: Base system (users, SSH, firewall, docker, exporter, logs)
+  hosts: all
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.core
+      tags: [core]
+    - role: ahmz1833.server_setup.node
+      tags: [node]
+    - role: journald          # local role: roles/journald
+      tags: [journald]

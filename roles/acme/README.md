@@ -42,7 +42,8 @@ Let’s Encrypt (ACME v2) certificate issuance and renewal with **cryptography o
 | `acme_reload_service` | Service name passed to `ansible.builtin.service` with `state: reloaded` after deploy. Set to `""` to skip. | `nginx` |
 | `acme_reload_command` | If non-empty, run this command with `become` instead of reloading `acme_reload_service`. | `""` |
 | `acme_dns_provider` | DNS-01 automation: `""` (manual) or `cloudflare`. Per-cert `dns_provider` overrides. | `""` |
-| `acme_cloudflare_api_token` | Cloudflare token for `cloudflare` provider. | `""` |
+| `acme_cloudflare_api_token` | Cloudflare token for `cloudflare` provider (keep it in ansible-vault). | `""` |
+| `acme_cloudflare_zone` | Cloudflare zone override (default: per-cert `zone`, else derived per record). | `""` |
 | `acme_dns_propagation_delay` | Seconds to wait after creating TXT records. | `15` |
 
 Staging example:
@@ -65,6 +66,8 @@ Each item describes one certificate.
 | `fullchain_path` | no | Remote full chain path (default: `<cert_dir>/fullchain.pem`). |
 | `privkey_path` | no | Remote private key path (default: `<cert_dir>/privkey.pem`). |
 | `renew_days` | no | Override `acme_renew_days` for this cert only. |
+| `dns_provider` | no | Per-cert DNS-01 provider (`""` manual or `cloudflare`), overrides `acme_dns_provider`. |
+| `zone` | no | Per-cert Cloudflare zone. |
 
 ---
 
@@ -94,7 +97,7 @@ Each item describes one certificate.
 |----------|------------|
 | Laptop / shell with TTY | `acme_noninteractive: false` (default). |
 | CI, `cron`, AWX without survey | `acme_noninteractive: true`, **http-01** with a **working webroot**, free port 80 if standalone is possible, or skip this role and use another ACME path. |
-| DNS-01 in CI | Not supported inside this role without human or external DNS API. |
+| DNS-01 in CI | Use `acme_dns_provider: cloudflare` (token in vault) with `acme_noninteractive: true`; other providers need a human or external DNS automation. |
 
 ---
 
@@ -169,8 +172,8 @@ Use a normal play with `hosts: localhost`, `connection: local`, and `become: tru
 
 ## Limitations (by design)
 
-- No **ACME client** on the target; no **DNS provider API** inside the role.
-- **DNS-01** needs human or external automation for TXT records.
+- No **ACME client** on the target.
+- **DNS-01** is automated only for **Cloudflare** (`acme_dns_provider: cloudflare`); other providers need a human (interactive prompt) or external automation for TXT records.
 - **HTTP-01 standalone** needs **Python 3**, **`/bin/bash`**, and privileges for **port 80**.
 - **Wildcard** certificates require **dns-01**.
 - Empty **`acme_certificates`** runs account/workspace setup only and issues **no** certs.

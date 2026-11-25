@@ -1,0 +1,15 @@
+---
+# Untrusted users get containers on a separate SSH port; admin SSH stays separate.
+sandbox_managed: true
+sandbox_ssh_port: "{{ vault_sandbox_ssh_port }}"
+sandbox_prune: true
+sandbox_users:
+  - name: student1
+    image: ubuntu:24.04
+    ssh_keys: ["ssh-ed25519 AAAA...student1"]
+    memory: 512m
+    cpus: 0.5
+
+core_firewall_rules:
+  - {port: "{{ vault_sandbox_ssh_port }}", comment: "sandbox SSH"}
+  - {port: 9100, src: "{{ vault_monitoring_ip }}", comment: "node_exporter ← mon-1 only"}

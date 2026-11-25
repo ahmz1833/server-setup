@@ -1,0 +1,97 @@
+---
+argument_specs:
+  main:
+    short_description: SSH gateway into per-guest Docker sandbox containers via one locked host user.
+    description:
+      - Creates a locked shared host user, maps each guest's SSH keys to a forced command in C(authorized_keys)
+        that C(docker exec)s into container C(sandbox-<name>), deploys those containers (UID/GID aligned with the
+        host user, sudo inside), and adds a dedicated sshd port with forwarding disabled (blockinfile in
+        C(/etc/ssh/sshd_config); needs OpenSSH 8.9+ for C(Match LocalPort)).
+      - Before provisioning, any C(sandbox-*) container not in C(sandbox_users) is stopped (or removed when
+        C(sandbox_prune) is true). The role fails if C(sandbox_users) is empty while C(sandbox_managed) is true.
+      - The firewall is not managed; open C(sandbox_ssh_port) yourself (e.g. C(core_firewall_rules)).
+      - "Tags: C(sandbox) (validate, prune, provision), C(sandbox-prune) (validate + prune only)."
+    author: AHMZ
+    options:
+      sandbox_managed:
+        type: bool
+        default: true
+        description:
+          - When false the role does nothing (no validation, prune or provisioning).
+
+      sandbox_ssh_port:
+        type: raw
+        default: 2222
+        description:
+          - Extra sshd listen port reserved for the sandbox user (C(Match LocalPort) restricts it to C(sandbox_shared_user)).
+
+      sandbox_prune:
+        type: bool
+        default: false
+        description:
+          - Unmanaged C(sandbox-*) containers are removed when true, stopped when false.
+
+      sandbox_shared_user:
+        type: str
+        default: sandbox
+        description:
+          - Locked host account that all guests SSH in as; its home holds per-guest dirs C(/home/<user>/<name>).
+
+      sandbox_users:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Virtual guests; each maps SSH keys to container C(sandbox-<name>). Must be non-empty when
+            C(sandbox_managed) is true.
+        options:
+          name:
+            type: str
+            required: true
+            description:
+              - Guest id (must match C(^[a-zA-Z0-9][a-zA-Z0-9_.-]*$), unique); container is C(sandbox-<name>).
+          ssh_keys:
+            type: list
+            elements: str
+            required: true
+            description:
+              - Non-empty list of full public key lines allowed to log in as this guest.
+          image:
+            type: str
+            description:
+              - Container image. Defaults to C(ubuntu:24.04).
+          shell:
+            type: str
+            description:
+              - Interactive shell inside the container. Defaults to C(/bin/bash).
+          ports:
+            type: list
+            elements: raw
+            description:
+              - Published ports, docker_container syntax (e.g. C(127.0.0.1:8081:8080)).
+          volumes:
+            type: list
+            elements: str
+            description:
+              - Volume/bind list. Defaults to C(/home/<sandbox_shared_user>/<name>:/home/<name>).
+          working_dir:
+            type: str
+            description:
+              - Container working directory. Defaults to C(/home/<name>).
+          env:
+            type: dict
+            description:
+              - Extra environment variables, merged over C(HOME=/home/<name>).
+          networks:
+            type: list
+            elements: dict
+            description:
+              - "docker_container C(networks) list (e.g. C([{name: mynet}]))."
+          memory:
+            type: raw
+            description:
+              - Memory limit (e.g. C(512m)).
+          cpus:
+            type: raw
+            description:
+              - CPU limit (e.g. C(0.5)).

@@ -1,0 +1,9 @@
+---
+- name: Base system (all hosts; proxy hosts get gost via node + group_vars/proxy)
+  ansible.builtin.import_playbook: base.yml
+- name: Public websites
+  ansible.builtin.import_playbook: edge.yml
+- name: Sandboxes
+  ansible.builtin.import_playbook: sandbox.yml
+- name: Monitoring
+  ansible.builtin.import_playbook: monitoring.yml

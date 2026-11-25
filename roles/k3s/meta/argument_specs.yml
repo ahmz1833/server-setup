@@ -1,0 +1,336 @@
+---
+argument_specs:
+  main:
+    short_description: Provision, scale and operate K3s clusters (servers, agents, HA etcd) plus Day-2 operations.
+    description:
+      - >-
+        Day 0/1 (C(k3s_state=present)): validates inventory, installs the K3s binary via the C(asset) role, renders
+        C(/etc/rancher/k3s/config.yaml), C(k3s.env) and systemd units, bootstraps/joins servers and agents, merges firewall
+        rules into the C(core) firewall role and deploys Traefik HelmChartConfig, node-local-dns and user manifests.
+      - >-
+        Day 2 (any other C(k3s_state)): drain, uncordon, rotate-certs, fetch-kubeconfig or uninstall/absent the node.
+      - >-
+        Requires inventory groups C(k3s_control_plane_group) (non-empty) and optionally C(k3s_agent_group); fact gathering must be enabled.
+      - >-
+        Tags: the role's own tasks carry no tags (the k3s-* tags listed in the README are not implemented); the included
+        C(core) firewall tasks are applied with tags C(k3s), C(firewall).
+    author: AHMZ
+    options:
+      # -----------------------------------------------------------------------
+      # Meta / playbook-level derived
+      # -----------------------------------------------------------------------
+      k3s_enable_ipv6:
+        type: raw
+        description: IPv6 toggle. Default derived from playbook var C(enable_ipv6) (false when undefined). Currently not read by any task.
+      k3s_download_locally:
+        type: raw
+        description: Passed to the C(asset) role (stage the binary on the controller). Default derived from playbook var C(download_locally).
+      k3s_internet_restricted:
+        type: raw
+        description:
+          - Pull system images through C(k3s_dockerhub_mirror) (sets system-default-registry / pause-image).
+          - Default derived from playbook var C(is_iran) (false when undefined).
+
+      # -----------------------------------------------------------------------
+      # Lifecycle
+      # -----------------------------------------------------------------------
+      k3s_state:
+        type: str
+        default: present
+        choices: [present, absent, uninstall, drain, uncordon, rotate-certs, fetch-kubeconfig]
+        description:
+          - C(present) provisions/updates the node and cluster; C(absent)/C(uninstall) decommission the node (needs C(k3s_force_uninstall));
+            C(drain)/C(uncordon) run kubectl via the primary server; C(rotate-certs) rotates server certificates;
+            C(fetch-kubeconfig) writes the cluster kubeconfig to C(k3s_kubeconfig_local_dest) on the controller.
+      k3s_force_uninstall:
+        type: bool
+        default: false
+        description: Safety guard; must be true for C(k3s_state=absent) or C(uninstall).
+      k3s_drain_ignore_errors:
+        type: bool
+        default: false
+        description: Do not fail when C(kubectl drain) returns non-zero.
+      k3s_drain_timeout:
+        type: str
+        default: 300s
+        description: C(--timeout) for C(kubectl drain).
+      k3s_cluster_name:
+        type: str
+        default: k3s
+        description: Cluster name; added as C(cluster-name) node label and used as kubeconfig cluster/context name.
+      k3s_cluster_domain:
+        type: str
+        description: Cluster DNS domain used by the node-local-dns template. Not set in defaults; the template falls back to C(cluster.local).
+
+      # -----------------------------------------------------------------------
+      # Asset / version
+      # -----------------------------------------------------------------------
+      k3s_version:
+        type: str
+        default: v1.36.3+k3s1
+        description: K3s release to install; bump and re-run to upgrade in place.
+      k3s_asset_url:
+        type: str
+        default: https://github.com/k3s-io/k3s/releases/download/%v/k3s
+        description: Binary download URL template (C(%v) is replaced with the version by the C(asset) role).
+      k3s_install_dir:
+        type: str
+        default: /usr/local/bin
+        description: Directory where the C(k3s) binary is installed.
+
+      # -----------------------------------------------------------------------
+      # Topology
+      # -----------------------------------------------------------------------
+      k3s_role:
+        type: str
+        default: server
+        choices: [server, agent]
+        description: Node mode, C(server) (control plane) or C(agent) (worker).
+      k3s_datastore_role:
+        type: str
+        default: standalone
+        choices: [standalone, cluster-init, join]
+        description:
+          - Server datastore mode. C(standalone) embedded SQLite, C(cluster-init) primary server of an embedded etcd cluster,
+            C(join) secondary server. Only validated/used on servers.
+      k3s_datastore_endpoint:
+        type: raw
+        default: ""
+        description: External datastore endpoint (C(datastore-endpoint)) for servers; empty uses the embedded datastore.
+      k3s_control_plane_group:
+        type: str
+        default: k3s_servers
+        description: Inventory group of server nodes (must exist and be non-empty).
+      k3s_agent_group:
+        type: str
+        default: k3s_agents
+        description: Inventory group of agent nodes.
+      k3s_token:
+        type: raw
+        default: ""
+        description: Cluster join token; when empty it is read from the primary server.
+
+      # -----------------------------------------------------------------------
+      # Network / endpoint
+      # -----------------------------------------------------------------------
+      k3s_https_listen_port:
+        type: raw
+        default: 6443
+        description: API server HTTPS listen port.
+      k3s_control_plane_domain:
+        type: str
+        default: ""
+        description: Optional external DNS name of the API endpoint; added to TLS SANs, used as join URL and temporarily to C(/etc/hosts).
+      k3s_control_plane_port:
+        type: raw
+        description: External API port used with C(k3s_control_plane_domain). Default derived from C(k3s_https_listen_port).
+      k3s_bind_address:
+        type: raw
+        default: ""
+        description: Server C(bind-address); also preferred when resolving this host's cluster IP.
+      k3s_node_ip:
+        type: raw
+        default: ""
+        description: Node IP to advertise (C(node-ip)); empty auto-resolves.
+      k3s_node_name:
+        type: str
+        default: ""
+        description: Kubernetes node name; empty uses nodename/hostname/inventory_hostname.
+      k3s_cluster_cidr:
+        type: str
+        default: 10.42.0.0/16
+        description: Pod CIDR (servers only, immutable after first boot).
+      k3s_service_cidr:
+        type: str
+        default: 10.43.0.0/16
+        description: Service CIDR (servers only, immutable after first boot).
+      k3s_flannel_backend:
+        type: str
+        default: vxlan
+        description: Flannel backend (e.g. C(vxlan), C(host-gw), C(wireguard-native), C(none)); servers only, also selects firewall overlay ports.
+      k3s_tls_sans:
+        type: list
+        elements: str
+        default: []
+        description: Extra API server certificate SANs (server IPs/hostnames and C(k3s_control_plane_domain) are added automatically).
+
+      # -----------------------------------------------------------------------
+      # Scheduling metadata
+      # -----------------------------------------------------------------------
+      k3s_node_labels:
+        type: dict
+        default: {}
+        description: Node labels (C(key=value) map) rendered to C(node-label).
+      k3s_node_taints:
+        type: list
+        elements: str
+        default: []
+        description: Node taints as C(key=value:Effect) strings.
+
+      # -----------------------------------------------------------------------
+      # Components / ingress
+      # -----------------------------------------------------------------------
+      k3s_disable_servicelb:
+        type: bool
+        default: false
+        description: Disable the built-in ServiceLB (Klipper); also suppresses opening ingress ports in the firewall.
+      k3s_disable_traefik:
+        type: bool
+        default: false
+        description: Disable the built-in Traefik ingress (removes the role's HelmChartConfig).
+      k3s_disable_components:
+        type: list
+        elements: str
+        default: []
+        description: Additional built-in components to disable (e.g. C(local-storage), C(metrics-server)).
+      k3s_traefik_config:
+        type: dict
+        description:
+          - >-
+            Traefik HelmChartConfig values: C(enabled), C(service.type) (LoadBalancer/ClusterIP/NodePort),
+            C(service.externalTrafficPolicy) (C(Local) forces C(deployment.kind=DaemonSet)), C(deployment.kind),
+            C(forwardedHeaders.insecure)/C(trustedIPs), and C(ports.web)/C(ports.websecure) with C(port), C(exposedPort),
+            C(hostPort), C(nodePort), C(forwardedHeaders), C(transport).
+          - Default enables Traefik with ports 8000/80 and 8443/443 and no trusted IPs; see defaults/main.yml and README.
+      k3s_config:
+        type: dict
+        default: {}
+        description: Extra key/value pairs rendered into C(config.yaml); C(kubelet-arg) is ignored here (use C(k3s_kubelet_args)).
+      k3s_kubelet_args:
+        type: list
+        elements: str
+        default: []
+        description: Kubelet flags as C(key=value) strings merged into C(kubelet-arg) after role-contributed flags.
+      k3s_cpu_manager_policy:
+        type: str
+        default: none
+        choices: [none, static]
+        description: Kubelet CPU manager policy; C(static) requires non-zero reserved CPU via C(k3s_kube_reserved)/C(k3s_system_reserved).
+      k3s_kube_reserved:
+        type: str
+        default: ""
+        description: Kubelet C(kube-reserved) (e.g. C(cpu=500m,memory=512Mi)); empty omits it.
+      k3s_system_reserved:
+        type: str
+        default: ""
+        description: Kubelet C(system-reserved) (e.g. C(cpu=500m,memory=512Mi)); empty omits it.
+
+      # -----------------------------------------------------------------------
+      # Mirror registry
+      # -----------------------------------------------------------------------
+      k3s_dockerhub_mirror:
+        type: str
+        default: hub.hamdocker.ir
+        description: Registry mirror used for system images when C(k3s_internet_restricted) is true.
+      k3s_system_default_registry:
+        type: raw
+        description:
+          - Server C(system-default-registry); empty disables. Default derived as C(k3s_dockerhub_mirror) when
+            C(k3s_internet_restricted) is true, else empty.
+      k3s_pause_image:
+        type: raw
+        description:
+          - C(pause-image) for every node; empty disables. Default derived as C(<k3s_system_default_registry>/rancher/mirrored-pause:3.6)
+            when a system default registry is set, else empty.
+
+      # -----------------------------------------------------------------------
+      # Node-local DNS
+      # -----------------------------------------------------------------------
+      k3s_node_local_dns:
+        type: bool
+        default: false
+        description: Deploy NodeLocalDNSCache and point kubelet C(cluster-dns) at C(k3s_node_local_dns_ip).
+      k3s_node_local_dns_ip:
+        type: str
+        default: 169.254.20.10
+        description: Link-local IP the node-local DNS cache listens on.
+      k3s_node_local_dns_image_repo:
+        type: raw
+        description:
+          - Node-cache image repository. Default derived as C(<k3s_system_default_registry>/k8smirror/k8s-dns-node-cache) when a
+            system default registry is set, else C(registry.k8s.io/dns/k8s-dns-node-cache).
+      k3s_node_local_dns_image_tag:
+        type: str
+        default: 1.26.8
+        description: Node-cache image tag.
+      k3s_node_local_dns_upstream:
+        type: list
+        elements: str
+        default: []
+        description: Upstream resolvers for non-cluster queries; empty uses the host C(/etc/resolv.conf).
+
+      # -----------------------------------------------------------------------
+      # Environment / manifests
+      # -----------------------------------------------------------------------
+      k3s_env:
+        type: dict
+        default: {}
+        description: Environment variables rendered into C(/etc/rancher/k3s/k3s.env) (e.g. C(HTTP_PROXY), C(NO_PROXY)).
+      k3s_manifests:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Extra manifests copied to C(/var/lib/rancher/k3s/server/manifests/) on servers. Each item needs C(name) (file name)
+            and C(content) (manifest text); items missing either are skipped.
+
+      # -----------------------------------------------------------------------
+      # Firewall integration
+      # -----------------------------------------------------------------------
+      k3s_firewall_manage:
+        type: bool
+        default: true
+        description: Compute K3s firewall rules and apply them via C(core) role C(tasks_from=firewall).
+      k3s_firewall_enable_nodeport:
+        type: bool
+        default: false
+        description: Open the NodePort range (TCP and UDP).
+      k3s_firewall_nodeport_range:
+        type: str
+        default: 30000-32767
+        description: NodePort range to open when C(k3s_firewall_enable_nodeport) is true.
+      k3s_firewall_allowed_api_cidrs:
+        type: list
+        elements: str
+        default: [0.0.0.0/0]
+        description: Source CIDRs allowed to the API server port (servers only).
+      k3s_firewall_allowed_ingress_cidrs:
+        type: list
+        elements: str
+        default: [0.0.0.0/0]
+        description: Source CIDRs allowed to Traefik exposed ports (only when Traefik and ServiceLB are enabled); C([]) opens nothing.
+      k3s_firewall_allowed_etcd_cidrs:
+        type: list
+        elements: str
+        default: []
+        description: Source CIDRs for etcd ports 2379/2380 on servers; empty allows all control plane node IPs.
+      k3s_firewall_allowed_kubelet_cidrs:
+        type: list
+        elements: str
+        default: []
+        description: Source CIDRs for kubelet port 10250; empty allows all cluster node IPs.
+      k3s_firewall_rules:
+        type: raw
+        description:
+          - Computed by the role from the C(k3s_firewall_*) settings and cluster node IPs, then merged into the C(core) firewall.
+          - "Do not set it; tune C(k3s_firewall_*) instead. Default: computed in defaults/main.yml."
+      k3s_persist_firewall_facts:
+        type: bool
+        default: true
+        description: Persist computed firewall rules as a local fact so the C(core) role can re-apply them standalone.
+      k3s_firewall_facts_file:
+        type: str
+        default: /etc/ansible/facts.d/k3s.fact
+        description: Local fact file for persisted firewall rules.
+
+      # -----------------------------------------------------------------------
+      # Kubeconfig retrieval
+      # -----------------------------------------------------------------------
+      k3s_kubeconfig_local_dest:
+        type: str
+        default: "~/.kube/config.k3s"
+        description: Controller path for C(k3s_state=fetch-kubeconfig) output (C(~) expanded).
+      k3s_kubeconfig_mode:
+        type: raw
+        default: "0600"
+        description: File mode of the fetched kubeconfig.

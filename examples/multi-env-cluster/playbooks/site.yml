@@ -1,0 +1,7 @@
+---
+- name: Base system
+  ansible.builtin.import_playbook: base.yml
+- name: Kubernetes cluster
+  ansible.builtin.import_playbook: cluster.yml
+- name: Mail
+  ansible.builtin.import_playbook: mail.yml

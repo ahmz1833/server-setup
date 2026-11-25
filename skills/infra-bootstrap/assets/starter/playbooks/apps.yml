@@ -1,0 +1,7 @@
+---
+- name: Docker applications
+  hosts: web
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.apps
+      tags: [apps]

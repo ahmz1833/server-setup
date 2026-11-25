@@ -1,0 +1,4 @@
+---
+# Location settings: the collection switches mirrors, timezone and download strategy.
+is_iran: true
+download_locally: true      # fetch binaries on the controller, push to hosts

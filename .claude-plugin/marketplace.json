@@ -1,0 +1,15 @@
+{
+  "name": "server-setup",
+  "owner": { "name": "AHMZ" },
+  "metadata": {
+    "description": "Infrastructure-as-code skills for the ahmz1833.server_setup Ansible collection"
+  },
+  "plugins": [
+    {
+      "name": "server-setup",
+      "source": "./",
+      "description": "Skills: infra-iac (operate/change/debug servers via IaC), infra-bootstrap (new infra project), server-setup-dev (develop the collection).",
+      "version": "1.5.0"
+    }
+  ]
+}

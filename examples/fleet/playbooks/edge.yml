@@ -1,0 +1,11 @@
+---
+- name: Public websites
+  hosts: edge
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.acme
+      tags: [acme]
+    - role: ahmz1833.server_setup.nginx
+      tags: [nginx]
+    - role: ahmz1833.server_setup.apps
+      tags: [apps]

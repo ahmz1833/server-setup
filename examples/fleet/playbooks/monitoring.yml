@@ -1,0 +1,28 @@
+---
+- name: Monitoring stack
+  hosts: monitoring
+  become: true
+  pre_tasks:
+    # The apps role creates app dirs and containers but cannot render config files yet.
+    # UPSTREAM: per-app `templates`/`files` support in ahmz1833.server_setup.apps
+    # Until then this minimal complement only writes the config file the container reads.
+    - name: Prometheus config directory
+      ansible.builtin.file:
+        path: /opt/apps/prometheus/config
+        state: directory
+        mode: "0755"
+      tags: [apps, monitoring]
+    # Scrape targets come from the inventory: a new host is scraped after the next apply.
+    - name: Prometheus config
+      ansible.builtin.template:
+        src: prometheus.yml.j2      # playbooks/templates/ is searched automatically
+        dest: /opt/apps/prometheus/config/prometheus.yml
+        mode: "0644"
+      tags: [apps, monitoring]
+  roles:
+    - role: ahmz1833.server_setup.acme
+      tags: [acme]
+    - role: ahmz1833.server_setup.nginx
+      tags: [nginx]
+    - role: ahmz1833.server_setup.apps
+      tags: [apps]

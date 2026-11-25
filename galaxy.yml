@@ -1,7 +1,7 @@
 ---
 namespace: ahmz1833
 name: server_setup
-version: 1.4.18
+version: 1.5.0
 readme: README.md
 authors:
   - AHMZ <ahmz.ut@gmail.com>
@@ -11,7 +11,8 @@ description: >-
   node (Docker static engine, sing-box, GOST, X-UI, tools, node_exporter), Nginx
   with ModSecurity CRS and observability, ACME certificates, declarative Docker
   apps, SSH Docker sandboxes, mail server, composable K3s cluster provisioning, plus
-  a shared asset installer role for binaries and archives.
+  a shared asset installer role for binaries and archives. Ships an IaC project
+  standard, security/operations docs, full example projects and AI agent skills.
 
 license:
   - MIT
@@ -36,6 +37,8 @@ tags:
   - mail
   - k3s
   - kubernetes
+  - iac
+  - ai
 
 repository: https://github.com/ahmz1833/server-setup
 documentation: https://github.com/ahmz1833/server-setup/blob/master/README.md
@@ -60,3 +63,7 @@ build_ignore:
   - .pytest_cache
   - .tox
   - .ansible
+  - .claude-plugin
+  - .dockerignore
+  - "examples/*/.venv"
+  - "examples/*/collections"

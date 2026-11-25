@@ -1,0 +1,5 @@
+.git
+*.tar.gz
+**/.venv
+**/collections
+**/.vault_pass*

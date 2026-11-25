@@ -1,0 +1,32 @@
+# Deploy an app from ITS OWN repository's CI (GitLab example; GitHub Actions is analogous).
+# The app repo does not contain infra; it calls the apps role in preserve mode, which
+# updates only the image and keeps ports/env/volumes from the running container.
+#
+# CI variables (masked + protected): DEPLOY_SSH_KEY, DEPLOY_HOST, DEPLOY_PORT, DEPLOY_USER
+# The deploy user should be a dedicated, least-privilege account (security.md §7).
+deploy:
+  stage: deploy
+  image: ghcr.io/ahmz1833/server-setup:1.5.0     # pinned runner = pinned collection
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - install -m 600 /dev/null /tmp/key && printf '%s\n' "$DEPLOY_SSH_KEY" > /tmp/key
+    - |
+      cat > /tmp/deploy.yml <<YAML
+      - hosts: target
+        become: true
+        roles:
+          - role: ahmz1833.server_setup.apps
+            vars:
+              apps_preserve_mode: true
+              apps_list:
+                - name: website
+                  image: ghcr.io/example/website:${CI_COMMIT_TAG}
+                  pull: always
+      YAML
+    - >
+      ansible-playbook /tmp/deploy.yml
+      -i "target ansible_host=$DEPLOY_HOST ansible_port=$DEPLOY_PORT ansible_user=$DEPLOY_USER,"
+      --private-key /tmp/key -e ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new'
+  # Afterwards, bump the pinned image in the infra repo (host_vars/edge-1/main.yml) so the
+  # IaC stays the source of truth — e.g. via an MR opened by this job.
