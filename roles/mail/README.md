@@ -49,7 +49,17 @@ account, which the role maps as allowed to spoof any sender.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `mail_domain` | `"example.com"` | Primary domain for the mailserver |
-| `mail_hostname` | `"mail.example.com"` | FQDN of the mailserver |
+| `mail_hostname` | `"mail.{{ mail_domain }}"` | FQDN of the mailserver (A record, MX target, printed DNS instructions) |
+
+### Paths, network and ports
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `mail_network_name` | `"mail-net"` | Docker network shared by the mailserver and webmail containers |
+| `mail_data_dir` | `"/opt/apps/dms"` | docker-mailserver data/config on the host |
+| `mail_snappymail_data_dir` | `"/opt/apps/snappymail"` | SnappyMail data on the host |
+| `mail_webmail_port` | `"8888"` | Webmail port, published on `127.0.0.1` only (put a reverse proxy in front) |
+| `mail_whitelist_label_key` / `mail_whitelist_label_value` | `apps.ansible.prune.whitelist` / `"true"` | Label set on the mail containers. With these defaults the `apps` role's prune never removes them; if you change them, add the new label to `apps_prune.whitelist_labels`. |
 
 ### Users and Passwords
 

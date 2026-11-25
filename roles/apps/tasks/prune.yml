@@ -22,7 +22,8 @@
         {%- set to_remove = [] -%}
         {%- set managed = apps_list | map(attribute='name') | list -%}
         {%- set patterns = ['^sandbox-.*$', '^runner-.*$', '^worker-.*$'] + (apps_prune.whitelist_patterns | default([])) -%}
-        {%- set whitelist_labels = apps_prune.whitelist_labels | default([]) -%}
+        {#- Built-in protection label, set e.g. by the mail role; always honoured. -#}
+        {%- set whitelist_labels = [{'key': 'apps.ansible.prune.whitelist', 'value': 'true'}] + (apps_prune.whitelist_labels | default([])) -%}
         {%- for res in _apps_docker_full_info.results | default([]) -%}
           {%- set c = res.container -%}
           {%- set name = c.Name | regex_replace('^/', '') -%}

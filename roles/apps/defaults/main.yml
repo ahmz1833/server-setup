@@ -117,9 +117,8 @@ apps_networks: []
 #       # Security
 #       privileged: false
 #       read_only: false
-#       capabilities:
-#         add: [NET_ADMIN]
-#         drop: [MKNOD, SYS_CHROOT]
+#       capabilities: [NET_ADMIN]          # capabilities to ADD (docker_container `capabilities`)
+#       cap_drop: [MKNOD, SYS_CHROOT]      # capabilities to drop
 #       security_opts: ["no-new-privileges:true"]
 #
 #       # Logging
@@ -150,7 +149,7 @@ apps_list: []
 # WARNING: Enable with caution. Removes containers/networks not in apps_list.
 
 apps_prune:
-  # Master switch (default: opposite of preserve_mode for safety)
+  # Master switch
   enabled: false
 
   # What to prune
@@ -158,7 +157,7 @@ apps_prune:
   networks: false
 
   # Container name patterns to never prune (regex).
-  # tasks/prune.yml always prepends ^sandbox-.*$ even if this list is empty.
+  # tasks/prune.yml always adds ^sandbox-.*$, ^runner-.*$ and ^worker-.*$ even if this list is empty.
   whitelist_patterns:
     - "^sandbox-.*$"
 
@@ -168,4 +167,6 @@ apps_prune:
   #   - a dict with exact key/value match, e.g.
   #       key: "com.example.role"
   #       value: "system"
+  # Containers labelled apps.ansible.prune.whitelist=true are always protected
+  # (built in; the mail role sets this label on its containers).
   whitelist_labels: []

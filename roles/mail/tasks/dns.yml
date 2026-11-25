@@ -8,12 +8,12 @@
       Please configure the following DNS records for {{ mail_domain }}:
 
       1. A Record:
-         Name: mail
+         Name: {{ mail_hostname }}
          Value: <your-server-ip>
 
       2. MX Record:
          Name: @
-         Value: mail.{{ mail_domain }}
+         Value: {{ mail_hostname }}
          Priority: 10
 
       3. TXT Record (SPF):
