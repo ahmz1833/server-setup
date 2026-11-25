@@ -1,0 +1,10 @@
+---
+# UPSTREAM-CANDIDATE: generic log-retention setting; fits ahmz1833.server_setup.core
+- name: Configure journald retention
+  ansible.builtin.template:
+    src: retention.conf.j2
+    dest: /etc/systemd/journald.conf.d/retention.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald

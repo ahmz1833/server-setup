@@ -1,0 +1,3 @@
+---
+k3s_role: agent
+k3s_datastore_role: join

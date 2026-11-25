@@ -1,0 +1,18 @@
+---
+# FAKE values. `make vault-init ENV=<env> VAULT_PER_ENV=1` → encrypted vault.yml
+vault_admin_user: opsadmin
+vault_admin_cidr: "203.0.113.0/28"           # office / VPN egress
+vault_monitoring_cidr: "10.0.0.50/32"        # Prometheus, scrapes over the private network
+vault_hosts:
+  cp-1:     {address: 198.51.100.11, private_ip: 10.0.0.11, ssh_port: 22}
+  cp-2:     {address: 198.51.100.12, private_ip: 10.0.0.12}
+  cp-3:     {address: 198.51.100.13, private_ip: 10.0.0.13}
+  worker-1: {address: 198.51.100.21, private_ip: 10.0.0.21}
+  worker-2: {address: 198.51.100.22, private_ip: 10.0.0.22}
+  mail-1:   {address: 198.51.100.31, private_ip: 10.0.0.31}
+vault_k3s_token: CHANGEME-long-random-string
+vault_k3s_api_name: k8s-api.internal.example.com
+vault_mail_admin_password: CHANGEME
+vault_mail_noreply_password: CHANGEME
+vault_mail_webmail_admin_password: CHANGEME
+vault_mail_webmail_admin_path: CHANGEME-random-path

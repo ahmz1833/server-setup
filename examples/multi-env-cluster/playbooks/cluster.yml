@@ -1,0 +1,8 @@
+---
+# Day 0/1: bootstrap or converge the cluster. Upgrades: playbooks/ops/k3s-upgrade.yml
+- name: K3s cluster
+  hosts: k3s_cluster
+  become: true
+  roles:
+    - role: ahmz1833.server_setup.k3s
+      tags: [k3s]

@@ -1,0 +1,40 @@
+---
+# ---------------------------------------------------------------------------
+# prod — environment-wide settings. Secrets & exposure-sensitive values: vault.yml
+# ---------------------------------------------------------------------------
+env_name: prod
+
+# Connection: one vaulted map for all hosts instead of a vault file per host.
+ansible_host: "{{ vault_hosts[inventory_hostname].address }}"
+ansible_port: "{{ vault_hosts[inventory_hostname].ssh_port | default(22) }}"
+ansible_user: "{{ vault_admin_user }}"
+core_ssh_port: "{{ vault_hosts[inventory_hostname].ssh_port | default(22) }}"
+
+is_iran: false
+enable_ipv6: false
+primary_user: "{{ vault_admin_user }}"
+
+core_users:
+  - name: "{{ vault_admin_user }}"
+    groups: ["sudo"]
+    sudoer: true
+    sudoer_no_pass: true
+    ssh_keys:
+      - "{{ playbook_dir }}/../files/ssh_keys/admin.pub"
+core_ssh_allow_users: ["{{ vault_admin_user }}"]
+# SSH only from the admin network (office/VPN/bastion); the CIDR is topology → vault.
+# Lockout risk: make sure you connect from inside it before applying (security.md §11).
+core_firewall_ssh_src: "{{ vault_admin_cidr }}"
+
+core_manage_firewall: true
+core_fail2ban_enabled: true
+
+node_docker_enabled: true
+node_gost_install: false
+node_exporter_install: true
+node_exporter_enabled: true
+# Exporter on the private interface, reachable only by the monitoring server
+node_exporter_listen_address: "{{ vault_hosts[inventory_hostname].private_ip }}:9100"
+
+# local role (roles/journald): bounded logs on every host
+journald_max_use: 1G

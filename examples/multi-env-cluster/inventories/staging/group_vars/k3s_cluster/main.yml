@@ -1,0 +1,15 @@
+---
+# k3s settings shared by servers and agents (variable reference: roles-index → k3s)
+k3s_version: "v1.36.3+k3s1"
+k3s_token: "{{ vault_k3s_token }}"      # fixed token → rebuilds join the same cluster
+k3s_node_ip: "{{ vault_hosts[inventory_hostname].private_ip }}"
+k3s_flannel_backend: vxlan
+
+# API only from admin network; HTTP(S) ingress is public by design.
+k3s_firewall_allowed_api_cidrs: ["{{ vault_admin_cidr }}"]
+k3s_firewall_allowed_ingress_cidrs: ["0.0.0.0/0"]
+k3s_tls_sans: ["{{ vault_k3s_api_name }}"]       # internal API name → vault
+
+# Host firewall: k3s merges its own rules into core's; these are extra.
+core_firewall_rules:
+  - {port: 9100, src: "{{ vault_monitoring_cidr }}", comment: "node_exporter from monitoring only"}
