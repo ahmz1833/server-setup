@@ -14,6 +14,14 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - **infra-iac** routes debugging/performance/measurement requests to `server-diagnostics`.
+- **examples Makefile**: `make shell` now works on the **servers** — `make shell H=<host>`
+  opens an SSH session (connection resolved from inventory + vault), `make shell H=<pattern>
+  -- <cmd>` / `CMD='…'` runs a command on one or many hosts (sudo; `SUDO=0`). New
+  `make module` (any Ansible module) and `make var` (templated variable, vault values
+  refused). The local toolchain subshell from 1.5.x is removed.
+- **examples Makefile**: a sudo password file (`.become_pass[.<env>]` or `.become-pass[.<env>]`,
+  gitignored) is passed with `--become-password-file` to every ansible command — no prompt;
+  `BECOME_ASK=1` still prompts when there is no file.
 
 ### Fixed
 - **galaxy.yml**: `dist/` excluded from the collection build (an empty `dist/` was shipped in 1.5.1).

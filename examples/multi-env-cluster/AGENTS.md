@@ -27,7 +27,8 @@ This project is operated with the `infra-iac` skill (plus `server-diagnostics`,
 - Cluster changes on prod roll with `serial: 1` (see `playbooks/ops/k3s-upgrade.yml`).
 
 
-- **Agents never see secret values**: no vault viewing/decrypting; wire `vault_*`
+- **Agents never see secret values**: no vault viewing/decrypting, never read
+  `.vault_pass*`/`.become_pass*`; wire `vault_*`
   references with placeholders and ask the human to fill them (`make vault-edit`), or use
   `make vault-gen` for random ones.
 - **Collection first**: anything `ahmz1833.server_setup` can manage is managed through its

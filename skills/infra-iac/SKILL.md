@@ -57,8 +57,10 @@ If `ansible-playbook` doesn't work or the collection isn't installed:
 `scripts/ensure-toolchain.sh <project-dir>` (bundled with this skill). It creates a `.venv` if
 needed and installs/upgrades the **latest** `ahmz1833.server_setup` into `./collections`.
 Container status/logs on a host (read-only): `make docker-logs H=<host> [C=<container>] [N=200] [SINCE=10m]`.
-Ad-hoc ansible commands with the right inventory/vault/collections: `make shell -- <cmd>`
-(or `make shell CMD='<cmd>'` when arguments contain `=` or quotes).
+Commands on servers: `make shell H=<host|group> -- <cmd>` (or `CMD='<cmd>'` when it contains
+`=` or quotes; sudo by default, `SUDO=0` for the login user); any module:
+`make module H=… M=<module> A='<args>'`; a variable's value: `make var H=<host> V=<var>`.
+Inventory and vault resolve the connection, so you never handle addresses.
 No Python available: `make docker-shell` (runner image). Details: `references/toolchain.md`.
 Projects without the standard layout: use their own entry points, or plain
 `ansible-playbook -i <inventory> <playbook>` with their vault options.
@@ -69,7 +71,7 @@ State the classification and your plan in one or two lines before acting.
 
 | Kind | Examples | How |
 |---|---|---|
-| **1. Inspect / answer** | status, logs, "why is X slow/down", disk, versions, who has access | Read-only commands only (`make shell -- ansible <host> -a '<cmd>'` / `make shell CMD='…'`, `make docker-logs`, `ssh`, `kubectl get`). Report findings. No writes. |
+| **1. Inspect / answer** | status, logs, "why is X slow/down", disk, versions, who has access | Read-only commands only (`make shell H=<host> -- <cmd>`, `make docker-logs`, `make var`, `kubectl get`). Report findings. No writes. |
 | **2. One-off operation** | restart/reload, reboot, drain/uncordon, fetch kubeconfig, backup, prune images, redeploy same image | Prefer: existing `playbooks/ops/*` → collection entry point (e.g. k3s `k3s_state`) → ad-hoc module. Confirm before anything disruptive (reboot, drain, restart of prod services). If the job will recur, add it as `playbooks/ops/<job>.yml`. |
 | **3. Persistent change** | add user/key, open port, add site/app/domain/host, change config, upgrade versions | **The change loop below.** Always. |
 | **4. Emergency** | prod down, active attack, locked out | Minimal manual fix with the user's OK, log every command, then codify (repo matches host, `check` shows no diff) or revert — before the session ends. |
@@ -117,7 +119,12 @@ Minimal exposure of secrets to the AI session (`references/security.md` §5a):
 
 - Never ask for secrets or real IPs/ports/internal names in chat. Never run
   `make vault-view`, `ansible-vault view/decrypt/edit`, `make host … SHOW_VAULT=1`, or read
-  `.vault_pass*`, kubeconfigs, private keys, state files, rendered configs with credentials.
+  `.vault_pass*`, `.become_pass*`/`.become-pass*`, kubeconfigs, private keys, state files,
+  rendered configs with credentials.
+- sudo asks for a password ("Missing sudo password")? Ask the human to create
+  `.become_pass` (or `.become_pass.<env>`) with mode 600 — the Makefile then uses it for every
+  ansible command. Don't use `BECOME_ASK=1` yourself (you can't answer prompts) and never
+  take the password in chat.
 - Wire secrets by reference: `x: "{{ vault_x }}"` + placeholder `vault_x: CHANGEME` in the
   matching `vault.yml.example`.
 - Random secrets: `make vault-gen KEY=vault_x FILE=<vault.yml>` (never printed).

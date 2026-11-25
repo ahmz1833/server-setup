@@ -1,6 +1,8 @@
 .venv/
 collections/
 .vault_pass*
+.become_pass*
+.become-pass*
 !.vault_pass*.example
 *.retry
 .ansible/

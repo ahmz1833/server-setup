@@ -25,7 +25,7 @@ put() {
   mkdir -p "$STAGE/$(dirname "$dst")"
   if [ -d "$src" ]; then
     mkdir -p "$STAGE/$dst"
-    (cd "$src" && tar --exclude='./.venv' --exclude='./collections' --exclude='.vault_pass*' \
+    (cd "$src" && tar --exclude='./.venv' --exclude='./collections' --exclude='.vault_pass*' --exclude='.become_pass*' --exclude='.become-pass*' \
       --exclude='vault.yml' -cf - .) | (cd "$STAGE/$dst" && tar -xf -)
   else
     cp "$src" "$STAGE/$dst"

@@ -135,6 +135,9 @@ The starter Makefile supports this via `VAULT_IDS` (see [toolchain.md](toolchain
 `VAULT_IDS="prod@.vault_pass.prod"`; by default it uses `default@.vault_pass` if present,
 else prompts.
 
+(The sudo password works the same way: a gitignored `.become_pass` file — see
+[toolchain.md](toolchain.md).)
+
 Password sources, in order of preference: a password manager script
 (`--vault-id prod@scripts/vault-pass-client.sh`), a gitignored file (`.vault_pass*`),
 an environment variable in CI (write it to a temp file with mode 600), an interactive
@@ -173,7 +176,8 @@ internal names): the agent wires `vault_*` references; the human puts the values
 
 - ask you to paste a secret (or a real IP/port/internal name) into the chat;
 - view or decrypt vaults (`make vault-view`, `ansible-vault view|decrypt|edit`),
-  read `.vault_pass*`, kubeconfigs, private keys, `.env` files or Terraform state;
+  read `.vault_pass*`, `.become_pass*`/`.become-pass*`, kubeconfigs, private keys, `.env`
+  files or Terraform state;
 - print resolved secret values (`make host … SHOW_VAULT=1`, `ansible -m debug` of
   `vault_*`-derived vars, `env`, `docker inspect` of containers with secret env, `cat` of
   rendered config files containing credentials);
@@ -187,6 +191,7 @@ internal names): the agent wires `vault_*` references; the human puts the values
 | It can be random (passwords, tokens, API keys you define) | `make vault-gen KEY=vault_x FILE=<vault.yml> [LEN=32]` — generated and encrypted in one pipe, never printed |
 | It comes from outside (provider API token, registry login, license key, TLS key from a CA, a person's password) | hand-off to the human with exact instructions |
 | Check that a secret exists | `make vault-keys` — lists key names only |
+| sudo needs a password | the human creates `.become_pass` (mode 600, gitignored); the Makefile passes it to every ansible command — the agent only checks the file exists (`test -s .become_pass`) |
 | Inspect a host's vars | `make host H=<host>` — `vault_*` values are shown as `<hidden>` |
 | A secret is needed on the host as a file (key, cert) | `copy: content="{{ vault_x }}" mode=0600` with `no_log: true` — the human puts the content in the vault |
 | You pasted a secret into the chat anyway | the agent does not repeat it, tells you to put it in the vault yourself and suggests rotating it if it is sensitive |

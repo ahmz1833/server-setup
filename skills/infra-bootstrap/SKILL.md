@@ -88,6 +88,8 @@ make check LIMIT=<host>
 
 - Tell the user to store the generated `.vault_pass*` in their password manager.
 - They must put their **public** key in `files/ssh_keys/admin.pub`.
+- If sudo on the hosts needs a password, they create `.become_pass` (mode 600, gitignored;
+  `.become_pass.<env>` per environment) — all `make` ansible commands use it without prompting.
 - First apply on a fresh host usually connects as root or the provider's default user:
   `make apply LIMIT=<host> EXTRA="-u root"` (confirm first). It creates the admin user,
   hardens SSH and enables the firewall — follow the lockout precautions (keep a session

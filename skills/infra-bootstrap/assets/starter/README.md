@@ -42,5 +42,6 @@ No Python/Ansible on this machine? `make docker-shell`, then the same `make` tar
 | Upgrade OS | `make run PLAY=ops/upgrade LIMIT=web-1` |
 | See a host's vars | `make host H=web-1` |
 | Container logs | `make docker-logs H=web-1` (list) · `make docker-logs H=web-1 C=app SINCE=10m` |
-| Ad-hoc command | `make shell -- ansible web -m ping` · `make shell CMD='ansible web-1 -b -a "df -h"'` |
-| Work interactively with ansible | `make shell` (venv, inventory and vault preset) |
+| Command on servers | `make shell H=web -- df -h` · `make shell H=web-1 CMD='ss -ltnp \| grep 443'` |
+| SSH into a server | `make shell H=web-1` (address/port/user come from inventory + vault) |
+| Any module / a variable | `make module H=web-1 M=ansible.builtin.setup A='filter=ansible_mem*'` · `make var H=web-1 V=nginx_sites` |

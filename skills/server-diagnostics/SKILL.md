@@ -31,9 +31,12 @@ firewall, monitoring), hand over to `infra-iac`'s change loop.
    commands via inventory variables (`{{ hostvars['<host>'].ansible_host }}`); never ask for
    or print real IPs, ports or secrets; mask IPs in output before reading it (filter below);
    don't paste raw outputs into the repo.
-7. **Run through the project toolchain**: `make shell CMD='ansible <host> …'`,
-   `make docker-logs`, or `ssh <alias>` for interactive digging. No project: an inventory the
-   user prepares, or their `~/.ssh/config` aliases.
+7. **Run on servers through the project Makefile** (connection resolved from inventory and
+   vault): `make shell H=<host|group> -- <cmd>` (or `CMD='…'` with quotes/`=`; sudo by default,
+   `SUDO=0` for the login user; a `.become_pass` file is used automatically if sudo needs a
+   password), `make module H=… M=<module> A='<args>'` for any module
+   (`EXTRA='-B 300 -P 0'` for background jobs), `make docker-logs`, `make var`. No project: an
+   inventory the user prepares, or their `~/.ssh/config` aliases.
 
 ```bash
 # IP mask — pipe any output through this before reading it
@@ -95,7 +98,7 @@ its bootstrap installs the user's dotfiles scripts into the admin user's `~/.loc
 (run as that user, or by full path). Check presence before anything else:
 
 ```bash
-make shell CMD="ansible <host> -m ansible.builtin.shell -a 'ls ~/.local/bin; command -v sysbench fio iperf3 mtr'"
+make shell H=<host> SUDO=0 CMD='ls ~/.local/bin; command -v sysbench fio iperf3 mtr'
 ```
 
 Helpers you may find there (names and options may change — read `--help`):
@@ -108,8 +111,8 @@ Helpers you may find there (names and options may change — read `--help`):
 
 Fallback order when a tool is missing: install the standard package temporarily → fetch the
 helper on the controller (`https://raw.githubusercontent.com/ahmz1833/dots/main/scripts/<name>`)
-and run it with `ansible.builtin.script` (copies, runs, deletes; works for hosts without
-GitHub access) → standard tools (`sysbench`, `fio`, `iperf3`, `mtr`, `curl -w`, `dd oflag=direct`).
+and run it with `make module H=<host> SUDO=0 M=ansible.builtin.script A='<local path> <args>'`
+(copies, runs, deletes; works for hosts without GitHub access) → standard tools (`sysbench`, `fio`, `iperf3`, `mtr`, `curl -w`, `dd oflag=direct`).
 
 ### Benchmarks
 
@@ -127,7 +130,7 @@ The iperf3 server exists only for the test window:
    address only**, at the top of the active chain (collection firewall: `HOST-FIREWALL`;
    otherwise the nft/ufw setup you find). Account for NAT and provider security groups.
 3. Start the server time-bounded in the background, e.g.
-   `ansible <srv> -b -B 300 -P 0 -m ansible.builtin.command -a 'timeout 240 iperf3 -s -p <port>'`
+   `make module H=<srv> M=ansible.builtin.command A='timeout 240 iperf3 -s -p <port>' EXTRA='-B 300 -P 0'`
    (or one-shot mode if available).
 4. From the client: both directions (normal and `-R`), ~10 s each; optionally parallel
    streams (`-P N`) to separate per-flow from link limits; target the server via
