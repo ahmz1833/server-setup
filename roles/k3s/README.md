@@ -35,9 +35,9 @@ Designed for **systemd** Linux. **Gather facts** must be enabled so host archite
 1. **validate** — Assert node execution mode, server datastore role, and inventory group existence (`validate/main.yml`).
 2. **install** — Remove legacy env files and deploy K3s binary asset via **`asset`** role (`install/main.yml`).
 3. **configure** — Render `/etc/rancher/k3s/k3s.env`, systemd service units, and `/etc/rancher/k3s/config.yaml` (`configure/main.yml`).
-4. **firewall** — Assemble and merge K3s port rules into `core` firewall role (`firewall/main.yml`).
-5. **hosts bootstrap** — Temporarily add `k3s_control_plane_domain` to `/etc/hosts` for joining nodes (`tasks/main.yml`).
-6. **cluster** — Bootstrap primary control plane (`server_init.yml`), join secondary servers (`server_join.yml`), or join worker agents (`agent.yml`).
+4. **hosts bootstrap** — Temporarily add `k3s_control_plane_domain` to `/etc/hosts` for joining nodes (`tasks/main.yml`).
+5. **cluster** — Bootstrap primary control plane (`server_init.yml`), join secondary servers (`server_join.yml`), or join worker agents (`agent.yml`).
+6. **firewall** — Assemble and merge K3s port rules into `core` firewall role (`firewall/main.yml`).
 7. **manifests** — Deploy Traefik `HelmChartConfig` and user-defined Kubernetes YAML manifests (`manifests/main.yml`).
 8. **hosts cleanup** — Remove temporary `/etc/hosts` bootstrap entry in `always:` block (`tasks/main.yml`).
 
@@ -45,16 +45,9 @@ Designed for **systemd** Linux. **Gather facts** must be enabled so host archite
 1. **validate** — Validate node and cluster facts (`validate/main.yml`).
 2. **day2** — Execute specified operation (`drain`, `uncordon`, `rotate-certs`, `fetch-kubeconfig`, `uninstall`).
 
-| Tag | Scope |
-|-----|--------|
-| `k3s` | Entire role |
-| `k3s-validate` | Configuration and inventory schema assertions |
-| `k3s-install` | K3s binary asset installation |
-| `k3s-configure` | Config files and systemd service unit rendering |
-| `k3s-firewall` | K3s firewall rule generation and core role invocation |
-| `k3s-cluster` | Cluster bootstrapping, token resolution, and server/agent joining |
-| `k3s-manifests` | Traefik HelmChartConfig and custom manifest deployment |
-| `k3s-day2` | Day 2 cluster operations (drain, uncordon, cert rotation, fetch kubeconfig, uninstall) |
+**Tags:** the role's own tasks are untagged — tag the role where you include it
+(e.g. `tags: [k3s]`). The included `core` firewall tasks are applied with tags `k3s` and
+`firewall`. Use `k3s_state` (not tags) to select day-2 operations.
 
 ---
 
