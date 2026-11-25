@@ -44,7 +44,7 @@ The role is built for **systemd**-based hosts. It works best on **Debian/Ubuntu*
 8. **ipset** — if `core_manage_ipset` and `core_ipsets` non-empty
 9. **firewall** — if `core_manage_firewall`
 10. **fail2ban** — if `core_fail2ban_enabled`
-11. **cron** — if `core_manage_cron`
+11. **cron** — if `core_manage_cron` (installs the cron package when there are jobs)
 
 | Tag | Scope |
 |-----|--------|
