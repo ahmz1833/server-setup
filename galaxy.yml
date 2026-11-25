@@ -1,7 +1,7 @@
 ---
 namespace: ahmz1833
 name: server_setup
-version: 1.5.1
+version: 1.6.0
 readme: README.md
 authors:
   - AHMZ <ahmz.ut@gmail.com>
@@ -64,5 +64,6 @@ build_ignore:
   - .ansible
   - .claude-plugin
   - .dockerignore
+  - dist
   - "examples/*/.venv"
   - "examples/*/collections"

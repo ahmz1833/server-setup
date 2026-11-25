@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-11-25
+
+### Added
+- **skills**: `server-diagnostics` — availability and performance debugging for any workload
+  (discovers and uses available metrics/log sources first: Prometheus-style metrics,
+  exporters, logs, Kubernetes metrics, sysstat, provider graphs), USE/RED analysis,
+  benchmarks and egress/IP-reputation checks with the helper scripts the node role's
+  bootstrap installs, strictly ephemeral iperf3 tests between servers and to public servers.
+  Leaves no trace, masks IPs, hands durable fixes to `infra-iac`.
+
+### Changed
+- **infra-iac** routes debugging/performance/measurement requests to `server-diagnostics`.
+
+### Fixed
+- **galaxy.yml**: `dist/` excluded from the collection build (an empty `dist/` was shipped in 1.5.1).
+
 ## [1.5.1] - 2026-11-25
 
 ### Fixed

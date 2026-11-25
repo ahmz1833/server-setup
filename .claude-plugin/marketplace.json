@@ -8,8 +8,8 @@
     {
       "name": "server-setup",
       "source": "./",
-      "description": "Skills: infra-iac (operate/change/debug servers via IaC), infra-bootstrap (new infra project), server-setup-dev (develop the collection).",
-      "version": "1.5.1"
+      "description": "Skills: infra-iac (operate/change servers via IaC), server-diagnostics (availability/performance debugging, benchmarks, network, IP reputation), infra-bootstrap (new infra project), server-setup-dev (develop the collection).",
+      "version": "1.6.0"
     }
   ]
 }
