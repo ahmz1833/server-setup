@@ -34,6 +34,12 @@ This project is operated with the `infra-iac` skill (plus `server-diagnostics`,
 - **Collection first**: anything `ahmz1833.server_setup` can manage is managed through its
   roles — never re-implemented locally or by hand.
 
+## Commits & comments
+
+- Small commits; short, precise conventional messages; brief PR descriptions.
+- No AI co-author trailers.
+- Comments only where needed, saying **why**, not what.
+
 ## This project
 
 - **Environments**: `inventories/staging`, `inventories/prod` (default `ENV=prod`).

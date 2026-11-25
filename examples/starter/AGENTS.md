@@ -33,6 +33,12 @@ This project is operated with the `infra-iac` skill (plus `server-diagnostics`,
 - Read-only investigation is fine; state-changing one-off jobs use `playbooks/ops/` or are
   confirmed first.
 
+## Commits & comments
+
+- Small commits; short, precise conventional messages; brief PR descriptions.
+- No AI co-author trailers.
+- Comments only where needed, saying **why**, not what.
+
 ## This project
 
 - **Environments**: `inventories/prod` (default). <add staging if any>
