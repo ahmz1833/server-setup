@@ -65,6 +65,9 @@ core_apt_mirrors:
 # cache_valid_time: Skip apt-get update if cache is newer than this (seconds)
 # Set to 0 to always update, or high value to minimize updates
 core_apt_cache_valid_time: 3600
+# apt update retries against flaky mirrors
+core_apt_update_retries: 3
+core_apt_update_retry_delay: 5
 
 # Base packages to install on all systems
 core_packages:
@@ -118,6 +121,7 @@ core_manage_users: true
 # core_users:
 #   - name: admin
 #     password: '<Hash made by mkpasswd>' # if provided, password will be updated. Must be provided when creating.
+#     group: admins                       # optional primary group (created if missing)
 #     groups: ["sudo", "docker"]
 #     append: <true/false>                # Default: true (if true, do not remove user from already joined groups)
 #     shell: /bin/bash

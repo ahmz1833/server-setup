@@ -47,6 +47,7 @@
     state: present
     create_home: true
     shell: "{{ item.shell | default('/bin/bash') }}"
+    group: "{{ item.group | default(omit) }}"
     groups: "{{ item.groups | default(omit) }}"
     append: "{{ item.append | default(true) }}"
     password: "{{ item.password | default(omit) }}"

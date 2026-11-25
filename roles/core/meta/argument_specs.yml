@@ -91,14 +91,12 @@ argument_specs:
         description: Seconds an apt cache is considered fresh (0 = always update). Ignored right after a mirror rewrite.
       core_apt_update_retries:
         type: int
-        description:
-          - Retries for C(apt update) against flaky mirrors.
-          - "Default: 3 (inline task default; not in defaults/main.yml)."
+        default: 3
+        description: Retries for C(apt update) against flaky mirrors.
       core_apt_update_retry_delay:
         type: int
-        description:
-          - Seconds between C(apt update) retries.
-          - "Default: 5 (inline task default; not in defaults/main.yml)."
+        default: 5
+        description: Seconds between C(apt update) retries.
       core_packages:
         type: list
         elements: str
@@ -187,7 +185,7 @@ argument_specs:
             description: Supplementary groups (list or comma-separated string).
           group:
             type: str
-            description: Group name ensured to exist (note - not assigned as the user's primary group).
+            description: Primary group of the user; created if missing. Omit to keep the system default (usually a group named like the user).
           append:
             type: raw
             description: "Keep existing group memberships (bool). Default: true."
