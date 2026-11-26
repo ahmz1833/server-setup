@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
   run in check mode, so `--check` no longer fails on them.
 - **core**: installs cron when it manages cron jobs (minimal images lack `crontab`).
 
+### Changed
+- **asset**: hosts with `is_iran` fetch release assets from the S3 mirror by default
+  (`asset_use_mirror` derived from `is_iran`, `asset_mirror_base_url` set to the mirror).
+
 ## [1.6.1] - 2026-11-25
 
 ### Fixed

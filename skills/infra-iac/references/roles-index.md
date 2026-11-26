@@ -96,7 +96,7 @@ Roles: [acme](#acme) · [apps](#apps) · [asset](#asset) · [core](#core) · [k3
 | `asset_download_locally` | bool | `false` | Download (and cache) on the controller, then push a gzip payload to the target (restricted-egress targets). |
 | `asset_extract` | bool | `true` | Treat the download as an archive and extract it; false = single raw file. |
 | `asset_extract_src` | str |  | Path inside the extracted archive (or staging filename); `%v` is replaced. For `package`, a trailing `/` copies directory contents. Default: `asset_name`. |
-| `asset_mirror_base_url` | str | `""` | Mirror base URL (trailing slashes normalised); used only when `asset_use_mirror` is true. |
+| `asset_mirror_base_url` | str | `"https://s3.ahmz.ir/server_setup/assets"` | Mirror base URL (trailing slashes normalised); same layout as the controller cache. |
 | `asset_name` | str **req** |  | Logical asset name; used for temp dirs, the default destination `/usr/local/bin/<name>` and the file-type version sidecar. |
 | `asset_origin_scheme` | str | `"https://"` | Scheme prepended when `asset_url` has none. |
 | `asset_proxy` | str | `""` | HTTP/HTTPS/SOCKS5 proxy URL for downloads (e.g. `socks5://127.0.0.1:1080`). Applies on the controller when `asset_download_locally`, otherwise on the target. |
@@ -106,7 +106,7 @@ Roles: [acme](#acme) · [apps](#apps) · [asset](#asset) · [core](#core) · [k3
 | `asset_service_stop` | str |  | systemd unit stopped (best-effort) before installing an update. No default (nothing is stopped). |
 | `asset_type` | str |  | `binary`: single executable (version from CLI); `file`: single file; `package`: directory tree in `asset_dest`. Default: `binary` (inline task default; not in defaults/main.yml). Choices: `binary`, `file`, `package`. |
 | `asset_url` | str **req** |  | Download URL or scheme-less suffix (`asset_origin_scheme` is prepended); `%v` is replaced with the resolved version. Example: `github.com/org/app/releases/download/v%v/app-%v-linux-amd64.tar.gz`. |
-| `asset_use_mirror` | bool | `false` | Fetch from `asset_mirror_base_url` + URL suffix instead of the origin. |
+| `asset_use_mirror` | raw |  | Fetch from `asset_mirror_base_url` + URL suffix (origin URL without scheme) instead of the origin. Default: derived from `is_iran`. |
 | `asset_version` | str **req** |  | Version constraint - plain `1.2.3` (treated as `>=`), `>=1.2.3` or `==1.2.3`; the bare version replaces `%v`. |
 | `asset_version_cmd` | str |  | Arguments passed to the installed binary to print its version (`binary` type, used when the destination exists). No default; without it the installed version is not compared. |
 | `asset_version_regex` | str |  | Regex with one capture group extracting the version from the version command output (with `asset_version_cmd`). No default. |
