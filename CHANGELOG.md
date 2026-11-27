@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 - **core**: read-only safety checks (SSH keys/non-root user, swap, cron listing, IPv6 lookup)
   run in check mode, so `--check` no longer fails on them.
 - **core**: installs cron when it manages cron jobs (minimal images lack `crontab`).
+- **k3s**: an explicit `k3s_token` is written on the first config render; before, the first server
+  started without it (sealing the datastore with a random token) and the next apply failed to restart.
 
 ### Changed
 - **asset**: hosts with `is_iran` fetch release assets from the S3 mirror by default
