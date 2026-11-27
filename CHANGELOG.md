@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
 - **core**: installs cron when it manages cron jobs (minimal images lack `crontab`).
 - **k3s**: an explicit `k3s_token` is written on the first config render; before, the first server
   started without it (sealing the datastore with a random token) and the next apply failed to restart.
+- **k3s**: firewall rules are applied before bootstrap/join; with a default-deny host firewall,
+  joining servers could not reach etcd/API on their peers.
 
 ### Changed
 - **asset**: hosts with `is_iran` fetch release assets from the S3 mirror by default
