@@ -15,3 +15,7 @@
   ansible.builtin.include_tasks: agent.yml
   when:
     - k3s_role == 'agent'
+
+- name: Reconcile node labels and taints on registered nodes
+  ansible.builtin.include_tasks: node_metadata.yml
+  when: k3s_reconcile_node_metadata | bool

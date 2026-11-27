@@ -1,6 +1,6 @@
 # Ansible managed: Traefik HelmChartConfig for K3s
 # service.type ('LoadBalancer', 'ClusterIP', 'NodePort'),
-# service.externalTrafficPolicy,
+# service.externalTrafficPolicy, service.annotations,
 # deployment.kind, nodeSelector, tolerations,
 # forwardedHeaders (trustedIPs / insecure, global + per-entrypoint),
 # exposedPort, hostPort, optional explicit nodePort, and per-entrypoint transport.
@@ -22,15 +22,22 @@ spec:
 {%   set deploy_kind = t_deploy.kind | default('') %}
 {% endif %}
 {% set t_fh = (t_cfg.forwardedHeaders if (t_cfg.forwardedHeaders is defined and t_cfg.forwardedHeaders is mapping) else {}) %}
-{% if svc_type | length > 0 or svc_policy | length > 0 %}
+{% set svc_ann = (t_svc.annotations if (t_svc.annotations is defined and t_svc.annotations is mapping) else {}) %}
+{% if svc_type | length > 0 or svc_policy | length > 0 or svc_ann | length > 0 %}
     service:
 {% if svc_type | length > 0 %}
       type: {{ svc_type }}
+{% elif svc_policy | length == 0 and k3s_disable_servicelb | default(false) | bool %}
+      type: ClusterIP
 {% endif %}
 {% if svc_policy | length > 0 %}
       spec:
         externalTrafficPolicy: {{ svc_policy }}
 {% endif %}
+{% if svc_ann | length > 0 %}
+      annotations:
+{{ svc_ann | to_nice_yaml(indent=2) | indent(8, true) }}
+{%- endif %}
 {% elif k3s_disable_servicelb | default(false) | bool %}
     service:
       type: ClusterIP

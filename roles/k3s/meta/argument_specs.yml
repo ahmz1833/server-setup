@@ -166,6 +166,13 @@ argument_specs:
         elements: str
         default: []
         description: Node taints as C(key=value:Effect) strings.
+      k3s_reconcile_node_metadata:
+        type: bool
+        default: true
+        description:
+          - >-
+            Also apply C(k3s_node_labels)/C(k3s_node_taints) to nodes that are already registered (k3s itself
+            applies them only at registration). Additive: removing an entry does not remove it from the node.
 
       # -----------------------------------------------------------------------
       # Components / ingress
@@ -189,6 +196,7 @@ argument_specs:
           - >-
             Traefik HelmChartConfig values: C(enabled), C(service.type) (LoadBalancer/ClusterIP/NodePort),
             C(service.externalTrafficPolicy) (C(Local) forces C(deployment.kind=DaemonSet)), C(deployment.kind),
+            C(service.annotations) (e.g. C(svccontroller.k3s.cattle.io/tolerations) for servicelb pods),
             C(nodeSelector) and C(tolerations) (Traefik pod placement, e.g. only on ingress nodes),
             C(forwardedHeaders.insecure)/C(trustedIPs), and C(ports.web)/C(ports.websecure) with C(port), C(exposedPort),
             C(hostPort), C(nodePort), C(forwardedHeaders), C(transport).
