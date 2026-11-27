@@ -281,7 +281,7 @@ Options: `core_enable_ipv6`, `core_firewall_allow_ping`, `core_firewall_block_sc
 | `k3s_system_reserved` | str | `""` | Kubelet `system-reserved` (e.g. `cpu=500m,memory=512Mi`); empty omits it. |
 | `k3s_tls_sans` | list[str] | `[]` | Extra API server certificate SANs (server IPs/hostnames and `k3s_control_plane_domain` are added automatically). |
 | `k3s_token` | raw | `""` | Cluster join token; when empty it is read from the primary server. |
-| `k3s_traefik_config` | dict |  | Traefik HelmChartConfig values: `enabled`, `service.type` (LoadBalancer/ClusterIP/NodePort), `service.externalTrafficPolicy` (`Local` forces `deployment.kind=DaemonSet`), `deployment.kind`, `forwardedHeaders.insecure`/`trustedIPs`, and `ports.web`/`ports.websecure` with `port`, `exposedPort`, `hostPort`, `nodePort`, `forwardedHeaders`, `transport`. Default enables Traefik with ports 8000/80 and 8443/443 and no trusted IPs; see defaults/main.yml and README. |
+| `k3s_traefik_config` | dict |  | Traefik HelmChartConfig values: `enabled`, `service.type` (LoadBalancer/ClusterIP/NodePort), `service.externalTrafficPolicy` (`Local` forces `deployment.kind=DaemonSet`), `deployment.kind`, `nodeSelector` and `tolerations` (Traefik pod placement, e.g. only on ingress nodes), `forwardedHeaders.insecure`/`trustedIPs`, and `ports.web`/`ports.websecure` with `port`, `exposedPort`, `hostPort`, `nodePort`, `forwardedHeaders`, `transport`. Default enables Traefik with ports 8000/80 and 8443/443 and no trusted IPs; see defaults/main.yml and README. |
 | `k3s_version` | str | `"v1.36.3+k3s1"` | K3s release to install; bump and re-run to upgrade in place. |
 
 ## mail

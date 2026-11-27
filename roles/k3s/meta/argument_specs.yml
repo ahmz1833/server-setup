@@ -189,6 +189,7 @@ argument_specs:
           - >-
             Traefik HelmChartConfig values: C(enabled), C(service.type) (LoadBalancer/ClusterIP/NodePort),
             C(service.externalTrafficPolicy) (C(Local) forces C(deployment.kind=DaemonSet)), C(deployment.kind),
+            C(nodeSelector) and C(tolerations) (Traefik pod placement, e.g. only on ingress nodes),
             C(forwardedHeaders.insecure)/C(trustedIPs), and C(ports.web)/C(ports.websecure) with C(port), C(exposedPort),
             C(hostPort), C(nodePort), C(forwardedHeaders), C(transport).
           - Default enables Traefik with ports 8000/80 and 8443/443 and no trusted IPs; see defaults/main.yml and README.

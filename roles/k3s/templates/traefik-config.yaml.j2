@@ -1,7 +1,7 @@
 # Ansible managed: Traefik HelmChartConfig for K3s
 # service.type ('LoadBalancer', 'ClusterIP', 'NodePort'),
 # service.externalTrafficPolicy,
-# deployment.kind,
+# deployment.kind, nodeSelector, tolerations,
 # forwardedHeaders (trustedIPs / insecure, global + per-entrypoint),
 # exposedPort, hostPort, optional explicit nodePort, and per-entrypoint transport.
 apiVersion: helm.cattle.io/v1
@@ -39,6 +39,14 @@ spec:
     deployment:
       kind: {{ deploy_kind }}
 {% endif %}
+{% if t_cfg.nodeSelector is defined and t_cfg.nodeSelector is mapping %}
+    nodeSelector:
+{{ t_cfg.nodeSelector | to_nice_yaml(indent=2) | indent(6, true) }}
+{%- endif %}
+{% if t_cfg.tolerations is defined and t_cfg.tolerations is sequence and t_cfg.tolerations | length > 0 %}
+    tolerations:
+{{ t_cfg.tolerations | to_nice_yaml(indent=2) | indent(6, true) }}
+{%- endif %}
 {% set t_ports = (t_cfg.ports if (t_cfg.ports is defined and t_cfg.ports is mapping) else {}) %}
 {% set t_web = (t_ports.web if (t_ports.web is defined and t_ports.web is mapping) else {}) %}
 {% set t_websec = (t_ports.websecure if (t_ports.websecure is defined and t_ports.websecure is mapping) else {}) %}
