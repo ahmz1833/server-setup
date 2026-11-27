@@ -15,7 +15,9 @@
 - name: Set Docker version facts
   ansible.builtin.set_fact:
     node_docker_installed: "{{ node_docker_check.rc == 0 }}"
-    node_docker_current_version: "{{ node_docker_version_output.stdout | default('0.0.0') | regex_search('[0-9]+\\.[0-9]+\\.[0-9]+') | default('0.0.0', true) }}"
+    node_docker_current_version: >-
+      {{ node_docker_version_output.stdout | default('0.0.0')
+         | regex_search('[0-9]+\\.[0-9]+\\.[0-9]+') | default('0.0.0', true) }}
 
 - name: Display Docker status
   ansible.builtin.debug:

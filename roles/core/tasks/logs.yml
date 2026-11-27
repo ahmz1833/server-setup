@@ -34,6 +34,7 @@
       ansible.builtin.package:
         name: logrotate
         state: present
+      register: _core_logrotate_pkg
 
     # Global directives before the include apply to every logrotate.d entry that does not
     # set its own, so a chatty service cannot grow a log past this between weekly rotations.
@@ -44,9 +45,12 @@
         line: "maxsize {{ core_logrotate_maxsize }}"
         insertbefore: '^include\s'
         state: "{{ 'present' if core_logrotate_maxsize | string | length > 0 else 'absent' }}"
+      # In check mode a fresh install is only simulated, so its files do not exist yet.
+      when: not (ansible_check_mode and _core_logrotate_pkg is changed)
 
     - name: Ensure the logrotate timer runs
       ansible.builtin.systemd:
         name: logrotate.timer
         state: started
         enabled: true
+      when: not (ansible_check_mode and _core_logrotate_pkg is changed)
