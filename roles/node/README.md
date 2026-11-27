@@ -60,8 +60,8 @@ Designed for **systemd** Linux. **Gather facts** must be enabled so `ansible_fac
 | `node_singbox_install` | `{{ node_internet_restricted }}` (often `is_iran`) | `node_singbox_enabled` |
 | `node_gost_install` | `true` | `node_gost_enabled` |
 | `node_xui_install` | `false` | `node_xui_enabled` |
-| `node_docker_enabled` | `true` | `node_docker_enabled` (also starts/stops units) |
-| `node_exporter_install` | `true` | `node_exporter_enabled` |
+| `node_docker_enabled` | `true` | `node_docker_enabled` (also starts/stops units; `false` stops and disables an existing Docker/containerd) |
+| `node_exporter_install` | `true` | `node_exporter_enabled` (`false` also stops an existing `node_exporter` unit) |
 | `node_bootstrap_enabled` | `true` | — |
 | `node_lazydocker_install` | `{{ node_docker_enabled }}` | — |
 | `node_wgcf_install` | `false` | — |

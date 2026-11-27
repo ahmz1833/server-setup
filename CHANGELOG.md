@@ -22,6 +22,8 @@ All notable changes to this project will be documented in this file.
   started without it (sealing the datastore with a random token) and the next apply failed to restart.
 - **k3s**: firewall rules are applied before bootstrap/join; with a default-deny host firewall,
   joining servers could not reach etcd/API on their peers.
+- **node**: `node_docker_enabled: false` / `node_exporter_install: false` stop and disable units a
+  previous run started; the skipped install files left them running.
 - **node**: Docker status no longer crashes when the client exists but the daemon is down
   (empty `docker version` output left the version fact as None).
 
