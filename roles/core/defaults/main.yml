@@ -112,6 +112,19 @@ core_swap_file: "/swapfile"
 core_swap_size_mb: 2048
 
 # -----------------------------------------------------------------------------
+# Logs (journald limits + logrotate)
+# -----------------------------------------------------------------------------
+core_manage_logs: true
+# [Journal] settings in a journald.conf.d drop-in; {} leaves systemd's defaults (10% of the
+# filesystem, up to 4G). journald vacuums down to the new limit when it restarts.
+core_journald_config:
+  SystemMaxUse: 1G
+# Install logrotate and make sure its timer runs (some images ship it disabled).
+core_logrotate_enabled: true
+# Rotate any log bigger than this on the next run, ahead of its daily/weekly schedule ("" = off).
+core_logrotate_maxsize: 100M
+
+# -----------------------------------------------------------------------------
 # User Management
 # -----------------------------------------------------------------------------
 core_manage_users: true

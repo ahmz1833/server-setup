@@ -1,0 +1,48 @@
+---
+# k3s applies node-label/node-taint only when a node first registers, so later changes to
+# k3s_node_labels/k3s_node_taints would never reach existing nodes without this.
+# Additive: labels/taints dropped from the vars stay on the node until removed by hand.
+- name: Read registered node object
+  ansible.builtin.command: "{{ k3s_install_dir }}/k3s kubectl get node {{ _k3s_node_name }} -o json"
+  delegate_to: "{{ _k3s_primary_node }}"
+  register: _k3s_node_obj
+  changed_when: false
+  check_mode: false
+  retries: 24
+  delay: 5
+  until: _k3s_node_obj.rc == 0
+
+- name: Compute node labels and taints that differ from the vars
+  ansible.builtin.set_fact:
+    _k3s_labels_missing: >-
+      {%- set cur = (_k3s_node_obj.stdout | from_json).metadata.labels | default({}) -%}
+      {%- set want = ({'cluster-name': k3s_cluster_name} if k3s_cluster_name | default('') | length > 0 else {})
+                     | combine(k3s_node_labels | default({})) -%}
+      {%- set out = [] -%}
+      {%- for k, v in want.items() if cur[k] | default(none) != (v | string) -%}
+      {%-   set _ = out.append(k ~ '=' ~ v) -%}
+      {%- endfor -%}
+      {{ out }}
+    _k3s_taints_missing: >-
+      {%- set cur = [] -%}
+      {%- for t in (_k3s_node_obj.stdout | from_json).spec.taints | default([]) -%}
+      {%-   set _ = cur.append(t.key ~ (('=' ~ t.value) if t.value | default('') | length > 0 else '') ~ ':' ~ t.effect) -%}
+      {%- endfor -%}
+      {{ k3s_node_taints | default([]) | reject('in', cur) | list }}
+
+- name: Apply node labels
+  ansible.builtin.command: >-
+    {{ k3s_install_dir }}/k3s kubectl label node {{ _k3s_node_name }} --overwrite
+    {{ _k3s_labels_missing | map('quote') | join(' ') }}
+  delegate_to: "{{ _k3s_primary_node }}"
+  when: _k3s_labels_missing | length > 0
+  changed_when: true
+
+# --overwrite replaces a taint with the same key and effect, so a changed value lands too.
+- name: Apply node taints
+  ansible.builtin.command: >-
+    {{ k3s_install_dir }}/k3s kubectl taint node {{ _k3s_node_name }} --overwrite
+    {{ _k3s_taints_missing | map('quote') | join(' ') }}
+  delegate_to: "{{ _k3s_primary_node }}"
+  when: _k3s_taints_missing | length > 0
+  changed_when: true

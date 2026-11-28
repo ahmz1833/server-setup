@@ -67,13 +67,14 @@ argument_specs:
         default: https://
         description: Scheme prepended when C(asset_url) has none.
       asset_use_mirror:
-        type: bool
-        default: false
-        description: Fetch from C(asset_mirror_base_url) + URL suffix instead of the origin.
+        type: raw
+        description:
+          - Fetch from C(asset_mirror_base_url) + URL suffix (origin URL without scheme) instead of the origin.
+          - "Default: derived from C(is_iran)."
       asset_mirror_base_url:
         type: str
-        default: ""
-        description: Mirror base URL (trailing slashes normalised); used only when C(asset_use_mirror) is true.
+        default: https://s3.ahmz.ir/server_setup/assets
+        description: Mirror base URL (trailing slashes normalised); same layout as the controller cache.
       asset_cache_enabled:
         type: bool
         default: true

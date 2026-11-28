@@ -13,6 +13,7 @@
   register: core_pubkey_check
   ignore_errors: true
   changed_when: false
+  check_mode: false
   become: true
   when:
     - not core_ssh_password_auth
@@ -34,6 +35,7 @@
     executable: /bin/bash
   register: core_user_count_check
   changed_when: false
+  check_mode: false
   when: not core_ssh_permit_root_login
 
 - name: Abort on missing non-root user

@@ -1,0 +1,56 @@
+---
+# Unbounded logs fill small disks: journald's own cap is 10% of the filesystem (up to 4G) per
+# journal, and some images ship logrotate with its timer disabled, so syslog grows forever.
+- name: Create journald drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: core_journald_config | length > 0
+
+- name: Configure journald limits
+  ansible.builtin.template:
+    src: journald.conf.j2
+    dest: /etc/systemd/journald.conf.d/50-core.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: core_journald_config | length > 0
+  notify: Restart journald
+
+- name: Remove journald limits when none are set
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d/50-core.conf
+    state: absent
+  when: core_journald_config | length == 0
+  notify: Restart journald
+
+- name: Rotate logs with logrotate
+  when: core_logrotate_enabled
+  block:
+    - name: Install logrotate
+      ansible.builtin.package:
+        name: logrotate
+        state: present
+      register: _core_logrotate_pkg
+
+    # Global directives before the include apply to every logrotate.d entry that does not
+    # set its own, so a chatty service cannot grow a log past this between weekly rotations.
+    - name: Set global logrotate maxsize
+      ansible.builtin.lineinfile:
+        path: /etc/logrotate.conf
+        regexp: '^maxsize\s'
+        line: "maxsize {{ core_logrotate_maxsize }}"
+        insertbefore: '^include\s'
+        state: "{{ 'present' if core_logrotate_maxsize | string | length > 0 else 'absent' }}"
+      # In check mode a fresh install is only simulated, so its files do not exist yet.
+      when: not (ansible_check_mode and _core_logrotate_pkg is changed)
+
+    - name: Ensure the logrotate timer runs
+      ansible.builtin.systemd:
+        name: logrotate.timer
+        state: started
+        enabled: true
+      when: not (ansible_check_mode and _core_logrotate_pkg is changed)

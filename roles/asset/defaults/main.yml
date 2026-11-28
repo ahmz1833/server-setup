@@ -16,8 +16,8 @@
 # asset_service_stop: string
 # asset_register_path_var: string (Variable name to register the final path)
 # asset_origin_scheme: string (default: "https://")
-# asset_use_mirror: bool (default: false)
-# asset_mirror_base_url: string (e.g., "https://mirror.com/my-mirror")
+# asset_use_mirror: bool (default: is_iran)
+# asset_mirror_base_url: string (default: the server_setup S3 mirror)
 # asset_cache_enabled: bool (default: true, only used when asset_download_locally is true)
 # asset_cache_dir: string (default: "$HOME/.cache/ahmz/server_setup/assets" on localhost)
 # asset_cache_force_refresh: bool (default: false)
@@ -25,8 +25,9 @@
 asset_extract: true
 asset_download_locally: false
 asset_origin_scheme: "https://"
-asset_use_mirror: false
-asset_mirror_base_url: ""
+# Restricted networks reach GitHub poorly; the mirror has the controller-cache layout.
+asset_use_mirror: "{{ is_iran | default(false) | bool }}"
+asset_mirror_base_url: https://s3.ahmz.ir/server_setup/assets
 asset_cache_enabled: true
 asset_cache_dir: "{{ lookup('env', 'HOME') }}/.cache/ahmz/server_setup/assets"
 asset_cache_force_refresh: false

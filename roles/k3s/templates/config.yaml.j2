@@ -85,8 +85,10 @@ system-default-registry: "{{ k3s_system_default_registry }}"
 pause-image: "{{ k3s_pause_image }}"
 {% endif %}
 
-{% if _k3s_effective_token | default('') | length > 0 %}
-token: "{{ _k3s_effective_token }}"
+{# k3s_token must be in the very first render: k3s seals its datastore with the token of its first start. #}
+{% set _k3s_token_render = _k3s_effective_token | default(k3s_token | default(''), true) %}
+{% if _k3s_token_render | length > 0 %}
+token: "{{ _k3s_token_render }}"
 {% endif %}
 
 {% set labels = [] %}

@@ -44,3 +44,8 @@
   ansible.builtin.systemd:
     name: host-firewall-enforce
     state: restarted
+
+- name: Restart journald
+  ansible.builtin.systemd:
+    name: systemd-journald
+    state: restarted

@@ -65,6 +65,8 @@ k3s_tls_sans: []
 # Node Scheduling Metadata
 k3s_node_labels: {}
 k3s_node_taints: []
+# k3s itself applies both only at registration; this also applies them to existing nodes.
+k3s_reconcile_node_metadata: true
 
 # Built-in Component & Ingress Control
 k3s_disable_servicelb: false

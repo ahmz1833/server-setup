@@ -7,7 +7,7 @@ argument_specs:
       - Runs in order system, packages, ntp, swap, users, ssh, sysctl, ipv6, ipset, firewall (HOST-FIREWALL iptables chain), fail2ban, cron;
         each block has a C(core_manage_*) / C(core_fail2ban_enabled) toggle.
       - Reads playbook-level globals C(is_iran), C(enable_ipv6), C(download_locally), C(primary_user) through derived defaults.
-      - "Tags: core, core-system, core-packages, core-ntp, core-swap, core-users, core-ssh, core-sysctl, core-ipv6, core-ipset,
+      - "Tags: core, core-system, core-packages, core-ntp, core-swap, core-logs, core-users, core-ssh, core-sysctl, core-ipv6, core-ipset,
         core-firewall, core-iptables, core-fail2ban, core-cron."
     author: AHMZ
     options:
@@ -153,6 +153,33 @@ argument_specs:
         type: int
         default: 2048
         description: Swap file size in MiB (only used when the file is created).
+
+      # -----------------------------------------------------------------------
+      # Logs
+      # -----------------------------------------------------------------------
+      core_manage_logs:
+        type: bool
+        default: true
+        description: Manage journald limits and logrotate at all.
+      core_journald_config:
+        type: dict
+        default:
+          SystemMaxUse: 1G
+        description:
+          - >-
+            C([Journal]) settings written to C(/etc/systemd/journald.conf.d/50-core.conf) (e.g. C(SystemMaxUse),
+            C(MaxRetentionSec)). C({}) removes the drop-in and leaves systemd's defaults.
+      core_logrotate_enabled:
+        type: bool
+        default: true
+        description: Install logrotate and keep C(logrotate.timer) enabled and running.
+      core_logrotate_maxsize:
+        type: str
+        default: 100M
+        description:
+          - >-
+            Global C(maxsize) in C(/etc/logrotate.conf): any log above it rotates on the next run, ahead of its
+            schedule. Entries that set their own C(maxsize) keep it. Empty string removes the line.
 
       # -----------------------------------------------------------------------
       # Users

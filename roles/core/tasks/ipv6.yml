@@ -22,6 +22,7 @@
     label: "{{ item.interface }}"
   register: _core_ipv6_netfiles
   changed_when: false
+  check_mode: false
   failed_when: _core_ipv6_netfiles.stdout | trim == ''
   when: core_enable_ipv6 | bool
 

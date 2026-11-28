@@ -28,6 +28,22 @@
   tags: [node, node-exporter]
   when: node_exporter_install
 
+# The install files above are skipped when a feature is off, so units an earlier run
+# started would keep running (and holding memory) without this.
+- name: Node Services - Stop units of disabled features
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: >-
+    {{ ([] if node_docker_enabled else ['docker.socket', 'docker.service', 'containerd.service'])
+       + ([] if node_exporter_install else ['node_exporter.service']) }}
+  register: node_disabled_units
+  failed_when:
+    - node_disabled_units is failed
+    - "'Could not find the requested service' not in (node_disabled_units.msg | default(''))"
+  tags: [node, node-docker, node-exporter]
+
 - name: Node Services - Gitlab Runner Installation
   ansible.builtin.import_tasks: gitlab-runner.yml
   tags: [node, node-gitlab-runner]

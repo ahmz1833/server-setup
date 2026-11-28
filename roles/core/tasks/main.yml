@@ -17,6 +17,11 @@
   when: core_manage_swap
   tags: [core, core-swap, core-system]
 
+- name: Core Setup - Log Limits and Rotation
+  ansible.builtin.import_tasks: logs.yml
+  when: core_manage_logs
+  tags: [core, core-logs, core-system]
+
 - name: Core Setup - User Management
   ansible.builtin.import_tasks: users.yml
   when: core_manage_users

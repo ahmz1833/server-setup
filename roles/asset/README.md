@@ -50,8 +50,8 @@ For **`binary`**, you must also pass **`asset_version_cmd`** and **`asset_versio
 | `asset_cache_dir` | `$HOME/.cache/ahmz/server_setup/assets` | Controller cache root (lookup `HOME`). |
 | `asset_cache_force_refresh` | `false` | Re-download into cache even if cache file exists. |
 | `asset_origin_scheme` | `https://` | Prepended when `asset_url` has no scheme. |
-| `asset_use_mirror` | `false` | If `true` and `asset_mirror_base_url` set, fetch from mirror + suffix path. |
-| `asset_mirror_base_url` | `""` | Mirror origin (no trailing slash required; role normalizes). |
+| `asset_use_mirror` | `is_iran` | If `true`, fetch from `asset_mirror_base_url` + the origin URL without scheme. |
+| `asset_mirror_base_url` | `https://s3.ahmz.ir/server_setup/assets` | Mirror origin, same layout as the controller cache (`s3sync -P ~/.cache/ahmz/server_setup/assets <bucket> server_setup/assets` fills it). |
 | `asset_proxy` / `asset_proxy_username` / `asset_proxy_password` | empty | Passed to `get_url` / `unarchive` downloads. With `asset_download_locally`, proxy applies on **localhost**; otherwise on the **target**. |
 | `asset_service_stop` | _(unset)_ | If set, **`systemd`** `state: stopped` on the target before install (best-effort). |
 | `asset_register_path_var` | _(unset)_ | If set, **`set_fact`** that name to **`_asset_dest`** on the target after install. |

@@ -38,13 +38,14 @@ The role is built for **systemd**-based hosts. It works best on **Debian/Ubuntu*
 2. **packages** — APT mirrors (Debian), cache update, `core_packages` + `core_extra_packages`
 3. **ntp** — if `core_manage_ntp`
 4. **swap** — if `core_manage_swap`
-5. **users** — if `core_manage_users`
-6. **ssh** — if `core_manage_ssh`
-7. **sysctl** — if `core_manage_sysctl`
-8. **ipset** — if `core_manage_ipset` and `core_ipsets` non-empty
-9. **firewall** — if `core_manage_firewall`
-10. **fail2ban** — if `core_fail2ban_enabled`
-11. **cron** — if `core_manage_cron`
+5. **logs** — if `core_manage_logs` (journald limits, logrotate timer and global `maxsize`)
+6. **users** — if `core_manage_users`
+7. **ssh** — if `core_manage_ssh`
+8. **sysctl** — if `core_manage_sysctl`
+9. **ipset** — if `core_manage_ipset` and `core_ipsets` non-empty
+10. **firewall** — if `core_manage_firewall`
+11. **fail2ban** — if `core_fail2ban_enabled`
+12. **cron** — if `core_manage_cron` (installs the cron package when there are jobs)
 
 | Tag | Scope |
 |-----|--------|
@@ -53,6 +54,7 @@ The role is built for **systemd**-based hosts. It works best on **Debian/Ubuntu*
 | `core-packages` | packages |
 | `core-ntp` | NTP |
 | `core-swap` | Swap |
+| `core-logs` | journald limits + logrotate |
 | `core-users` | Users |
 | `core-ssh` | SSH (+ users tag overlap) |
 | `core-sysctl` | Sysctl |
@@ -81,11 +83,19 @@ These are usually set in the playbook and read via `defaults` (`| default(...)`)
 
 ### Toggles
 
-`core_manage_ntp`, `core_manage_swap`, `core_manage_users`, `core_manage_ssh`, `core_manage_sysctl`, `core_manage_ipset`, `core_manage_firewall`, `core_manage_cron`, `core_fail2ban_enabled` — each can be set `false` to skip that block.
+`core_manage_ntp`, `core_manage_swap`, `core_manage_logs`, `core_manage_users`, `core_manage_ssh`, `core_manage_sysctl`, `core_manage_ipset`, `core_manage_firewall`, `core_manage_cron`, `core_fail2ban_enabled` — each can be set `false` to skip that block.
 
 ### Packages
 
 `core_packages` uses **Debian-style names** (e.g. `netcat-openbsd`). On **RHEL**, override the list or use `core_extra_packages` / replace with distro-specific names (`nmap-ncat`, etc.).
+
+### Logs
+
+`core_journald_config` (default `SystemMaxUse: 1G`) caps the journal through a drop-in;
+`core_logrotate_maxsize` (default `100M`) rotates any log above that size on the next daily
+logrotate run, and `core_logrotate_enabled` keeps `logrotate.timer` running (some images ship it
+disabled, so syslog never rotates). Set `core_journald_config: {}` / `core_logrotate_maxsize: ""`
+to keep the distribution's behaviour.
 
 ### Sysctl and BBR
 

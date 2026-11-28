@@ -96,7 +96,7 @@ Roles: [acme](#acme) · [apps](#apps) · [asset](#asset) · [core](#core) · [k3
 | `asset_download_locally` | bool | `false` | Download (and cache) on the controller, then push a gzip payload to the target (restricted-egress targets). |
 | `asset_extract` | bool | `true` | Treat the download as an archive and extract it; false = single raw file. |
 | `asset_extract_src` | str |  | Path inside the extracted archive (or staging filename); `%v` is replaced. For `package`, a trailing `/` copies directory contents. Default: `asset_name`. |
-| `asset_mirror_base_url` | str | `""` | Mirror base URL (trailing slashes normalised); used only when `asset_use_mirror` is true. |
+| `asset_mirror_base_url` | str | `"https://s3.ahmz.ir/server_setup/assets"` | Mirror base URL (trailing slashes normalised); same layout as the controller cache. |
 | `asset_name` | str **req** |  | Logical asset name; used for temp dirs, the default destination `/usr/local/bin/<name>` and the file-type version sidecar. |
 | `asset_origin_scheme` | str | `"https://"` | Scheme prepended when `asset_url` has none. |
 | `asset_proxy` | str | `""` | HTTP/HTTPS/SOCKS5 proxy URL for downloads (e.g. `socks5://127.0.0.1:1080`). Applies on the controller when `asset_download_locally`, otherwise on the target. |
@@ -106,7 +106,7 @@ Roles: [acme](#acme) · [apps](#apps) · [asset](#asset) · [core](#core) · [k3
 | `asset_service_stop` | str |  | systemd unit stopped (best-effort) before installing an update. No default (nothing is stopped). |
 | `asset_type` | str |  | `binary`: single executable (version from CLI); `file`: single file; `package`: directory tree in `asset_dest`. Default: `binary` (inline task default; not in defaults/main.yml). Choices: `binary`, `file`, `package`. |
 | `asset_url` | str **req** |  | Download URL or scheme-less suffix (`asset_origin_scheme` is prepended); `%v` is replaced with the resolved version. Example: `github.com/org/app/releases/download/v%v/app-%v-linux-amd64.tar.gz`. |
-| `asset_use_mirror` | bool | `false` | Fetch from `asset_mirror_base_url` + URL suffix instead of the origin. |
+| `asset_use_mirror` | raw |  | Fetch from `asset_mirror_base_url` + URL suffix (origin URL without scheme) instead of the origin. Default: derived from `is_iran`. |
 | `asset_version` | str **req** |  | Version constraint - plain `1.2.3` (treated as `>=`), `>=1.2.3` or `==1.2.3`; the bare version replaces `%v`. |
 | `asset_version_cmd` | str |  | Arguments passed to the installed binary to print its version (`binary` type, used when the destination exists). No default; without it the installed version is not compared. |
 | `asset_version_regex` | str |  | Regex with one capture group extracting the version from the version command output (with `asset_version_cmd`). No default. |
@@ -118,7 +118,7 @@ Roles: [acme](#acme) · [apps](#apps) · [asset](#asset) · [core](#core) · [k3
 - Baseline provisioning for systemd hosts (best on Debian/Ubuntu and Red Hat family).
 - Runs in order system, packages, ntp, swap, users, ssh, sysctl, ipv6, ipset, firewall (HOST-FIREWALL iptables chain), fail2ban, cron; each block has a `core_manage_*` / `core_fail2ban_enabled` toggle.
 - Reads playbook-level globals `is_iran`, `enable_ipv6`, `download_locally`, `primary_user` through derived defaults.
-- Tags: core, core-system, core-packages, core-ntp, core-swap, core-users, core-ssh, core-sysctl, core-ipv6, core-ipset, core-firewall, core-iptables, core-fail2ban, core-cron.
+- Tags: core, core-system, core-packages, core-ntp, core-swap, core-logs, core-users, core-ssh, core-sysctl, core-ipv6, core-ipset, core-firewall, core-iptables, core-fail2ban, core-cron.
 
 | Variable | Type | Default | Description |
 |---|---|---|---|
@@ -156,9 +156,13 @@ Roles: [acme](#acme) · [apps](#apps) · [asset](#asset) · [core](#core) · [k3
 | `core_ipsets` | list[dict] | `[]` | IPSets to create. Keys: `name` (required), `type` (default `hash:net`), `family` (`inet` default \| `inet6`), `entries` (static list) or `url` (fetched list) with optional `cron` (5-field schedule for auto-update). |
 | `core_ipv6_interfaces` | list[dict] | `[]` | Per-interface IPv6 via systemd-networkd drop-ins (requires `core_enable_ipv6`); stale drop-ins are removed. Keys: `interface` (required), `mode` (`auto` RA/DHCPv6 default \| `static`), `addresses` (list, required for static), `gateway`. |
 | `core_is_iran` | raw |  | Iran-specific behaviour (Asia/Tehran timezone, APT mirror rewrite). Default: derived from global `is_iran` (false when unset). |
+| `core_journald_config` | dict | `{"SystemMaxUse": "1G"}` | `[Journal]` settings written to `/etc/systemd/journald.conf.d/50-core.conf` (e.g. `SystemMaxUse`, `MaxRetentionSec`). `{}` removes the drop-in and leaves systemd's defaults. |
+| `core_logrotate_enabled` | bool | `true` | Install logrotate and keep `logrotate.timer` enabled and running. |
+| `core_logrotate_maxsize` | str | `"100M"` | Global `maxsize` in `/etc/logrotate.conf`: any log above it rotates on the next run, ahead of its schedule. Entries that set their own `maxsize` keep it. Empty string removes the line. |
 | `core_manage_cron` | bool | `true` | Manage prefixed cron jobs. |
 | `core_manage_firewall` | bool | `true` | Manage the HOST-FIREWALL iptables chain (jumped from INPUT position 1) plus the host-firewall-enforce daemon. |
 | `core_manage_ipset` | bool | `true` | Manage ipsets (only runs when `core_ipsets` is non-empty); restored at boot by ipset-restore.service. |
+| `core_manage_logs` | bool | `true` | Manage journald limits and logrotate at all. |
 | `core_manage_nameservers` | raw |  | Write a static /etc/resolv.conf (removes a symlink first, e.g. systemd-resolved stub). Default: true when `core_nameservers` is non-empty. |
 | `core_manage_ntp` | bool | `true` | Configure systemd-timesyncd (Debian) or chrony (RedHat/SUSE/Arch). |
 | `core_manage_ssh` | bool | `true` | Harden sshd (managed block in sshd_config, disables sshd_config.d includes and ssh.socket activation). |
@@ -274,6 +278,7 @@ Options: `core_enable_ipv6`, `core_firewall_allow_ping`, `core_firewall_block_sc
 | `k3s_node_taints` | list[str] | `[]` | Node taints as `key=value:Effect` strings. |
 | `k3s_pause_image` | raw |  | `pause-image` for every node; empty disables. Default derived as `<k3s_system_default_registry>/rancher/mirrored-pause:3.6` when a system default registry is set, else empty. |
 | `k3s_persist_firewall_facts` | bool | `true` | Persist computed firewall rules as a local fact so the `core` role can re-apply them standalone. |
+| `k3s_reconcile_node_metadata` | bool | `true` | Also apply `k3s_node_labels`/`k3s_node_taints` to nodes that are already registered (k3s itself applies them only at registration). Additive: removing an entry does not remove it from the node. |
 | `k3s_role` | str | `"server"` | Node mode, `server` (control plane) or `agent` (worker). Choices: `server`, `agent`. |
 | `k3s_service_cidr` | str | `"10.43.0.0/16"` | Service CIDR (servers only, immutable after first boot). |
 | `k3s_state` | str | `"present"` | `present` provisions/updates the node and cluster; `absent`/`uninstall` decommission the node (needs `k3s_force_uninstall`); `drain`/`uncordon` run kubectl via the primary server; `rotate-certs` rotates server certificates; `fetch-kubeconfig` writes the cluster kubeconfig to `k3s_kubeconfig_local_dest` on the controller. Choices: `present`, `absent`, `uninstall`, `drain`, `uncordon`, `rotate-certs`, `fetch-kubeconfig`. |
@@ -281,7 +286,7 @@ Options: `core_enable_ipv6`, `core_firewall_allow_ping`, `core_firewall_block_sc
 | `k3s_system_reserved` | str | `""` | Kubelet `system-reserved` (e.g. `cpu=500m,memory=512Mi`); empty omits it. |
 | `k3s_tls_sans` | list[str] | `[]` | Extra API server certificate SANs (server IPs/hostnames and `k3s_control_plane_domain` are added automatically). |
 | `k3s_token` | raw | `""` | Cluster join token; when empty it is read from the primary server. |
-| `k3s_traefik_config` | dict |  | Traefik HelmChartConfig values: `enabled`, `service.type` (LoadBalancer/ClusterIP/NodePort), `service.externalTrafficPolicy` (`Local` forces `deployment.kind=DaemonSet`), `deployment.kind`, `forwardedHeaders.insecure`/`trustedIPs`, and `ports.web`/`ports.websecure` with `port`, `exposedPort`, `hostPort`, `nodePort`, `forwardedHeaders`, `transport`. Default enables Traefik with ports 8000/80 and 8443/443 and no trusted IPs; see defaults/main.yml and README. |
+| `k3s_traefik_config` | dict |  | Traefik HelmChartConfig values: `enabled`, `service.type` (LoadBalancer/ClusterIP/NodePort), `service.externalTrafficPolicy` (`Local` forces `deployment.kind=DaemonSet`), `deployment.kind`, `service.annotations` (e.g. `svccontroller.k3s.cattle.io/tolerations` for servicelb pods), `nodeSelector` and `tolerations` (Traefik pod placement, e.g. only on ingress nodes), `forwardedHeaders.insecure`/`trustedIPs`, and `ports.web`/`ports.websecure` with `port`, `exposedPort`, `hostPort`, `nodePort`, `forwardedHeaders`, `transport`. Default enables Traefik with ports 8000/80 and 8443/443 and no trusted IPs; see defaults/main.yml and README. |
 | `k3s_version` | str | `"v1.36.3+k3s1"` | K3s release to install; bump and re-run to upgrade in place. |
 
 ## mail

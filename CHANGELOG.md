@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-11-28
+
+### Added
+- **k3s**: `k3s_traefik_config.nodeSelector` / `tolerations` place Traefik pods (e.g. only on ingress nodes).
+- **k3s**: `k3s_traefik_config.service.annotations` (e.g. `svccontroller.k3s.cattle.io/tolerations`
+  so servicelb pods run on tainted nodes).
+- **k3s**: `k3s_reconcile_node_metadata` (default on) applies `k3s_node_labels`/`k3s_node_taints` to
+  already-registered nodes; k3s itself applies them only at registration.
+- **core**: log limits — `core_journald_config` (default `SystemMaxUse: 1G`), `core_logrotate_maxsize`
+  (default `100M`, global in `logrotate.conf`) and `core_logrotate_enabled` (keeps `logrotate.timer`
+  running; some images ship it disabled). Tag `core-logs`.
+
+### Fixed
+- **core**: read-only safety checks (SSH keys/non-root user, swap, cron listing, IPv6 lookup)
+  run in check mode, so `--check` no longer fails on them.
+- **core**: installs cron when it manages cron jobs (minimal images lack `crontab`).
+- **k3s**: an explicit `k3s_token` is written on the first config render; before, the first server
+  started without it (sealing the datastore with a random token) and the next apply failed to restart.
+- **k3s**: firewall rules are applied before bootstrap/join; with a default-deny host firewall,
+  joining servers could not reach etcd/API on their peers.
+- **node**: `node_docker_enabled: false` / `node_exporter_install: false` stop and disable units a
+  previous run started; the skipped install files left them running.
+- **node**: Docker status no longer crashes when the client exists but the daemon is down
+  (empty `docker version` output left the version fact as None).
+
+### Changed
+- **asset**: hosts with `is_iran` fetch release assets from the S3 mirror by default
+  (`asset_use_mirror` derived from `is_iran`, `asset_mirror_base_url` set to the mirror).
+
 ## [1.6.1] - 2026-11-25
 
 ### Fixed

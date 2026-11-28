@@ -11,6 +11,10 @@
     - name: Configure K3s service and environment
       ansible.builtin.include_tasks: configure/main.yml
 
+    # Before bootstrap/join: joining servers need etcd/API ports open on every peer.
+    - name: Apply K3s firewall rules
+      ansible.builtin.include_tasks: firewall/main.yml
+
     - name: Add temporary control plane domain entry to /etc/hosts for cluster bootstrapping
       ansible.builtin.lineinfile:
         path: /etc/hosts
@@ -23,9 +27,6 @@
 
     - name: Orchestrate K3s cluster lifecycle
       ansible.builtin.include_tasks: cluster/main.yml
-
-    - name: Apply K3s firewall rules
-      ansible.builtin.include_tasks: firewall/main.yml
 
     - name: Deploy Kubernetes manifests
       ansible.builtin.include_tasks: manifests/main.yml
