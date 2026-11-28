@@ -1,7 +1,7 @@
 {
   "name": "server-setup",
   "description": "AI skills for operating infrastructure as code with Ansible and the ahmz1833.server_setup collection: IaC operations, availability/performance diagnostics and benchmarking, security (public-repo + attack-surface), project bootstrap, collection development.",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "author": { "name": "AHMZ" },
   "homepage": "https://github.com/ahmz1833/server-setup",
   "repository": "https://github.com/ahmz1833/server-setup",
