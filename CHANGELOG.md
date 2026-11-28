@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.6.2] - 2026-11-26
+## [1.7.0] - 2026-11-28
 
 ### Added
 - **k3s**: `k3s_traefik_config.nodeSelector` / `tolerations` place Traefik pods (e.g. only on ingress nodes).
