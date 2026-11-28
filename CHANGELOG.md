@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-11-28
+
+### Added
+- **examples Makefile**: `make ssh-config [REPLACE=1]` writes the project's hosts into
+  `~/.ssh/config` as a managed block (connection resolved from inventory + vault; optional
+  `ssh_config_identity_file`, `ssh_config_extra`, `ssh_config_skip`), with backup and
+  conflict handling. New helper `scripts/infra-tools.py`.
+
+### Changed
+- **Vault values for agents are split into identifiers and credentials**: agents may read
+  identifiers (IPs, ports, domains, usernames, CIDRs) from the vault; credentials stay
+  never-printed. `make host` now shows vault identifiers and hides credentials; `make var`
+  refuses credential-looking names (was: all `vault_*`). security.md §5a, skills and the
+  example AGENTS.md updated.
+
 ## [1.7.0] - 2026-11-28
 
 ### Added

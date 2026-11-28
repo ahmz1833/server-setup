@@ -8,6 +8,7 @@
 #   make shell H=web-1 SUDO=0 -- id            run as the login user instead of root
 #   make module H=web-1 M=ansible.builtin.setup A='filter=ansible_mem*'   any Ansible module
 #   make var H=web-1 V=nginx_sites             a variable's templated value on a host
+#   make ssh-config [REPLACE=1]                write/refresh this project's hosts in ~/.ssh/config
 .DEFAULT_GOAL := help
 
 ENV       ?= prod
@@ -24,6 +25,9 @@ N         ?= 200
 SINCE     ?=
 LEN       ?=
 SHOW_VAULT ?= 0
+REPLACE   ?= 0
+SSH_CONFIG ?= ~/.ssh/config
+PROJECT   ?= $(notdir $(CURDIR))
 SUDO      ?= 1
 M         ?=
 A         ?=
@@ -53,6 +57,8 @@ ifeq (shell,$(firstword $(MAKECMDGOALS)))
 endif
 CMD ?= $(SHELL_ARGS)
 BIN := $(if $(wildcard .venv/bin/ansible-playbook),.venv/bin/,)
+PY  := $(if $(BIN),$(BIN)python,python3)
+TOOLS := $(PY) scripts/infra-tools.py
 # project-local collections first; image/system paths as fallback (docker-shell)
 export ANSIBLE_COLLECTIONS_PATH := $(CURDIR)/collections:$(HOME)/.ansible/collections:/usr/share/ansible/collections
 export ANSIBLE_CONFIG := $(CURDIR)/ansible.cfg
@@ -80,7 +86,7 @@ ARGS := -i $(INV) $(VAULT_ARGS) \
   $(if $(LIMIT),--limit '$(LIMIT)') $(if $(TAGS),--tags '$(TAGS)') \
   $(if $(SKIP),--skip-tags '$(SKIP)') $(BECOME_ARGS) $(EXTRA)
 
-.PHONY: help setup skills shell module var validate check apply run ping host docker-logs graph vault-init vault-edit vault-view vault-keys vault-gen vault-check lint docker-shell
+.PHONY: help setup skills shell module var ssh-config validate check apply run ping host docker-logs graph vault-init vault-edit vault-view vault-keys vault-gen vault-check lint docker-shell
 
 shell: ## On servers: `make shell H=<host>` = SSH session; `make shell H=<host|group> -- <cmd>` or CMD='<cmd>' [SUDO=0]
 	@test -n "$(H)" || { echo "usage: make shell H=<host|group> [-- <cmd> | CMD='<cmd>'] [SUDO=0]"; exit 1; }
@@ -130,10 +136,10 @@ run: ## Run any playbook: make run PLAY=ops/restart EXTRA="-e service=nginx" LIM
 ping: ## Connectivity check (LIMIT to narrow)
 	$(BIN)ansible '$(or $(LIMIT),all)' $(HOSTARGS) -m ansible.builtin.ping
 
-host: ## Resolved vars of a host (vault_* values hidden; SHOW_VAULT=1 shows them): make host H=web-1
+host: ## Resolved vars of a host — vault identifiers shown, credentials hidden (SHOW_VAULT=1: all): make host H=web-1
 	@test -n "$(H)" || { echo "usage: make host H=<host>"; exit 1; }
 	@$(BIN)ansible-inventory -i $(INV) $(VAULT_ARGS) --host $(H) --yaml \
-	  $(if $(filter 1,$(SHOW_VAULT)),,| awk '/^vault_/{split($$0,k,":"); print k[1]": <hidden>"; skip=1; next} /^[^ ]/{skip=0} !skip')
+	  $(if $(filter 1,$(SHOW_VAULT)),,| $(TOOLS) mask)
 
 docker-logs: ## Container logs (read-only): make docker-logs H=web-1 C=app [N=200] [SINCE=10m]; no C = list containers
 	@test -n "$(H)" || { echo "usage: make docker-logs H=<host> [C=<container>] [N=200] [SINCE=10m]"; exit 1; }
@@ -144,10 +150,16 @@ module: ## Any Ansible module on servers: make module H=<pattern> M=<module> [A=
 	@test -n "$(H)" -a -n "$(M)" || { echo "usage: make module H=<host|group> M=<module> [A='<args>'] [SUDO=0]"; exit 1; }
 	@$(BIN)ansible '$(H)' $(HOSTARGS) $(BECOME) -m $(M) $(if $(A),-a '$(call squote,$(A))')
 
-var: ## Templated value of a variable on a host: make var H=web-1 V=nginx_sites (vault_* refused)
+var: ## Templated value of a variable on a host: make var H=web-1 V=nginx_sites (credentials refused)
 	@test -n "$(H)" -a -n "$(V)" || { echo "usage: make var H=<host> V=<variable>"; exit 1; }
-	@case "$(V)" in vault_*) [ "$(SHOW_VAULT)" = 1 ] || { echo "refusing to print $(V) (vault value); SHOW_VAULT=1 to override"; exit 1; };; esac
+	@if [ "$(SHOW_VAULT)" != 1 ] && $(TOOLS) is-credential '$(V)'; then \
+	  echo "refusing to print $(V): looks like a credential (SHOW_VAULT=1 to override — humans only)"; exit 1; fi
 	@$(BIN)ansible '$(H)' $(HOSTARGS) -m ansible.builtin.debug -a 'var=$(V)'
+
+ssh-config: ## Write this project's hosts into ~/.ssh/config (managed block; REPLACE=1 drops old hand-written entries)
+	@ANSIBLE_LOAD_CALLBACK_PLUGINS=1 ANSIBLE_STDOUT_CALLBACK=json $(BIN)ansible all $(HOSTARGS) -m ansible.builtin.debug \
+	  -a 'msg={{ {"host": ansible_host | default(inventory_hostname), "port": ansible_port | default(22), "user": ansible_user | default(""), "key": ansible_ssh_private_key_file | default(ssh_config_identity_file | default("")), "extra": ssh_config_extra | default({}), "skip": ssh_config_skip | default(false)} | to_json }}' \
+	  | $(TOOLS) ssh-config --project '$(PROJECT)' --file '$(SSH_CONFIG)' $(if $(filter 1,$(REPLACE)),--replace)
 
 graph: ## Show groups and hosts
 	$(BIN)ansible-inventory -i $(INV) $(VAULT_ARGS) --graph

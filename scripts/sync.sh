@@ -25,7 +25,7 @@ put() {
   mkdir -p "$STAGE/$(dirname "$dst")"
   if [ -d "$src" ]; then
     mkdir -p "$STAGE/$dst"
-    (cd "$src" && tar --exclude='./.venv' --exclude='./collections' --exclude='.vault_pass*' --exclude='.become_pass*' --exclude='.become-pass*' \
+    (cd "$src" && tar --exclude='./.venv' --exclude='./collections' --exclude='.vault_pass*' --exclude='.become_pass*' --exclude='.become-pass*' --exclude='__pycache__' \
       --exclude='vault.yml' -cf - .) | (cd "$STAGE/$dst" && tar -xf -)
   else
     cp "$src" "$STAGE/$dst"
@@ -33,7 +33,7 @@ put() {
 }
 
 SHARED=(Makefile ansible.cfg requirements.txt .gitignore .yamllint .ansible-lint
-        files/ssh_keys/README.md playbooks/ops/restart.yml playbooks/ops/reboot.yml
+        scripts/infra-tools.py files/ssh_keys/README.md playbooks/ops/restart.yml playbooks/ops/reboot.yml
         playbooks/ops/upgrade.yml)
 
 # 1. roles index

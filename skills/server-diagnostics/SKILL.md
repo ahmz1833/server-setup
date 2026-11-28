@@ -27,10 +27,11 @@ firewall, monitoring), hand over to `infra-iac`'s change loop.
 5. **Discover tools, don't assume them.** Tools and helper scripts change. Check what exists
    on the host and read its `--help` before each use; build commands from what it says
    today. Fall back to standard tools when something is missing or behaves differently.
-6. **Minimal exposure.** Address hosts by inventory name; reference addresses inside
-   commands via inventory variables (`{{ hostvars['<host>'].ansible_host }}`); never ask for
-   or print real IPs, ports or secrets; mask IPs in output before reading it (filter below);
-   don't paste raw outputs into the repo.
+6. **Minimal exposure.** Address hosts by inventory name and reference addresses through
+   inventory variables (`{{ hostvars['<host>'].ansible_host }}`). Identifiers (IPs, ports)
+   may be read when needed, but keep them out of repo files and reports you write there;
+   credentials are never printed. Mask IPs in outputs you paste into reports (filter
+   below).
 7. **Run on servers through the project Makefile** (connection resolved from inventory and
    vault): `make shell H=<host|group> -- <cmd>` (or `CMD='…'` with quotes/`=`; sudo by default,
    `SUDO=0` for the login user; a `.become_pass` file is used automatically if sudo needs a

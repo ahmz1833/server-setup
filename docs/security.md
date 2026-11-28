@@ -168,33 +168,42 @@ Deleting it in a new commit is **not** enough — it is in history and in every 
 ## 5a. Secrets and AI agents — minimal exposure
 
 Anything an AI agent reads (command output, files, chat) leaves your machine and may be
-logged. Treat the agent like a contractor who configures *where* a secret is used but
-never *sees* it. This also applies to exposure-sensitive values (real IPs, ports,
-internal names): the agent wires `vault_*` references; the human puts the values in.
+logged. Vault content falls into two classes with different rules for agents:
+
+| Class | Examples | Agent may read? | Where it may appear |
+|---|---|---|---|
+| **Identifiers** | IP addresses, ports, domains/hostnames, usernames, CIDRs, provider/region | **yes**, when the task needs them (connectivity, debugging, `make ssh-config`, firewall reasoning) | vault, the user's local `~/.ssh/config`, the chat — **never** in plaintext repo files, commit messages or public places |
+| **Credentials** | passwords, tokens, API keys, private keys, seeds/UUIDs used as secrets, secret URL paths, kubeconfigs, `.vault_pass*`, `.become_pass*` | **no** — never printed, never pasted into chat or command lines | only in vaults or the files their tools need on hosts; moved between vaults by pipe, never displayed |
+
+The Makefile enforces the split: `make host` shows identifier values and hides credential
+values; `make var` refuses credential-looking names. Classification is by key name
+(identifier names like `*_ip`, `*_port`, `*_domain`, `*_user`, `address`, `ssh_port`); anything
+not recognised as an identifier is treated as a credential.
 
 **The agent must not:**
 
-- ask you to paste a secret (or a real IP/port/internal name) into the chat;
-- view or decrypt vaults (`make vault-view`, `ansible-vault view|decrypt|edit`),
-  read `.vault_pass*`, `.become_pass*`/`.become-pass*`, kubeconfigs, private keys, `.env`
+- ask you to paste a credential into the chat;
+- view or decrypt whole vault files (`make vault-view`, `ansible-vault view|decrypt|edit`),
+  or read `.vault_pass*`, `.become_pass*`/`.become-pass*`, kubeconfigs, private keys, `.env`
   files or Terraform state;
-- print resolved secret values (`make host … SHOW_VAULT=1`, `ansible -m debug` of
-  `vault_*`-derived vars, `env`, `docker inspect` of containers with secret env, `cat` of
-  rendered config files containing credentials);
-- put a secret into a command line (it ends up in the transcript and shell history).
+- print credential values (`make host … SHOW_VAULT=1`, `ansible -m debug` of credential
+  variables, `env`, `docker inspect` of containers with secret env, `cat` of rendered config
+  files containing credentials);
+- put a credential into a command line (transcript, shell history), or an identifier into
+  a plaintext repo file.
 
 **Instead:**
 
 | Situation | Do |
 |---|---|
-| A new secret is needed | wire it: `x: "{{ vault_x }}"` in the plain vars, `vault_x: CHANGEME` in `vault.yml.example`; then **ask the human** to add it (see the hand-off template below) |
+| A new credential is needed | wire it: `x: "{{ vault_x }}"` in the plain vars, `vault_x: CHANGEME` in `vault.yml.example`; then **ask the human** to add it (hand-off template below) |
 | It can be random (passwords, tokens, API keys you define) | `make vault-gen KEY=vault_x FILE=<vault.yml> [LEN=32]` — generated and encrypted in one pipe, never printed |
-| It comes from outside (provider API token, registry login, license key, TLS key from a CA, a person's password) | hand-off to the human with exact instructions |
-| Check that a secret exists | `make vault-keys` — lists key names only |
+| It comes from outside (provider API token, registry login, license key, a person's password) | hand-off to the human with exact instructions — or, if it already exists in another vault you may use, move it by pipe without printing |
+| A new identifier (IP, port, domain) is needed | add it to the vault yourself if the user gave it to you or you read it from an existing vault; reference it as `vault_*` |
+| Check what exists | `make vault-keys` (key names), `make host H=<h>` (identifiers visible, credentials hidden) |
 | sudo needs a password | the human creates `.become_pass` (mode 600, gitignored); the Makefile passes it to every ansible command — the agent only checks the file exists (`test -s .become_pass`) |
-| Inspect a host's vars | `make host H=<host>` — `vault_*` values are shown as `<hidden>` |
-| A secret is needed on the host as a file (key, cert) | `copy: content="{{ vault_x }}" mode=0600` with `no_log: true` — the human puts the content in the vault |
-| You pasted a secret into the chat anyway | the agent does not repeat it, tells you to put it in the vault yourself and suggests rotating it if it is sensitive |
+| A secret is needed on the host as a file (key, cert) | `copy: content="{{ vault_x }}" mode=0600` with `no_log: true` — the human (or a pipe from another vault) puts the content in the vault |
+| You pasted a credential into the chat anyway | the agent does not repeat it, tells you to put it in the vault yourself and suggests rotating it if it is sensitive |
 
 **Hand-off template** (what the agent tells you, then waits for "done"):
 

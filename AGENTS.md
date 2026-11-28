@@ -70,6 +70,9 @@ against the role specs. Prose accuracy (READMEs, docs) is on you and the reviewe
 ### A. Incremental & Conventional Commits
 - Atomic commits scoped by domain (`fix(k3s): ...`, `feat(node): ...`, `docs: ...`,
   `feat(skills): ...`). Don't mix unrelated multi-role changes in one commit.
+- Messages: short, precise subject; body only when needed. PR descriptions: brief.
+- No AI co-author trailers (`Co-Authored-By: Claude …` or similar).
+- Code comments: minimal, explain **why**, not what.
 
 ### B. Version Bumping & Changelog Updates
 - **`galaxy.yml`**: bump the semantic version (patch: fixes; minor: features/new
